@@ -16,13 +16,18 @@ extern crate tokio_postgres;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
 use hyper::server::Http;
+use std::net::SocketAddr;
 use std::process::exit;
+use std::sync::Arc;
 use tokio_core::reactor::Core;
 use tokio_postgres::TlsMode;
 
 use stq_http::controller::Application;
 
 mod controller;
+mod errors;
+mod models;
+mod repos;
 mod types;
 
 use controller::*;
@@ -30,7 +35,7 @@ use types::*;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
-    listen: String,
+    listen: SocketAddr,
     dsn: String,
 }
 
@@ -38,10 +43,12 @@ pub fn start_server(config: Config) {
     let mut core = Core::new().expect("Unexpected error creating event loop core");
 
     let manager = PostgresConnectionManager::new(config.dsn.clone(), || TlsMode::None).unwrap();
-    let db_pool = bb8::Pool::builder()
-        .build(manager, core.remote())
-        .wait()
-        .expect("Failed to create connection pool");
+    let db_pool = Arc::new(
+        bb8::Pool::builder()
+            .build(manager, core.remote())
+            .wait()
+            .expect("Failed to create connection pool"),
+    );
 
     let serve = Http::new()
         .serve_addr_handle(&config.listen, &core.handle(), move || {

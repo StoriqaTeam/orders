@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE IF EXISTS carts;
+DROP TABLE IF EXISTS cart_items;
