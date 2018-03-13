@@ -14,8 +14,11 @@ futures = "0.1.17"
 futures-cpupool = "0.1.7"
 hyper = "0.11.9"
 hyper-tls="0.1.2"
+log = "*"
 postgres = { git = "https://github.com/sfackler/rust-postgres" }
+serde = "*"
 serde_derive = "*"
 tokio-core = "*"
+tokio-postgres = { git = "https://github.com/sfackler/rust-postgres" }
 stq_http = { path = "vendor/libstqbackend/http" }
 stq_router = { path = "vendor/libstqbackend/router" }
