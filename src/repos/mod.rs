@@ -27,22 +27,28 @@ impl ProductsRepoImpl {
 
 impl ProductsRepo for ProductsRepoImpl {
     fn add(&self, item: CartItem) -> RepoFuture<()> {
-        Box::new(self.db_pool.run(|conn| {
-            println!("Acquired connection");
-            conn.prepare("INSERT INTO cart_items (user_id, product) VALUES ($1, $2);")
-                .and_then(|(s, c)| c.execute(&s, &[&item.user_id, &item.product_id]))
-                .map(|_| ())
-                .map_err(|(e, c)| e.into())
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    println!("Acquired connection");
+                    conn.prepare("INSERT INTO cart_items (user_id, product) VALUES ($1, $2);")
+                        .and_then(move |(s, c)| c.execute(&s, &[&item.user_id, &item.product_id]))
+                })
+                .map(|v| ())
+                .map_err(RepoError::from),
+        )
     }
 
     fn clear(&self, user_id: i64) -> RepoFuture<()> {
-        Box::new(self.db_pool.run(|conn| {
-            println!("Acquired connection");
-            conn.prepare("DELETE FROM cart_items WHERE user_id=$1;")
-                .and_then(|(s, c)| c.execute(&s, &[&user_id]))
-                .map(|_| ())
-                .map_err(|(e, c)| e.into())
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    println!("Acquired connection");
+                    conn.prepare("DELETE FROM cart_items WHERE user_id=$1;")
+                        .and_then(move |(s, c)| c.execute(&s, &[&user_id]))
+                })
+                .map(|v| ())
+                .map_err(RepoError::from),
+        )
     }
 }

@@ -47,7 +47,8 @@ impl Controller for ControllerImpl {
                 serialize_future(parse_body::<models::CartItem>(request.body()).and_then({
                     let db_pool = self.db_pool.clone();
                     move |cart_item| {
-                        ProductsRepoImpl::new(db_pool.clone()).add(cart_item)
+                        ProductsRepoImpl::new(db_pool.clone())
+                            .add(cart_item)
                             .map_err(|e| ControllerError::InternalServerError(e.into()))
                     }
                 }))
