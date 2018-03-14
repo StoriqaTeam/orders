@@ -20,5 +20,6 @@ serde = "*"
 serde_derive = "*"
 tokio-core = "*"
 tokio-postgres = { git = "https://github.com/sfackler/rust-postgres" }
+tokio-timer = "*"
 stq_http = { path = "vendor/libstqbackend/http" }
 stq_router = { path = "vendor/libstqbackend/router" }

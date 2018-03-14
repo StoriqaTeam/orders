@@ -12,8 +12,10 @@ extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
 extern crate tokio_postgres;
+extern crate tokio_timer;
 
 use bb8_postgres::PostgresConnectionManager;
+use futures::future;
 use futures::prelude::*;
 use hyper::server::Http;
 use std::collections::HashMap;
@@ -21,6 +23,7 @@ use std::env::Vars;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio_core::reactor::Core;
 use tokio_postgres::TlsMode;
 
@@ -43,13 +46,13 @@ pub struct Config {
 
 impl Config {
     pub fn from_vars(v: Vars) -> Result<Self, failure::Error> {
-        let vars = v.collect::<HashMap<String, String>>();
+        let data = v.collect::<HashMap<String, String>>();
 
         Ok(Self {
-            listen: vars.get("LISTEN_ADDR")
+            listen: data.get("LISTEN_ADDR")
                 .ok_or(format_err!("Listen address is not specified"))?
                 .parse()?,
-            dsn: vars.get("DATABASE_URL")
+            dsn: data.get("DATABASE_URL")
                 .ok_or(format_err!("Database address is not specified"))?
                 .clone(),
         })
@@ -60,12 +63,30 @@ pub fn start_server(config: Config) {
     let mut core = Core::new().expect("Unexpected error creating event loop core");
 
     let manager = PostgresConnectionManager::new(config.dsn.clone(), || TlsMode::None).unwrap();
-    let db_pool = Arc::new(
-        bb8::Pool::builder()
-            .build(manager, core.remote())
-            .wait()
-            .expect("Failed to create connection pool"),
-    );
+    let db_pool = Arc::new({
+        let remote = core.remote();
+        core.run(
+            //    tokio_timer::wheel().build().timeout(
+            bb8::Pool::builder()
+                .min_idle(Some(10))
+                .build(manager, remote)
+                .map_err(|e| format_err!("{}", e)),
+            //        Duration::from_secs(5),
+            //    ),
+        ).expect("Failed to create connection pool")
+    });
+
+    db_pool
+        .run(|conn| {
+            conn.batch_execute(
+                "CREATE TABLE IF NOT EXISTS cart_items (
+                    user_id BIGINT NOT NULL,
+                    product BIGINT NOT NULL
+                )",
+            ).map(|conn| ((), conn))
+        })
+        .wait()
+        .expect("Failed to prepare database");
 
     let serve = Http::new()
         .serve_addr_handle(&config.listen, &core.handle(), move || {
@@ -80,4 +101,21 @@ pub fn start_server(config: Config) {
             error!("Http Server Initialization Error: {}", why);
             exit(1);
         });
+
+    let handle = core.handle();
+    handle.spawn(
+        serve
+            .for_each({
+                let handle = handle.clone();
+                move |conn| {
+                    handle.spawn(
+                        conn.map(|_| ())
+                            .map_err(|why| error!("Server Error: {:?}", why)),
+                    );
+                    Ok(())
+                }
+            })
+            .map_err(|_| ()),
+    );
+    core.run(future::empty::<(), ()>()).unwrap();
 }

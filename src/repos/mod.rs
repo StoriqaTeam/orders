@@ -27,6 +27,8 @@ impl ProductsRepoImpl {
 
 impl ProductsRepo for ProductsRepoImpl {
     fn add(&self, item: CartItem) -> RepoFuture<()> {
+        println!("Adding started");
+        println!("State: {:?}", self.db_pool.state());
         Box::new(
             self.db_pool
                 .run(move |conn| {

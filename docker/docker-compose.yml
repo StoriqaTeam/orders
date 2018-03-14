@@ -29,8 +29,8 @@ services:
       - POSTGRES_USER=carts
       - POSTGRES_DB=carts
       - POSTGRES_PASSWORD=carts
-    expose:
-      - 5432
+    ports:
+      - "5432:5432"
 
 volumes:
   carts_cargo_cache:
