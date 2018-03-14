@@ -12,7 +12,7 @@ pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
 pub trait ProductsRepo {
     fn add(&self, item: CartItem) -> RepoFuture<()>;
-    fn clear(&self, user_id: i64) -> RepoFuture<()>;
+    fn clear(&self, user_id: DeleteCart) -> RepoFuture<()>;
 }
 
 pub struct ProductsRepoImpl {
@@ -39,13 +39,13 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn clear(&self, user_id: i64) -> RepoFuture<()> {
+    fn clear(&self, args: DeleteCart) -> RepoFuture<()> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
                     println!("Acquired connection");
                     conn.prepare("DELETE FROM cart_items WHERE user_id=$1;")
-                        .and_then(move |(s, c)| c.execute(&s, &[&user_id]))
+                        .and_then(move |(s, c)| c.execute(&s, &[&args.user_id]))
                 })
                 .map(|v| ())
                 .map_err(RepoError::from),

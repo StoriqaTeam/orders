@@ -46,8 +46,12 @@ impl Config {
         let vars = v.collect::<HashMap<String, String>>();
 
         Ok(Self {
-            listen: vars.get("LISTEN_ADDR").ok_or(format_err!("Listen address is not specified"))?.parse()?,
-            dsn: vars.get("DATABASE_URL").ok_or(format_err!("Database address is not specified"))?.clone(),
+            listen: vars.get("LISTEN_ADDR")
+                .ok_or(format_err!("Listen address is not specified"))?
+                .parse()?,
+            dsn: vars.get("DATABASE_URL")
+                .ok_or(format_err!("Database address is not specified"))?
+                .clone(),
         })
     }
 }

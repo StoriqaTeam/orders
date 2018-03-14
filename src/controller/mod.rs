@@ -1,4 +1,5 @@
 use futures;
+use futures::future;
 use futures::prelude::*;
 use hyper::{Delete, Get, Post, Put};
 use hyper::Request;
@@ -53,7 +54,18 @@ impl Controller for ControllerImpl {
                     }
                 }))
             }
-            (&_, _) => unreachable!(),
+            (&Delete, Some(Route::Item)) => {
+                serialize_future(parse_body::<models::DeleteCart>(request.body()).and_then({
+                    let db_pool = self.db_pool.clone();
+                    move |delete_cart| {
+                        ProductsRepoImpl::new(db_pool.clone())
+                            .clear(delete_cart)
+                            .map_err(|e| ControllerError::InternalServerError(e.into()))
+                    }
+                }))
+            }
+            // Fallback
+            _ => Box::new(future::err(ControllerError::NotFound)),
         }
     }
 }
