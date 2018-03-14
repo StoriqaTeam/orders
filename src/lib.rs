@@ -16,6 +16,8 @@ extern crate tokio_postgres;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
 use hyper::server::Http;
+use std::collections::HashMap;
+use std::env::Vars;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
@@ -37,6 +39,17 @@ use types::*;
 pub struct Config {
     listen: SocketAddr,
     dsn: String,
+}
+
+impl Config {
+    pub fn from_vars(v: Vars) -> Result<Self, failure::Error> {
+        let vars = v.collect::<HashMap<String, String>>();
+
+        Ok(Self {
+            listen: vars.get("LISTEN_ADDR").ok_or(format_err!("Listen address is not specified"))?.parse()?,
+            dsn: vars.get("DATABASE_URL").ok_or(format_err!("Database address is not specified"))?.clone(),
+        })
+    }
 }
 
 pub fn start_server(config: Config) {

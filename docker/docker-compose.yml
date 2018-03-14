@@ -1,0 +1,42 @@
+version: '3'
+services:
+  carts:
+    image: carts
+    build:
+      context: .
+      dockerfile: Dockerfile.carts
+    container_name: carts
+    working_dir: /app
+    command: ["sh", "-c", "/utils/wait_for_it.sh carts-pg:5432 ; diesel migration run ; cargo run"]
+    volumes:
+      - ..:/app
+      - carts_cargo_cache:/usr/local/cargo
+    environment:
+      - DATABASE_URL=postgresql://carts:carts@carts-pg/carts\
+      - LISTEN_ADDR=0.0.0.0:8000
+    expose:
+      - 8000
+    stdin_open: true
+    depends_on:
+      - carts-pg
+
+  carts-pg:
+    image: postgres:10
+    container_name: carts-pg
+    volumes:
+      - stq-carts-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=carts
+      - POSTGRES_DB=carts
+      - POSTGRES_PASSWORD=carts
+    expose:
+      - 5432
+
+volumes:
+  carts_cargo_cache:
+  stq-carts-postgres-data:
+
+networks:
+  default:
+    external:
+      name: storiqa
