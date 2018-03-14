@@ -21,7 +21,7 @@ use types::*;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Route {
-    Item,
+    CartProducts,
 }
 
 pub struct ControllerImpl {
@@ -32,7 +32,7 @@ pub struct ControllerImpl {
 impl ControllerImpl {
     pub fn new(db_pool: DbPool) -> Self {
         let mut route_parser: RouteParser<Route> = Default::default();
-        route_parser.add_route(r"^/items", || Route::Item);
+        route_parser.add_route(r"^/cart/products", || Route::CartProducts);
 
         ControllerImpl {
             db_pool,
@@ -44,18 +44,18 @@ impl ControllerImpl {
 impl Controller for ControllerImpl {
     fn call(&self, request: Request) -> ControllerFuture {
         match (request.method(), self.route_parser.test(request.path())) {
-            (&Post, Some(Route::Item)) => {
-                serialize_future(parse_body::<models::CartItem>(request.body()).and_then({
+            (&Put, Some(Route::Item)) => {
+                serialize_future(parse_body::<models::SetCartItem>(request.body()).and_then({
                     let db_pool = self.db_pool.clone();
                     move |cart_item| {
                         ProductsRepoImpl::new(db_pool.clone())
-                            .add(cart_item)
+                            .set_item(cart_item)
                             .map_err(|e| ControllerError::InternalServerError(e.into()))
                     }
                 }))
             }
             (&Delete, Some(Route::Item)) => {
-                serialize_future(parse_body::<models::DeleteCart>(request.body()).and_then({
+                serialize_future(parse_body::<models::DeleteItems>(request.body()).and_then({
                     let db_pool = self.db_pool.clone();
                     move |delete_cart| {
                         ProductsRepoImpl::new(db_pool.clone())

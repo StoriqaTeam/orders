@@ -80,8 +80,9 @@ pub fn start_server(config: Config) {
         .run(|conn| {
             conn.batch_execute(
                 "CREATE TABLE IF NOT EXISTS cart_items (
-                    user_id BIGINT NOT NULL,
-                    product BIGINT NOT NULL
+                    user_id  BIGINT NOT NULL,
+                    product  BIGINT NOT NULL,
+                    quantity BIGINT NOT NULL
                 )",
             ).map(|conn| ((), conn))
         })

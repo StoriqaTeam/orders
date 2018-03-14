@@ -1,10 +1,6 @@
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CartItem {
-    pub user_id: i64,
-    pub product_id: i64,
-}
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DeleteCart {
-    pub user_id: i64,
+pub struct Cart {
+    pub products: HashMap<i64, i64>,
 }
