@@ -1,5 +1,6 @@
 use failure::Error;
 use futures::prelude::*;
+use std::sync::{Arc, Mutex};
 use tokio_postgres;
 use tokio_postgres::transaction::Transaction;
 
@@ -30,6 +31,25 @@ impl ProductsRepoImpl {
 }
 
 impl ProductsRepo for ProductsRepoImpl {
+    fn get_cart(&self, user_id: i64) -> RepoFuture<models::Cart> {
+        let out = Arc::new(Mutex::new(models::Cart::default()));
+        Box::new(self.db_pool.run(move |conn| {
+            conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
+                .and_then(move |(s, c)| {
+                    c.query(&s, &[&user_id]).for_each({
+                        let out = out.clone();
+                        move |row| {
+                            let product_id = row.get("product_id");
+                            let quantity = row.get("quantity");
+
+                            out.lock().unwrap().products.insert(product_id, quantity);
+                        }
+                    })
+                })
+                .map(move |_| out.into_inner().unwrap())
+        }))
+    }
+
     fn set_item(&self, user_id: i64, product_id: i64, quantity: i64) -> RepoFuture<()> {
         println!("Adding started");
         println!("State: {:?}", self.db_pool.state());
@@ -67,10 +87,8 @@ impl ProductsRepo for ProductsRepoImpl {
             self.db_pool
                 .run(move |conn| {
                     println!("Acquired connection");
-                    conn.prepare(&format!(
-                        "DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2;",
-                        user_id, product_id
-                    )).and_then(move |(s, c)| c.execute(&s, &[&user_id, &product_id]))
+                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2;")
+                        .and_then(move |(s, c)| c.execute(&s, &[&user_id, &product_id]))
                 })
                 .map(|v| ())
                 .map_err(RepoError::from),
@@ -81,10 +99,8 @@ impl ProductsRepo for ProductsRepoImpl {
         Box::new(
             self.db_pool
                 .run(move |conn| {
-                    conn.prepare(&format!(
-                        "DELETE FROM cart_items WHERE user_id = $1;",
-                        user_id
-                    )).and_then(move |(s, c)| c.execute(&s, &[&user_id]))
+                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
+                        .and_then(move |(s, c)| c.execute(&s, &[&user_id]))
                 })
                 .map(|v| ())
                 .map_err(RepoError::from),

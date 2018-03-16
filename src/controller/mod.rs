@@ -1,8 +1,8 @@
 use futures;
 use futures::future;
 use futures::prelude::*;
-use hyper::{Delete, Get, Post, Put};
-use hyper::Request;
+use hyper;
+use hyper::{Delete, Get, Post, Put, Request};
 use std::sync::Arc;
 
 use stq_http;
@@ -43,13 +43,14 @@ impl ControllerImpl {
 
 impl Controller for ControllerImpl {
     fn call(&self, request: Request) -> ControllerFuture {
+        let user_id = request.headers().get::<hyper::header::From>();
         match (request.method(), self.route_parser.test(request.path())) {
-            (&Put, Some(Route::Item)) => {
-                serialize_future(parse_body::<models::SetCartItem>(request.body()).and_then({
+            (&Put, Some(Route::CartProducts(product_id))) => {
+                serialize_future(parse_body::<models::SetProductParams>(request.body()).and_then({
                     let db_pool = self.db_pool.clone();
-                    move |cart_item| {
+                    move |params| {
                         ProductsRepoImpl::new(db_pool.clone())
-                            .set_item(cart_item)
+                            .set_item(user_id, product_id, params.quantity)
                             .map_err(|e| ControllerError::InternalServerError(e.into()))
                     }
                 }))
