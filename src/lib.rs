@@ -3,6 +3,7 @@ extern crate bb8_postgres;
 #[macro_use]
 extern crate failure;
 extern crate futures;
+extern crate futures_state_stream;
 extern crate hyper;
 #[macro_use]
 extern crate log;
@@ -31,6 +32,7 @@ use stq_http::controller::Application;
 
 mod controller;
 mod errors;
+mod migrations;
 mod models;
 mod repos;
 mod types;
@@ -76,16 +78,7 @@ pub fn start_server(config: Config) {
         ).expect("Failed to create connection pool")
     });
 
-    db_pool
-        .run(|conn| {
-            conn.batch_execute(
-                "CREATE TABLE IF NOT EXISTS cart_items (
-                    user_id  BIGINT NOT NULL,
-                    product  BIGINT NOT NULL,
-                    quantity BIGINT NOT NULL
-                )",
-            ).map(|conn| ((), conn))
-        })
+    migrations::run(db_pool.clone())
         .wait()
         .expect("Failed to prepare database");
 
