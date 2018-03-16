@@ -1,0 +1,5 @@
+CREATE TABLE carts {
+    user_id INTEGER UNIQUE REFERENCES users ON DELETE CASCADE,
+    product INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+}
