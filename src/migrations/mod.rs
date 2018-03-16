@@ -11,9 +11,9 @@ pub fn run(db_pool: DbPool) -> Box<Future<Item = (), Error = tokio_postgres::Err
                 conn.batch_execute(
                     "
                 CREATE TABLE IF NOT EXISTS cart_items (
-                    user_id    BIGINT NOT NULL,
-                    product_id BIGINT NOT NULL,
-                    quantity   BIGINT NOT NULL,
+                    user_id    INTEGER NOT NULL,
+                    product_id BIGINT  NOT NULL,
+                    quantity   BIGINT  NOT NULL,
 
                     CONSTRAINT item UNIQUE (user_id, product_id)
                 )

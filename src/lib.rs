@@ -1,5 +1,6 @@
 extern crate bb8;
 extern crate bb8_postgres;
+extern crate env_logger;
 #[macro_use]
 extern crate failure;
 extern crate futures;
@@ -13,7 +14,6 @@ extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
 extern crate tokio_postgres;
-extern crate tokio_timer;
 
 use bb8_postgres::PostgresConnectionManager;
 use futures::future;
@@ -62,19 +62,19 @@ impl Config {
 }
 
 pub fn start_server(config: Config) {
+    // Prepare logger
+    env_logger::init();
+
     let mut core = Core::new().expect("Unexpected error creating event loop core");
 
     let manager = PostgresConnectionManager::new(config.dsn.clone(), || TlsMode::None).unwrap();
     let db_pool = Arc::new({
         let remote = core.remote();
         core.run(
-            //    tokio_timer::wheel().build().timeout(
             bb8::Pool::builder()
                 .min_idle(Some(10))
                 .build(manager, remote)
                 .map_err(|e| format_err!("{}", e)),
-            //        Duration::from_secs(5),
-            //    ),
         ).expect("Failed to create connection pool")
     });
 

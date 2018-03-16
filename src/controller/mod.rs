@@ -61,7 +61,7 @@ impl Controller for ControllerImpl {
                     .map(|auth| auth.0.clone())
                     .ok_or_else(|| ControllerError::BadRequest(format_err!("Missing user_id")))
                     .and_then(|string_id| {
-                        i64::from_str(&string_id).map_err(|e| {
+                        i32::from_str(&string_id).map_err(|e| {
                             ControllerError::BadRequest(format_err!(
                                 "Failed to parse user_id {}: {}",
                                 &string_id,
@@ -73,7 +73,7 @@ impl Controller for ControllerImpl {
                 let db_pool = self.db_pool.clone();
                 let route_parser = self.route_parser.clone();
                 move |user_id| {
-                    println!(
+                    debug!(
                         "Received request: {} @ {}",
                         request.method(),
                         request.path()
