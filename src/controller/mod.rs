@@ -24,6 +24,7 @@ use types::*;
 pub enum Route {
     CartProducts,
     CartProduct { product_id: i64 },
+    CartClear,
 }
 
 pub struct ControllerImpl {
@@ -34,13 +35,14 @@ pub struct ControllerImpl {
 impl ControllerImpl {
     pub fn new(db_pool: DbPool) -> Self {
         let mut route_parser: RouteParser<Route> = Default::default();
-        route_parser.add_route(r"^/cart/products", || Route::CartProducts);
         route_parser.add_route_with_params(r"^/cart/products/(\d+)$", |params| {
             params
                 .get(0)
                 .and_then(|string_id| string_id.parse::<i64>().ok())
                 .map(|product_id| Route::CartProduct { product_id })
         });
+        route_parser.add_route(r"^/cart/products", || Route::CartProducts);
+        route_parser.add_route(r"^/cart/clear", || Route::CartClear);
 
         ControllerImpl {
             db_pool,
@@ -61,7 +63,8 @@ impl Controller for ControllerImpl {
                     .and_then(|string_id| {
                         i64::from_str(&string_id).map_err(|e| {
                             ControllerError::BadRequest(format_err!(
-                                "Failed to parse user_id: {}",
+                                "Failed to parse user_id {}: {}",
+                                &string_id,
                                 e
                             ))
                         })
@@ -70,13 +73,18 @@ impl Controller for ControllerImpl {
                 let db_pool = self.db_pool.clone();
                 let route_parser = self.route_parser.clone();
                 move |user_id| {
+                    println!(
+                        "Received request: {} @ {}",
+                        request.method(),
+                        request.path()
+                    );
                     match (request.method(), route_parser.test(request.path())) {
                         (&Get, Some(Route::CartProducts)) => serialize_future(
                             ProductsRepoImpl::new(db_pool.clone())
                                 .get_cart(user_id)
                                 .map_err(|e| ControllerError::InternalServerError(e.into())),
                         ),
-                        (&Post, Some(Route::CartProducts)) => serialize_future(
+                        (&Post, Some(Route::CartClear)) => serialize_future(
                             ProductsRepoImpl::new(db_pool.clone())
                                 .clear_cart(user_id)
                                 .map_err(|e| ControllerError::InternalServerError(e.into())),
