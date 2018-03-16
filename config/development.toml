@@ -1,0 +1,2 @@
+listen = "0.0.0.0:8002"
+dsn = "postgresql://orders:orders@orders-pg/orders"
