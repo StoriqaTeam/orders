@@ -38,18 +38,27 @@ impl ProductsRepo for ProductsRepoImpl {
             self.db_pool
                 .run(move |conn| {
                     conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
-                        .and_then(move |(s, c)| {
-                            c.query(&s, &[&user_id]).for_each({
-                                let out = out.clone();
-                                move |row| {
-                                    let product_id = row.get("product_id");
-                                    let quantity = row.get("quantity");
+                        .and_then({
+                            let out = out.clone();
+                            move |(s, c)| {
+                                c.query(&s, &[&user_id]).for_each({
+                                    let out = out.clone();
+                                    move |row| {
+                                        let product_id = row.get("product_id");
+                                        let quantity = row.get("quantity");
 
-                                    out.lock().unwrap().products.insert(product_id, quantity);
-                                }
-                            })
+                                        out.lock().unwrap().products.insert(product_id, quantity);
+                                    }
+                                })
+                            }
                         })
-                        .map(move |c| (out.into_inner().unwrap(), c))
+                        .map({
+                            let out = out.clone();
+                            move |c| {
+                                let g = out.lock().unwrap();
+                                ((*g).clone(), c)
+                            }
+                        })
                 })
                 .map_err(RepoError::from),
         )
@@ -67,7 +76,6 @@ impl ProductsRepo for ProductsRepoImpl {
                         DO UPDATE SET quantity = $3
                         ;",
                     ).and_then(move |(s, c)| c.execute(&s, &[&user_id, &product_id, &quantity]))
-                        .map(|(_, t)| t)
                 })
                 .map(|v| ())
                 .map_err(RepoError::from),
@@ -94,7 +102,7 @@ impl ProductsRepo for ProductsRepoImpl {
                     conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
                         .and_then(move |(s, c)| c.execute(&s, &[&user_id]))
                 })
-                .map(|v| ())
+                .map(|_| ())
                 .map_err(RepoError::from),
         )
     }
