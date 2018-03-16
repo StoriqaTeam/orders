@@ -1,0 +1,41 @@
+version: '3'
+services:
+  orders:
+    image: orders
+    build:
+      context: .
+      dockerfile: Dockerfile.orders
+    container_name: orders
+    working_dir: /app
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run"]
+    volumes:
+      - ..:/app
+      - orders_cargo_cache:/usr/local/cargo
+    environment:
+      - DATABASE_URL=postgresql://orders:orders@orders-pg/orders
+    expose:
+      - 8002
+    stdin_open: true
+    depends_on:
+      - orders-pg
+
+  orders-pg:
+    image: postgres:10
+    container_name: orders-pg
+    volumes:
+      - stq-orders-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=orders
+      - POSTGRES_DB=orders
+      - POSTGRES_PASSWORD=orders
+    ports:
+      - "5432:5432"
+
+volumes:
+  orders_cargo_cache:
+  stq-orders-postgres-data:
+
+networks:
+  default:
+    external:
+      name: storiqa
