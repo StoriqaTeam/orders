@@ -24,7 +24,6 @@ use std::env::Vars;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio_core::reactor::Core;
 use tokio_postgres::TlsMode;
 
@@ -36,9 +35,6 @@ mod migrations;
 mod models;
 mod repos;
 mod types;
-
-use controller::*;
-use types::*;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {

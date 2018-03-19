@@ -1,23 +1,17 @@
-use failure::Error;
 use futures::prelude::*;
 use futures_state_stream::*;
 use std::sync::{Arc, Mutex};
-use tokio_postgres;
-use tokio_postgres::transaction::Transaction;
 
-use errors;
 use errors::*;
 use models;
-use models::*;
-use types;
 use types::*;
 
 pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
 pub trait ProductsRepo {
     fn get_cart(&self, user_id: i32) -> RepoFuture<models::Cart>;
-    fn set_item(&self, user_id: i32, product_id: i64, quantity: i64) -> RepoFuture<()>;
-    fn delete_item(&self, user_id: i32, product_id: i64) -> RepoFuture<()>;
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<()>;
+    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<()>;
     fn clear_cart(&self, user_id: i32) -> RepoFuture<()>;
 }
 
@@ -65,7 +59,7 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn set_item(&self, user_id: i32, product_id: i64, quantity: i64) -> RepoFuture<()> {
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<()> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -86,7 +80,7 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i64) -> RepoFuture<()> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<()> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -96,7 +90,7 @@ impl ProductsRepo for ProductsRepoImpl {
                             conn.execute(&statement, &[&user_id, &product_id])
                         })
                 })
-                .map(|v| ())
+                .map(|_| ())
                 .map_err(RepoError::from),
         )
     }

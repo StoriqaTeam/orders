@@ -1,4 +1,3 @@
-use futures;
 use futures::future;
 use futures::prelude::*;
 use hyper;
@@ -7,7 +6,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use stq_http;
-use stq_router;
 use stq_router::RouteParser;
 use stq_http::controller::Controller;
 use stq_http::errors::ControllerError;
@@ -23,7 +21,7 @@ use types::*;
 #[derive(Clone, Copy, Debug)]
 pub enum Route {
     CartProducts,
-    CartProduct { product_id: i64 },
+    CartProduct { product_id: i32 },
     CartClear,
 }
 
@@ -38,7 +36,7 @@ impl ControllerImpl {
         route_parser.add_route_with_params(r"^/cart/products/(\d+)$", |params| {
             params
                 .get(0)
-                .and_then(|string_id| string_id.parse::<i64>().ok())
+                .and_then(|string_id| string_id.parse().ok())
                 .map(|product_id| Route::CartProduct { product_id })
         });
         route_parser.add_route(r"^/cart/products", || Route::CartProducts);
@@ -95,7 +93,7 @@ impl Controller for ControllerImpl {
                                 .map_err(|e| ControllerError::InternalServerError(e.into())),
                         ),
                         (&Put, Some(Route::CartProduct { product_id })) => serialize_future(
-                            parse_body::<models::SetProductParams>(request.body()).and_then(
+                            parse_body::<models::UpsertCart>(request.body()).and_then(
                                 move |params| {
                                     ProductsRepoImpl::new(db_pool.clone())
                                         .set_item(user_id, product_id, params.quantity)
