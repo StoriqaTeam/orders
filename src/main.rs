@@ -1,6 +1,6 @@
-extern crate carts_lib;
+extern crate orders_lib;
 
 fn main() {
-    let config = carts_lib::Config::from_vars(std::env::vars()).unwrap();
-    carts_lib::start_server(config);
+    let config = orders_lib::Config::from_vars(std::env::vars()).unwrap();
+    orders_lib::start_server(config);
 }

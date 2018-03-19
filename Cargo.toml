@@ -1,9 +1,9 @@
 [package]
-name = "carts"
+name = "orders"
 version = "0.1.0"
 
 [lib]
-name = "carts_lib"
+name = "orders_lib"
 path = "src/lib.rs"
 
 [dependencies]
