@@ -1,6 +1,7 @@
 use futures::prelude::*;
 use futures_state_stream::*;
 use std::sync::{Arc, Mutex};
+use tokio_postgres;
 
 use errors::*;
 use models;
@@ -10,9 +11,9 @@ pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
 pub trait ProductsRepo {
     fn get_cart(&self, user_id: i32) -> RepoFuture<models::Cart>;
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<()>;
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<()>;
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<()>;
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<models::Cart>;
+    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<models::Cart>;
+    fn clear_cart(&self, user_id: i32) -> RepoFuture<models::Cart>;
 }
 
 pub struct ProductsRepoImpl {
@@ -25,41 +26,58 @@ impl ProductsRepoImpl {
     }
 }
 
+impl ProductsRepoImpl {
+    fn _get_cart(
+        conn: tokio_postgres::Connection,
+        user_id: i32,
+    ) -> Box<
+        Future<
+            Item = (models::Cart, tokio_postgres::Connection),
+            Error = (tokio_postgres::Error, tokio_postgres::Connection),
+        >,
+    > {
+        let out = Arc::new(Mutex::new(models::Cart::default()));
+
+        Box::new(
+            conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
+                .and_then({
+                    let out = out.clone();
+                    move |(statement, conn)| {
+                        conn.query(&statement, &[&user_id]).for_each({
+                            let out = out.clone();
+                            move |row| {
+                                let product_id = row.get("product_id");
+                                let quantity = row.get("quantity");
+
+                                out.lock().unwrap().products.insert(product_id, quantity);
+                            }
+                        })
+                    }
+                })
+                .map({
+                    let out = out.clone();
+                    move |conn| {
+                        let guard = out.lock().unwrap();
+                        ((*guard).clone(), conn)
+                    }
+                }),
+        )
+    }
+}
+
 impl ProductsRepo for ProductsRepoImpl {
     fn get_cart(&self, user_id: i32) -> RepoFuture<models::Cart> {
-        let out = Arc::new(Mutex::new(models::Cart::default()));
         Box::new(
             self.db_pool
                 .run(move |conn| {
                     debug!("Acquired DB connection");
-                    conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
-                        .and_then({
-                            let out = out.clone();
-                            move |(statement, conn)| {
-                                conn.query(&statement, &[&user_id]).for_each({
-                                    let out = out.clone();
-                                    move |row| {
-                                        let product_id = row.get("product_id");
-                                        let quantity = row.get("quantity");
-
-                                        out.lock().unwrap().products.insert(product_id, quantity);
-                                    }
-                                })
-                            }
-                        })
-                        .map({
-                            let out = out.clone();
-                            move |conn| {
-                                let guard = out.lock().unwrap();
-                                ((*guard).clone(), conn)
-                            }
-                        })
+                    Self::_get_cart(conn, user_id)
                 })
                 .map_err(RepoError::from),
         )
     }
 
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<()> {
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<models::Cart> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -72,15 +90,16 @@ impl ProductsRepo for ProductsRepoImpl {
                         DO UPDATE SET quantity = $3
                         ;",
                     ).and_then(move |(statement, conn)| {
-                        conn.execute(&statement, &[&user_id, &product_id, &quantity])
-                    })
+                            conn.execute(&statement, &[&user_id, &product_id, &quantity])
+                        })
+                        .map(|(_, conn)| conn)
+                        .and_then(move |conn| Self::_get_cart(conn, user_id))
                 })
-                .map(|_| ())
                 .map_err(RepoError::from),
         )
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<()> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<models::Cart> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -89,21 +108,23 @@ impl ProductsRepo for ProductsRepoImpl {
                         .and_then(move |(statement, conn)| {
                             conn.execute(&statement, &[&user_id, &product_id])
                         })
+                        .map(|(_, conn)| conn)
+                        .and_then(move |conn| Self::_get_cart(conn, user_id))
                 })
-                .map(|_| ())
                 .map_err(RepoError::from),
         )
     }
 
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<()> {
+    fn clear_cart(&self, user_id: i32) -> RepoFuture<models::Cart> {
         Box::new(
             self.db_pool
                 .run(move |conn| {
                     debug!("Acquired DB connection");
                     conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
                         .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id]))
+                        .map(|(_, conn)| conn)
+                        .and_then(move |conn| Self::_get_cart(conn, user_id))
                 })
-                .map(|_| ())
                 .map_err(RepoError::from),
         )
     }
