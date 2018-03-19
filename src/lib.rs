@@ -31,7 +31,6 @@ use stq_http::controller::Application;
 
 mod controller;
 mod errors;
-mod migrations;
 mod models;
 mod repos;
 mod types;
@@ -73,10 +72,6 @@ pub fn start_server(config: Config) {
                 .map_err(|e| format_err!("{}", e)),
         ).expect("Failed to create connection pool")
     });
-
-    migrations::run(db_pool.clone())
-        .wait()
-        .expect("Failed to prepare database");
 
     let serve = Http::new()
         .serve_addr_handle(&config.listen, &core.handle(), move || {
