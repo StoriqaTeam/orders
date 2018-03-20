@@ -9,6 +9,7 @@ path = "src/lib.rs"
 [dependencies]
 bb8 = { git = "https://github.com/vorot93/bb8", branch = "patch-1" }
 bb8-postgres = { git = "https://github.com/vorot93/bb8", branch = "patch-1" }
+config = "*"
 env_logger = "*"
 failure = "0.1"
 futures = "0.1"

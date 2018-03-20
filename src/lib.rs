@@ -1,5 +1,6 @@
 extern crate bb8;
 extern crate bb8_postgres;
+extern crate config as config_crate;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
@@ -29,34 +30,14 @@ use tokio_postgres::TlsMode;
 
 use stq_http::controller::Application;
 
+pub mod config;
 mod controller;
 mod errors;
 mod models;
 mod repos;
 mod types;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Config {
-    listen: SocketAddr,
-    dsn: String,
-}
-
-impl Config {
-    pub fn from_vars(v: Vars) -> Result<Self, failure::Error> {
-        let data = v.collect::<HashMap<String, String>>();
-
-        Ok(Self {
-            listen: data.get("LISTEN_ADDR")
-                .ok_or(format_err!("Listen address is not specified"))?
-                .parse()?,
-            dsn: data.get("DATABASE_URL")
-                .ok_or(format_err!("Database address is not specified"))?
-                .clone(),
-        })
-    }
-}
-
-pub fn start_server(config: Config) {
+pub fn start_server(config: config::Config) {
     // Prepare logger
     env_logger::init();
 
