@@ -8,26 +8,26 @@ use log;
 use models::*;
 use types::*;
 
-pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
+pub type ServiceFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
-pub trait ProductsRepo {
-    fn get_cart(&self, user_id: i32) -> RepoFuture<Cart>;
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<Cart>;
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<Cart>;
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<Cart>;
+pub trait CartService {
+    fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart>;
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
+    fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
 }
 
-pub struct ProductsRepoImpl {
+pub struct CartServiceImpl {
     db_pool: DbPool,
 }
 
-impl ProductsRepoImpl {
+impl CartServiceImpl {
     pub fn new(db_pool: DbPool) -> Self {
         Self { db_pool }
     }
 }
 
-impl ProductsRepoImpl {
+impl CartServiceImpl {
     fn _get_cart(
         conn: tokio_postgres::Connection,
         user_id: i32,
@@ -61,8 +61,8 @@ impl ProductsRepoImpl {
     }
 }
 
-impl ProductsRepo for ProductsRepoImpl {
-    fn get_cart(&self, user_id: i32) -> RepoFuture<Cart> {
+impl CartService for CartServiceImpl {
+    fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         debug!("Getting cart for user {}.", user_id);
         Box::new(
             self.db_pool
@@ -74,7 +74,7 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<Cart> {
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
         debug!("Setting item {} to quantity {} in cart for user {}.", product_id, quantity, user_id);
         Box::new(
             self.db_pool
@@ -95,7 +95,7 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<Cart> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
         debug!("Deleting item {} for user {}", product_id, user_id);
         Box::new(
             self.db_pool
@@ -110,7 +110,7 @@ impl ProductsRepo for ProductsRepoImpl {
         )
     }
 
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<Cart> {
+    fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         debug!("Clearing cart for user {}", user_id);
         Box::new(
             self.db_pool

@@ -33,7 +33,7 @@ pub mod controller;
 pub mod errors;
 pub mod log;
 pub mod models;
-pub mod repos;
+pub mod services;
 pub mod types;
 
 pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {

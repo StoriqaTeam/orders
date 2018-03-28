@@ -30,7 +30,7 @@ fn test_products_repo() {
     let remote = core.remote();
     let pool = Arc::new(core.run(prepare_db(remote)).unwrap());
 
-    let repo = ProductsRepoImpl::new(pool);
+    let repo = CartServiceImpl::new(pool);
 
     let user_id = 1234;
 

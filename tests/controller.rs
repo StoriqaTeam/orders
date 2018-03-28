@@ -29,7 +29,7 @@ pub struct ProductsRepoMemory {
     pub inner: ProductsRepoMemoryStorage,
 }
 
-impl ProductsRepo for ProductsRepoMemory {
+impl CartService for ProductsRepoMemory {
     fn get_cart(&self, user_id: i32) -> RepoFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
