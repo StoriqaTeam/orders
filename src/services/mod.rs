@@ -6,6 +6,7 @@ use tokio_postgres;
 use errors::*;
 use log;
 use models::*;
+use repos::*;
 use types::*;
 
 pub type ServiceFuture<T> = Box<Future<Item = T, Error = RepoError>>;
@@ -19,11 +20,12 @@ pub trait CartService {
 
 pub struct CartServiceImpl {
     db_pool: DbPool,
+    repo_factory: Arc<Fn(RepoConnection) -> Box<ProductRepo>>,
 }
 
 impl CartServiceImpl {
     pub fn new(db_pool: DbPool) -> Self {
-        Self { db_pool }
+        Self { db_pool, repo_factory: Arc::new(|conn| Box::new(ProductRepoImpl::new(conn))) }
     }
 }
 
