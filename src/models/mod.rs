@@ -1,3 +1,6 @@
+pub mod product;
+pub use self::product::*;
+
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
