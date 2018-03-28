@@ -25,7 +25,10 @@ pub struct CartServiceImpl {
 
 impl CartServiceImpl {
     pub fn new(db_pool: DbPool) -> Self {
-        Self { db_pool, repo_factory: Arc::new(|conn| Box::new(ProductRepoImpl::new(conn))) }
+        Self {
+            db_pool,
+            repo_factory: Arc::new(|conn| Box::new(ProductRepoImpl::new(conn))),
+        }
     }
 }
 

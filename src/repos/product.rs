@@ -2,7 +2,7 @@ use futures::prelude::*;
 use futures_state_stream::StateStream;
 
 use models::*;
-use repos::{RepoConnection, RepoFuture};
+use repos::{RepoConnection, RepoConnectionFuture};
 use util;
 
 #[derive(Clone, Debug)]
@@ -12,7 +12,7 @@ pub struct ProductMask {
 }
 
 pub trait ProductRepo {
-    fn get(self: Box<Self>, mask: ProductMask) -> RepoFuture<Vec<Product>>;
+    fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
 }
 
 pub struct ProductRepoImpl {
@@ -20,11 +20,13 @@ pub struct ProductRepoImpl {
 }
 
 impl ProductRepoImpl {
-    pub fn new(connection: RepoConnection) -> Self { Self { connection } }
+    pub fn new(connection: RepoConnection) -> Self {
+        Self { connection }
+    }
 }
 
 impl ProductRepo for ProductRepoImpl {
-    fn get(self: Box<Self>, mask: ProductMask) -> RepoFuture<Vec<Product>> {
+    fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
         let ProductMask { user_id, product_id } = mask;
 
         let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Select, "cart_items");
@@ -39,9 +41,11 @@ impl ProductRepo for ProductRepoImpl {
 
         let (statement, args) = query_builder.build();
 
-        Box::new(self.connection
-            .prepare2(&statement)
-            .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-            .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)))
+        Box::new(
+            self.connection
+                .prepare2(&statement)
+                .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
+                .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)),
+        )
     }
 }
