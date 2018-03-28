@@ -1,10 +1,11 @@
+use futures;
 use futures::prelude::*;
 use futures_state_stream::*;
-use std::sync::{Arc, Mutex};
-use tokio_postgres::Connection;
+use tokio_postgres;
 use tokio_postgres::rows::Row;
 use tokio_postgres::stmt::Statement;
 use tokio_postgres::transaction::Transaction;
+use tokio_postgres::types::ToSql;
 
 use models::*;
 use util;
@@ -23,7 +24,8 @@ impl From<tokio_postgres::Error> for RepoError {
     }
 }
 
-pub type RepoFuture<T> = Box<Future<Item = (T, Box<RepoConnection>), Error = (RepoError, Box<RepoConnection>)>>;
+pub type RepoConnection = Box<Connection + Send>;
+pub type RepoFuture<T> = Box<Future<Item = (T, RepoConnection), Error = (RepoError, RepoConnection)> + Send>;
 
 #[derive(Clone, Debug)]
 pub struct ProductMask {
@@ -31,43 +33,67 @@ pub struct ProductMask {
     product_id: Option<i32>,
 }
 
-pub trait RepoConnection {
-    fn prepare(self, query: &str) -> RepoFuture<(Statement, Box<RepoConnection>)>;
-    fn query(self, &Statement) -> Box<StateStream<Item = Row, State = Box<RepoConnection>, Error = RepoError> + Send>;
-    fn commit(self) -> RepoFuture<Box<RepoConnection>>;
+pub trait Connection {
+    fn prepare2(self: Box<Self>, query: &str) -> RepoFuture<Statement>;
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = RepoConnection, Error = RepoError> + Send>;
+    fn commit2(self: Box<Self>) -> RepoFuture<()>;
 }
 
+/*
 impl RepoConnection for Transaction {
-    fn prepare(self, query: &str) -> RepoFuture<(Statement, Box<RepoConnection>)> {
-        self.prepare(query)
-            .map(|(v, conn)| (v, Box::new(conn)))
-            .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn)))
+    fn prepare2(self, query: &str) -> RepoFuture<(Statement, Box<RepoConnection>)> {
+        Box::new(
+            self.prepare(query)
+                .map(|(v, conn)| (v, Box::new(conn)))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn))),
+        )
     }
 }
+*/
 
-impl RepoConnection for Connection {
-    fn prepare(self, query: &str) -> RepoFuture<(Statement, Box<RepoConnection>)> {
-        self.prepare(query)
-            .map(|(v, conn)| (v, Box::new(conn)))
-            .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn)))
+impl Connection for tokio_postgres::Connection {
+    fn prepare2(self: Box<Self>, query: &str) -> RepoFuture<Statement> {
+        Box::new(
+            self.prepare(query)
+                .map(|(v, conn)| (v, Box::new(conn) as RepoConnection))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as RepoConnection)),
+        )
+    }
+
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = RepoConnection, Error = RepoError> + Send> {
+        Box::new(
+            self.query(statement, &params.iter().map(|v| &**v as &ToSql).collect::<Vec<&ToSql>>())
+                .map_err(RepoError::from)
+                .map_state(|conn| Box::new(conn) as RepoConnection),
+        )
+    }
+
+    fn commit2(self: Box<Self>) -> RepoFuture<()> {
+        Box::new(futures::future::ok(((), self as RepoConnection)))
     }
 }
 
 pub trait ProductRepo {
-    fn get(self, mask: ProductMask) -> RepoFuture<(Box<ProductRepo>, Vec<Product>)>;
+    fn get(self: Box<Self>, mask: ProductMask) -> RepoFuture<Vec<Product>>;
 }
 
 pub struct ProductRepoImpl {
-    connection: Box<RepoConnection>,
+    connection: RepoConnection,
 }
 
-impl ProductRepo for RepoConnection {
-    fn get(self, mask: ProductMask) -> RepoFuture<Box<RepoConnection>> {
-        let out = Arc::new(Mutex::new(Cart::default()));
-
+impl ProductRepo for ProductRepoImpl {
+    fn get(self: Box<Self>, mask: ProductMask) -> RepoFuture<Vec<Product>> {
         let ProductMask { user_id, product_id } = mask;
 
-        let mut query_builder = util::SimpleQueryBuilder::new("SELECT * from cart_items");
+        let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Select, "cart_items");
 
         if let Some(v) = user_id {
             query_builder = query_builder.with_arg("user_id", v);
@@ -79,9 +105,9 @@ impl ProductRepo for RepoConnection {
 
         let (statement, args) = query_builder.build();
 
-        self.transaction
-            .prepare(&statement)
-            .and_then({ move |(statement, conn)| conn.query(&statement, &args.map(|v| &*v)) })
-            .map(Box::from)
+        Box::new(self.connection
+            .prepare2(&statement)
+            .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
+            .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)))
     }
 }
