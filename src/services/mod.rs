@@ -1,3 +1,4 @@
+use failure;
 use futures::prelude::*;
 use futures_state_stream::*;
 use std::any::Any;
@@ -19,7 +20,7 @@ pub trait CartService {
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
 }
 
-pub type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo>>;
+pub type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
 
 pub struct CartServiceImpl {
     db_pool: DbPool,
@@ -64,6 +65,8 @@ impl CartService for CartServiceImpl {
                     move |conn| {
                         log::acquired_db_connection(&conn);
                         Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                            .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                            .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres().unwrap()))
                     }
                 })
                 .map_err(RepoError::from),
@@ -72,13 +75,15 @@ impl CartService for CartServiceImpl {
 
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
         debug!("Setting item {} to quantity {} in cart for user {}.", product_id, quantity, user_id);
+
+        let repo_factory = self.repo_factory.clone();
         Box::new(
             self.db_pool
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
                     conn.prepare(
                         "
-                        INSERT INTO cart_items (user_id, product_id, quantitSy)
+                        INSERT INTO cart_items (user_id, product_id, quantity)
                         VALUES ($1, $2, $3)
                         ON CONFLICT (user_id, product_id)
                         DO UPDATE SET quantity = $3
@@ -86,8 +91,16 @@ impl CartService for CartServiceImpl {
                     ).and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id, &quantity]))
                         .map(|(_, conn)| conn)
                         .and_then({
-                            let repo_factory = self.repo_factory.clone();
-                            move |conn| Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                            move |conn| {
+                                Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                                    .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                                    .map_err(|(e, conn)| {
+                                        (
+                                            tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                            conn.unwrap_tokio_postgres().unwrap(),
+                                        )
+                                    })
+                            }
                         })
                 })
                 .map_err(RepoError::from),
@@ -96,6 +109,8 @@ impl CartService for CartServiceImpl {
 
     fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
         debug!("Deleting item {} for user {}", product_id, user_id);
+
+        let repo_factory = self.repo_factory.clone();
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -104,8 +119,16 @@ impl CartService for CartServiceImpl {
                         .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id]))
                         .map(|(_, conn)| conn)
                         .and_then({
-                            let repo_factory = self.repo_factory.clone();
-                            move |conn| Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                            move |conn| {
+                                Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                                    .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                                    .map_err(|(e, conn)| {
+                                        (
+                                            tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                            conn.unwrap_tokio_postgres().unwrap(),
+                                        )
+                                    })
+                            }
                         })
                 })
                 .map_err(RepoError::from),
@@ -114,6 +137,8 @@ impl CartService for CartServiceImpl {
 
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         debug!("Clearing cart for user {}", user_id);
+
+        let repo_factory = self.repo_factory.clone();
         Box::new(
             self.db_pool
                 .run(move |conn| {
@@ -121,7 +146,16 @@ impl CartService for CartServiceImpl {
                     conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
                         .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id]))
                         .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(Box::new(conn), user_id))
+                        .and_then(move |conn| {
+                            Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                                .map_err(|(e, conn)| {
+                                    (
+                                        tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                        conn.unwrap_tokio_postgres().unwrap(),
+                                    )
+                                })
+                        })
                 })
                 .map_err(RepoError::from),
         )

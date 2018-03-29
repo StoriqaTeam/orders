@@ -7,8 +7,8 @@ use util;
 
 #[derive(Clone, Debug, Default)]
 pub struct ProductMask {
-    user_id: Option<i32>,
-    product_id: Option<i32>,
+    pub user_id: Option<i32>,
+    pub product_id: Option<i32>,
 }
 
 pub trait ProductRepo {

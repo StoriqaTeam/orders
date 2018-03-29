@@ -7,6 +7,7 @@ use futures;
 use futures::prelude::*;
 use futures_state_stream::*;
 use std;
+use std::any::Any;
 use tokio_postgres;
 use tokio_postgres::rows::Row;
 use tokio_postgres::stmt::Statement;
@@ -16,7 +17,7 @@ use tokio_postgres::types::ToSql;
 pub type BoxedConnection<E> = Box<Connection<E> + Send>;
 pub type ConnectionFuture<T, E> = Box<Future<Item = (T, BoxedConnection<E>), Error = (E, BoxedConnection<E>)> + Send>;
 
-pub trait Connection<E>
+pub trait Connection<E>: Any
 where
     E: std::convert::From<tokio_postgres::Error>,
 {
@@ -27,11 +28,12 @@ where
         params: Vec<Box<ToSql + Send>>,
     ) -> Box<StateStream<Item = Row, State = BoxedConnection<E>, Error = E> + Send>;
     fn commit2(self: Box<Self>) -> ConnectionFuture<(), E>;
+    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection>;
 }
 
 /*
 impl RepoConnection for Transaction {
-    fn prepare2(self, query: &str) -> RepoFuture<(Statement, Box<RepoConnection>)> {
+    fn prepare2(self: Box<Self>, query: &str) -> RepoFuture<Statement> {
         Box::new(
             self.prepare(query)
                 .map(|(v, conn)| (v, Box::new(conn)))
@@ -64,6 +66,10 @@ impl Connection<RepoError> for tokio_postgres::Connection {
 
     fn commit2(self: Box<Self>) -> ConnectionFuture<(), RepoError> {
         Box::new(futures::future::ok(((), self as BoxedConnection<RepoError>)))
+    }
+
+    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection> {
+        Some(*self)
     }
 }
 
