@@ -42,7 +42,7 @@ impl SimpleQueryBuilder {
             } else {
                 query.push_str(" AND ");
             }
-            query.push_str(&format!("{} = ${}", col, i));
+            query.push_str(&format!("{} = ${}", col, i + 1));
             args.push(arg);
         }
         query.push(';');

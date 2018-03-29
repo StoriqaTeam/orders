@@ -22,6 +22,7 @@ use lib::controller::*;
 use lib::errors::*;
 use lib::models::*;
 use lib::repos::*;
+use lib::services::*;
 
 pub type ProductsRepoMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
 
@@ -30,14 +31,14 @@ pub struct ProductsRepoMemory {
 }
 
 impl CartService for ProductsRepoMemory {
-    fn get_cart(&self, user_id: i32) -> ConnectionFuture<Cart> {
+    fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
         Box::new(future::ok(cart.clone()))
     }
 
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ConnectionFuture<Cart> {
+    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
@@ -46,7 +47,7 @@ impl CartService for ProductsRepoMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ConnectionFuture<Cart> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
@@ -55,7 +56,7 @@ impl CartService for ProductsRepoMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn clear_cart(&self, user_id: i32) -> ConnectionFuture<Cart> {
+    fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 

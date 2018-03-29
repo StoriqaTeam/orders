@@ -16,6 +16,7 @@ use tokio_postgres::TlsMode;
 use lib::config;
 use lib::models::*;
 use lib::repos::*;
+use lib::services::*;
 
 fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
     let config = config::Config::new().unwrap();
