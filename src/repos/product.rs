@@ -5,7 +5,7 @@ use models::*;
 use repos::{RepoConnection, RepoConnectionFuture};
 use util;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProductMask {
     user_id: Option<i32>,
     product_id: Option<i32>,

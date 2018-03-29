@@ -1,5 +1,6 @@
 use futures::prelude::*;
 use futures_state_stream::*;
+use std::any::Any;
 use std::sync::{Arc, Mutex};
 use tokio_postgres;
 
@@ -18,9 +19,11 @@ pub trait CartService {
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
 }
 
+pub type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo>>;
+
 pub struct CartServiceImpl {
     db_pool: DbPool,
-    repo_factory: Arc<Fn(RepoConnection) -> Box<ProductRepo>>,
+    repo_factory: ProductRepoFactory,
 }
 
 impl CartServiceImpl {
@@ -33,34 +36,19 @@ impl CartServiceImpl {
 }
 
 impl CartServiceImpl {
-    fn _get_cart(
-        conn: tokio_postgres::Connection,
-        user_id: i32,
-    ) -> Box<Future<Item = (Cart, tokio_postgres::Connection), Error = (tokio_postgres::Error, tokio_postgres::Connection)>> {
-        let out = Arc::new(Mutex::new(Cart::default()));
-
+    fn _get_cart(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: i32) -> RepoConnectionFuture<Cart> {
         Box::new(
-            conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
-                .and_then({
-                    let out = out.clone();
-                    move |(statement, conn)| {
-                        conn.query(&statement, &[&user_id]).for_each({
-                            let out = out.clone();
-                            move |row| {
-                                let product_id = row.get("product_id");
-                                let quantity = row.get("quantity");
-
-                                out.lock().unwrap().products.insert(product_id, quantity);
-                            }
-                        })
-                    }
+            (repo_factory)(conn)
+                .get(ProductMask {
+                    user_id: Some(user_id),
+                    ..Default::default()
                 })
-                .map({
-                    let out = out.clone();
-                    move |conn| {
-                        let guard = out.lock().unwrap();
-                        ((*guard).clone(), conn)
+                .map(|(products, conn)| {
+                    let mut cart = Cart::default();
+                    for product in products.into_iter() {
+                        cart.products.insert(product.product_id, product.quantity);
                     }
+                    (cart, conn)
                 }),
         )
     }
@@ -71,9 +59,12 @@ impl CartService for CartServiceImpl {
         debug!("Getting cart for user {}.", user_id);
         Box::new(
             self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    Self::_get_cart(conn, user_id)
+                .run({
+                    let repo_factory = self.repo_factory.clone();
+                    move |conn| {
+                        log::acquired_db_connection(&conn);
+                        Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                    }
                 })
                 .map_err(RepoError::from),
         )
@@ -87,14 +78,17 @@ impl CartService for CartServiceImpl {
                     log::acquired_db_connection(&conn);
                     conn.prepare(
                         "
-                        INSERT INTO cart_items (user_id, product_id, quantity)
+                        INSERT INTO cart_items (user_id, product_id, quantitSy)
                         VALUES ($1, $2, $3)
                         ON CONFLICT (user_id, product_id)
                         DO UPDATE SET quantity = $3
                         ;",
                     ).and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id, &quantity]))
                         .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
+                        .and_then({
+                            let repo_factory = self.repo_factory.clone();
+                            move |conn| Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                        })
                 })
                 .map_err(RepoError::from),
         )
@@ -109,7 +103,10 @@ impl CartService for CartServiceImpl {
                     conn.prepare("DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2;")
                         .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id]))
                         .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
+                        .and_then({
+                            let repo_factory = self.repo_factory.clone();
+                            move |conn| Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                        })
                 })
                 .map_err(RepoError::from),
         )
@@ -124,7 +121,7 @@ impl CartService for CartServiceImpl {
                     conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
                         .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id]))
                         .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
+                        .and_then(move |conn| Self::_get_cart(Box::new(conn), user_id))
                 })
                 .map_err(RepoError::from),
         )

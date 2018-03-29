@@ -2,17 +2,17 @@ use tokio_postgres::rows::Row;
 
 #[derive(Clone, Debug)]
 pub struct NewProduct {
-    user_id: i32,
-    product_id: i32,
-    quantity: i32,
+    pub user_id: i32,
+    pub product_id: i32,
+    pub quantity: i32,
 }
 
 #[derive(Clone, Debug)]
 pub struct Product {
-    id: i32,
-    user_id: i32,
-    product_id: i32,
-    quantity: i32,
+    pub id: i32,
+    pub user_id: i32,
+    pub product_id: i32,
+    pub quantity: i32,
 }
 
 impl From<Row> for Product {
