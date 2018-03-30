@@ -27,6 +27,7 @@ use hyper::server::Http;
 use log_crate::LevelFilter as LogLevelFilter;
 use std::env;
 use std::io::Write;
+use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
 use tokio_core::reactor::{Core, Remote};
@@ -54,7 +55,7 @@ pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnect
 }
 
 /// Starts web server with the provided configuration
-pub fn start_server(config: config::Config) {
+pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<u16>, callback: F) {
     let mut builder = LogBuilder::new();
     builder
         .format(|formatter, record| {
@@ -83,8 +84,13 @@ pub fn start_server(config: config::Config) {
         ).expect("Failed to create connection pool")
     });
 
+    let listen_address = {
+        let port = port.unwrap_or(config.listen.port);
+        SocketAddr::from((config.listen.host, port))
+    };
+
     let serve = Http::new()
-        .serve_addr_handle(&config.listen, &core.handle(), move || {
+        .serve_addr_handle(&listen_address, &core.handle(), move || {
             let controller = Box::new(controller::ControllerImpl::new(db_pool.clone()));
 
             // Prepare application
@@ -109,6 +115,11 @@ pub fn start_server(config: config::Config) {
             })
             .map_err(|_| ()),
     );
-    info!("Listening on http://{}", config.listen);
+
+    info!("Listening on http://{}", listen_address);
+    handle.spawn_fn(move || {
+        callback();
+        future::ok(())
+    });
     core.run(future::empty::<(), ()>()).unwrap();
 }
