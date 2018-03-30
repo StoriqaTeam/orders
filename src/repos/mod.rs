@@ -31,17 +31,39 @@ where
     fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection>;
 }
 
-/*
-impl RepoConnection for Transaction {
-    fn prepare2(self: Box<Self>, query: &str) -> RepoFuture<Statement> {
+impl Connection<RepoError> for Transaction {
+    fn prepare2(self: Box<Self>, query: &str) -> ConnectionFuture<Statement, RepoError> {
         Box::new(
             self.prepare(query)
-                .map(|(v, conn)| (v, Box::new(conn)))
-                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn))),
+                .map(|(v, conn)| (v, Box::new(conn) as BoxedConnection<RepoError>))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as BoxedConnection<RepoError>)),
         )
     }
+
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = BoxedConnection<RepoError>, Error = RepoError> + Send> {
+        Box::new(
+            self.query(statement, &params.iter().map(|v| &**v as &ToSql).collect::<Vec<&ToSql>>())
+                .map_err(RepoError::from)
+                .map_state(|conn| Box::new(conn) as BoxedConnection<RepoError>),
+        )
+    }
+
+    fn commit2(self: Box<Self>) -> ConnectionFuture<(), RepoError> {
+        Box::new(
+            self.commit()
+                .map(|conn| ((), Box::new(conn) as BoxedConnection<RepoError>))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as BoxedConnection<RepoError>)),
+        )
+    }
+
+    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection> {
+        None
+    }
 }
-*/
 
 impl Connection<RepoError> for tokio_postgres::Connection {
     fn prepare2(self: Box<Self>, query: &str) -> ConnectionFuture<Statement, RepoError> {
