@@ -1,8 +1,6 @@
 use failure;
 use futures::prelude::*;
-use futures_state_stream::*;
-use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio_postgres;
 
 use errors::*;
@@ -81,26 +79,23 @@ impl CartService for CartServiceImpl {
             self.db_pool
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
-                    conn.prepare(
-                        "
-                        INSERT INTO cart_items (user_id, product_id, quantity)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (user_id, product_id)
-                        DO UPDATE SET quantity = $3
-                        ;",
-                    ).and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id, &quantity]))
-                        .map(|(_, conn)| conn)
+                    repo_factory(Box::new(conn))
+                        .insert(NewProduct {
+                            user_id,
+                            product_id,
+                            quantity,
+                        })
                         .and_then({
-                            move |conn| {
-                                Self::_get_cart(repo_factory, Box::new(conn), user_id)
-                                    .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
-                                    .map_err(|(e, conn)| {
-                                        (
-                                            tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                            conn.unwrap_tokio_postgres().unwrap(),
-                                        )
-                                    })
+                            move |(_, conn)| {
+                                Self::_get_cart(repo_factory, conn, user_id)
                             }
+                        })
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map_err(|(e, conn)| {
+                            (
+                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                conn.unwrap_tokio_postgres().unwrap(),
+                            )
                         })
                 })
                 .map_err(RepoError::from),

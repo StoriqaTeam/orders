@@ -13,6 +13,7 @@ pub struct ProductMask {
 
 pub trait ProductRepo {
     fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
+    fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()>;
 }
 
 pub struct ProductRepoImpl {
@@ -46,6 +47,22 @@ impl ProductRepo for ProductRepoImpl {
                 .prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
                 .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)),
+        )
+    }
+
+    fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()> {
+        let (statement, args) = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Insert, "cart_items")
+            .with_arg("user_id", item.user_id)
+            .with_arg("product_id", item.product_id)
+            .with_arg("quantity", item.quantity)
+            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $3")
+            .build();
+
+        Box::new(
+            self.connection
+                .prepare2(&statement)
+                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
+                .map(|(_rows, conn)| ((), conn)),
         )
     }
 }
