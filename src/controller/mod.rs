@@ -19,13 +19,13 @@ use types::*;
 
 pub struct ControllerImpl {
     pub route_parser: Arc<RouteParser<Route>>,
-    pub repo_factory: Arc<Fn() -> Box<CartService>>,
+    pub service_factory: Arc<Fn() -> Box<CartService>>,
 }
 
 impl ControllerImpl {
     pub fn new(db_pool: DbPool) -> Self {
         ControllerImpl {
-            repo_factory: Arc::new(move || Box::new(CartServiceImpl::new(db_pool.clone()))),
+            service_factory: Arc::new(move || Box::new(CartServiceImpl::new(db_pool.clone()))),
             route_parser: Arc::new(routing::make_router()),
         }
     }
@@ -51,7 +51,7 @@ impl Controller for ControllerImpl {
                     }),
             ).inspect(|user_id| debug!("Extracted user_id: {}", user_id))
                 .and_then({
-                    let repo_factory = self.repo_factory.clone();
+                    let repo_factory = self.service_factory.clone();
                     let route_parser = self.route_parser.clone();
                     move |user_id| {
                         match (method, route_parser.test(uri.path())) {

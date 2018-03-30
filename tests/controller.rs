@@ -24,13 +24,13 @@ use lib::models::*;
 use lib::repos::*;
 use lib::services::*;
 
-pub type ProductsRepoMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
+pub type CartServiceMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
 
-pub struct ProductsRepoMemory {
-    pub inner: ProductsRepoMemoryStorage,
+pub struct CartServiceMemory {
+    pub inner: CartServiceMemoryStorage,
 }
 
-impl CartService for ProductsRepoMemory {
+impl CartService for CartServiceMemory {
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
@@ -66,14 +66,14 @@ impl CartService for ProductsRepoMemory {
     }
 }
 
-fn make_test_controller(inner: ProductsRepoMemoryStorage) -> ControllerImpl {
+fn make_test_controller(inner: CartServiceMemoryStorage) -> ControllerImpl {
     ControllerImpl {
         route_parser: Arc::new(routing::make_router()),
-        repo_factory: Arc::new(move || Box::new(ProductsRepoMemory { inner: inner.clone() })),
+        service_factory: Arc::new(move || Box::new(CartServiceMemory { inner: inner.clone() })),
     }
 }
 
-fn run_controller_op(data: ProductsRepoMemoryStorage, req: Request) -> ControllerFuture {
+fn run_controller_op(data: CartServiceMemoryStorage, req: Request) -> ControllerFuture {
     make_test_controller(data).call(req)
 }
 
