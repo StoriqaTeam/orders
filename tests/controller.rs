@@ -69,7 +69,10 @@ impl CartService for CartServiceMemory {
 fn make_test_controller(inner: CartServiceMemoryStorage) -> ControllerImpl {
     ControllerImpl {
         route_parser: Arc::new(routing::make_router()),
-        service_factory: Arc::new(move || Box::new(CartServiceMemory { inner: inner.clone() })),
+        service_factory: Arc::new(ServiceFactory {
+            system_factory: Arc::new(|| Box::new(SystemServiceImpl::default())),
+            cart_factory: Arc::new(move || Box::new(CartServiceMemory { inner: inner.clone() })),
+        }),
     }
 }
 
