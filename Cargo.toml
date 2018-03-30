@@ -21,6 +21,7 @@ hyper-tls="0.1.2"
 log = "*"
 maplit = "*"
 postgres = { git = "https://github.com/sfackler/rust-postgres" }
+rand = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
