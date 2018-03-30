@@ -85,11 +85,7 @@ impl CartService for CartServiceImpl {
                             product_id,
                             quantity,
                         })
-                        .and_then({
-                            move |(_, conn)| {
-                                Self::_get_cart(repo_factory, conn, user_id)
-                            }
-                        })
+                        .and_then({ move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id) })
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
                         .map_err(|(e, conn)| {
                             (
@@ -110,20 +106,19 @@ impl CartService for CartServiceImpl {
             self.db_pool
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
-                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2;")
-                        .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id]))
-                        .map(|(_, conn)| conn)
-                        .and_then({
-                            move |conn| {
-                                Self::_get_cart(repo_factory, Box::new(conn), user_id)
-                                    .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
-                                    .map_err(|(e, conn)| {
-                                        (
-                                            tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                            conn.unwrap_tokio_postgres().unwrap(),
-                                        )
-                                    })
-                            }
+                    (repo_factory)(Box::new(conn))
+                        .remove(ProductMask {
+                            user_id: Some(user_id),
+                            product_id: Some(product_id),
+                            ..Default::default()
+                        })
+                        .and_then(move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map_err(|(e, conn)| {
+                            (
+                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                conn.unwrap_tokio_postgres().unwrap(),
+                            )
                         })
                 })
                 .map_err(RepoError::from),
@@ -138,18 +133,18 @@ impl CartService for CartServiceImpl {
             self.db_pool
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
-                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
-                        .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id]))
-                        .map(|(_, conn)| conn)
-                        .and_then(move |conn| {
-                            Self::_get_cart(repo_factory, Box::new(conn), user_id)
-                                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
-                                .map_err(|(e, conn)| {
-                                    (
-                                        tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                        conn.unwrap_tokio_postgres().unwrap(),
-                                    )
-                                })
+                    (repo_factory)(Box::new(conn))
+                        .remove(ProductMask {
+                            user_id: Some(user_id),
+                            ..Default::default()
+                        })
+                        .and_then(move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map_err(|(e, conn)| {
+                            (
+                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
+                                conn.unwrap_tokio_postgres().unwrap(),
+                            )
                         })
                 })
                 .map_err(RepoError::from),
