@@ -14,6 +14,7 @@ pub struct ProductMask {
 pub trait ProductRepo {
     fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
     fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()>;
+    fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()>;
 }
 
 pub struct ProductRepoImpl {
@@ -60,6 +61,27 @@ impl ProductRepo for ProductRepoImpl {
             self.connection
                 .prepare2(&statement)
                 .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
+                .map(|(_rows, conn)| ((), conn)),
+        )
+    }
+
+    fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()> {
+        let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Delete, "cart_items");
+
+        if let Some(v) = mask.user_id {
+            query_builder = query_builder.with_arg("user_id", v);
+        }
+
+        if let Some(v) = mask.product_id {
+            query_builder = query_builder.with_arg("product_id", v);
+        }
+
+        let (statement, args) = query_builder.build();
+
+        Box::new(
+            self.connection
+                .prepare2(&statement)
+                .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
                 .map(|(_rows, conn)| ((), conn)),
         )
     }
