@@ -5,7 +5,7 @@ use models::*;
 use repos::{RepoConnection, RepoConnectionFuture};
 use util;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct ProductMask {
     pub user_id: Option<i32>,
     pub product_id: Option<i32>,
@@ -28,15 +28,13 @@ impl ProductRepoImpl {
 
 impl ProductRepo for ProductRepoImpl {
     fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
-        let ProductMask { user_id, product_id } = mask;
-
         let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Select, "cart_items");
 
-        if let Some(v) = user_id {
+        if let Some(v) = mask.user_id {
             query_builder = query_builder.with_arg("user_id", v);
         }
 
-        if let Some(v) = product_id {
+        if let Some(v) = mask.product_id {
             query_builder = query_builder.with_arg("product_id", v);
         }
 
