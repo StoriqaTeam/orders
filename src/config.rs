@@ -35,11 +35,16 @@ pub struct Listen {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub struct Database {
+    pub dsn: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Server listen address
     pub listen: Listen,
-    /// Database address
-    pub dsn: String,
+    /// Database settings
+    pub db: Database,
 }
 
 impl Config {

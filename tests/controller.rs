@@ -250,7 +250,7 @@ fn test_clear_cart() {
         user_id => expected_cart.clone(),
     };
 
-    let mut req = Request::new(Method::Post, Uri::from_str("/cart/clear/").unwrap());
+    let mut req = Request::new(Method::Post, Uri::from_str("/cart/clear").unwrap());
     req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
 
     let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();

@@ -18,7 +18,7 @@ use lib::services::*;
 
 fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
     let config = lib::Config::new().unwrap();
-    let manager = PostgresConnectionManager::new(config.dsn.clone(), || TlsMode::None).unwrap();
+    let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
 
     bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
 }
