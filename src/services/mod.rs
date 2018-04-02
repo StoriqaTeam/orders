@@ -18,7 +18,7 @@ pub trait CartService {
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
 }
 
-pub type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
+type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
 
 pub struct CartServiceImpl {
     db_pool: DbPool,
