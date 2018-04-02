@@ -29,7 +29,7 @@ impl ProductRepoImpl {
 
 impl ProductRepo for ProductRepoImpl {
     fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
-        let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Select, "cart_items");
+        let mut query_builder = util::FilteredOperationBuilder::new(util::FilteredOperation::Select, "cart_items");
 
         if let Some(v) = mask.user_id {
             query_builder = query_builder.with_arg("user_id", v);
@@ -50,7 +50,7 @@ impl ProductRepo for ProductRepoImpl {
     }
 
     fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()> {
-        let (statement, args) = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Insert, "cart_items")
+        let (statement, args) = util::InsertBuilder::new("cart_items")
             .with_arg("user_id", item.user_id)
             .with_arg("product_id", item.product_id)
             .with_arg("quantity", item.quantity)
@@ -66,7 +66,7 @@ impl ProductRepo for ProductRepoImpl {
     }
 
     fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()> {
-        let mut query_builder = util::SimpleQueryBuilder::new(util::SimpleQueryOperation::Delete, "cart_items");
+        let mut query_builder = util::FilteredOperationBuilder::new(util::FilteredOperation::Delete, "cart_items");
 
         if let Some(v) = mask.user_id {
             query_builder = query_builder.with_arg("user_id", v);
