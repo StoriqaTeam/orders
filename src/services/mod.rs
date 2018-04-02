@@ -61,8 +61,8 @@ impl CartService for CartServiceImpl {
                     move |conn| {
                         log::acquired_db_connection(&conn);
                         get_cart_from_repo(repo_factory, Box::new(conn), user_id)
-                            .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
-                            .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres().unwrap()))
+                            .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                            .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                     }
                 })
                 .map_err(RepoError::from),
@@ -84,11 +84,11 @@ impl CartService for CartServiceImpl {
                             quantity,
                         })
                         .and_then({ move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id) })
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                         .map_err(|(e, conn)| {
                             (
                                 tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres().unwrap(),
+                                conn.unwrap_tokio_postgres(),
                             )
                         })
                 })
@@ -111,11 +111,11 @@ impl CartService for CartServiceImpl {
                             ..Default::default()
                         })
                         .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                         .map_err(|(e, conn)| {
                             (
                                 tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres().unwrap(),
+                                conn.unwrap_tokio_postgres(),
                             )
                         })
                 })
@@ -137,11 +137,11 @@ impl CartService for CartServiceImpl {
                             ..Default::default()
                         })
                         .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                         .map_err(|(e, conn)| {
                             (
                                 tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres().unwrap(),
+                                conn.unwrap_tokio_postgres(),
                             )
                         })
                 })

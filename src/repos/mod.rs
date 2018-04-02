@@ -28,7 +28,7 @@ where
         params: Vec<Box<ToSql + Send>>,
     ) -> Box<StateStream<Item = Row, State = BoxedConnection<E>, Error = E> + Send>;
     fn commit2(self: Box<Self>) -> ConnectionFuture<(), E>;
-    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection>;
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection;
 }
 
 impl Connection<RepoError> for Transaction {
@@ -60,8 +60,8 @@ impl Connection<RepoError> for Transaction {
         )
     }
 
-    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection> {
-        None
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection {
+        unreachable!()
     }
 }
 
@@ -90,8 +90,8 @@ impl Connection<RepoError> for tokio_postgres::Connection {
         Box::new(futures::future::ok(((), self as BoxedConnection<RepoError>)))
     }
 
-    fn unwrap_tokio_postgres(self: Box<Self>) -> Option<tokio_postgres::Connection> {
-        Some(*self)
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection {
+        *self
     }
 }
 
