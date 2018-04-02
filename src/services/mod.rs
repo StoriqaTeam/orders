@@ -34,23 +34,21 @@ impl CartServiceImpl {
     }
 }
 
-impl CartServiceImpl {
-    fn _get_cart(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: i32) -> RepoConnectionFuture<Cart> {
-        Box::new(
-            (repo_factory)(conn)
-                .get(ProductMask {
-                    user_id: Some(user_id),
-                    ..Default::default()
-                })
-                .map(|(products, conn)| {
-                    let mut cart = Cart::default();
-                    for product in products.into_iter() {
-                        cart.products.insert(product.product_id, product.quantity);
-                    }
-                    (cart, conn)
-                }),
-        )
-    }
+fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: i32) -> RepoConnectionFuture<Cart> {
+    Box::new(
+        (repo_factory)(conn)
+            .get(ProductMask {
+                user_id: Some(user_id),
+                ..Default::default()
+            })
+            .map(|(products, conn)| {
+                let mut cart = Cart::default();
+                for product in products.into_iter() {
+                    cart.products.insert(product.product_id, product.quantity);
+                }
+                (cart, conn)
+            }),
+    )
 }
 
 impl CartService for CartServiceImpl {
@@ -62,7 +60,7 @@ impl CartService for CartServiceImpl {
                     let repo_factory = self.repo_factory.clone();
                     move |conn| {
                         log::acquired_db_connection(&conn);
-                        Self::_get_cart(repo_factory, Box::new(conn), user_id)
+                        get_cart_from_repo(repo_factory, Box::new(conn), user_id)
                             .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
                             .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres().unwrap()))
                     }
@@ -85,7 +83,7 @@ impl CartService for CartServiceImpl {
                             product_id,
                             quantity,
                         })
-                        .and_then({ move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id) })
+                        .and_then({ move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id) })
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
                         .map_err(|(e, conn)| {
                             (
@@ -112,7 +110,7 @@ impl CartService for CartServiceImpl {
                             product_id: Some(product_id),
                             ..Default::default()
                         })
-                        .and_then(move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id))
+                        .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
                         .map_err(|(e, conn)| {
                             (
@@ -138,7 +136,7 @@ impl CartService for CartServiceImpl {
                             user_id: Some(user_id),
                             ..Default::default()
                         })
-                        .and_then(move |(_, conn)| Self::_get_cart(repo_factory, conn, user_id))
+                        .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres().unwrap()))
                         .map_err(|(e, conn)| {
                             (
