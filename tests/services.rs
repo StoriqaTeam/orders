@@ -13,13 +13,11 @@ use std::sync::Arc;
 use tokio_core::reactor::{Core, Remote};
 use tokio_postgres::TlsMode;
 
-use lib::config;
 use lib::models::*;
-use lib::repos::*;
 use lib::services::*;
 
 fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
-    let config = config::Config::new().unwrap();
+    let config = lib::Config::new().unwrap();
     let manager = PostgresConnectionManager::new(config.dsn.clone(), || TlsMode::None).unwrap();
 
     bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
