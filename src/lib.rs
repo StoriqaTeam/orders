@@ -1,5 +1,6 @@
 extern crate bb8;
 extern crate bb8_postgres;
+extern crate chrono;
 extern crate config as config_crate;
 extern crate env_logger;
 #[macro_use]
@@ -18,9 +19,14 @@ extern crate tokio_core;
 extern crate tokio_postgres;
 
 use bb8_postgres::PostgresConnectionManager;
+use chrono::prelude::*;
+use env_logger::Builder as LogBuilder;
 use futures::future;
 use futures::prelude::*;
 use hyper::server::Http;
+use log_crate::LevelFilter as LogLevelFilter;
+use std::env;
+use std::io::Write;
 use std::process::exit;
 use std::sync::Arc;
 use tokio_core::reactor::{Core, Remote};
@@ -47,10 +53,22 @@ pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnect
     bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
 }
 
-/// Starts the server with provided configuration
+/// Starts web server with the provided configuration
 pub fn start_server(config: config::Config) {
+    let mut builder = LogBuilder::new();
+    builder
+        .format(|formatter, record| {
+            let now = Utc::now();
+            writeln!(formatter, "{} - {} - {}", now.to_rfc3339(), record.level(), record.args())
+        })
+        .filter(None, LogLevelFilter::Info);
+
+    if env::var("RUST_LOG").is_ok() {
+        builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
     // Prepare logger
-    env_logger::init();
+    builder.init();
 
     let mut core = Core::new().expect("Unexpected error creating event loop core");
 
@@ -91,5 +109,6 @@ pub fn start_server(config: config::Config) {
             })
             .map_err(|_| ()),
     );
+    info!("Listening on http://{}", config.listen);
     core.run(future::empty::<(), ()>()).unwrap();
 }

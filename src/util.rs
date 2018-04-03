@@ -1,12 +1,13 @@
 use tokio_postgres::types::ToSql;
 
+/// Filtering operation
 #[derive(Clone, Copy, Debug)]
 pub enum FilteredOperation {
     Select,
     Delete,
 }
 
-/// Enables the user to construct a simple insert or select query.
+/// Construct a simple select or delete query.
 pub struct FilteredOperationBuilder {
     op: FilteredOperation,
     table: String,
@@ -15,6 +16,7 @@ pub struct FilteredOperationBuilder {
 }
 
 impl FilteredOperationBuilder {
+    /// Create a new builder
     pub fn new<N: Into<String>>(op: FilteredOperation, table: N) -> Self {
         Self {
             op,
@@ -24,17 +26,19 @@ impl FilteredOperationBuilder {
         }
     }
 
-    pub fn with_arg<K: Into<String>, V: ToSql + Send + 'static>(mut self, k: K, v: V) -> Self {
-        self.args.push((k.into(), Box::new(v)));
+    /// Add filtering arguments
+    pub fn with_arg<C: Into<String>, V: ToSql + Send + 'static>(mut self, column: C, value: V) -> Self {
+        self.args.push((column.into(), Box::new(value)));
         self
     }
 
-    pub fn with_extra<S: Into<String>>(mut self, s: S) -> Self {
-        self.extra = s.into();
+    /// Add additional statements before the semicolon
+    pub fn with_extra<S: Into<String>>(mut self, statements: S) -> Self {
+        self.extra = statements.into();
         self
     }
 
-    /// Builds a query
+    /// Build a query
     pub fn build(self) -> (String, Vec<Box<ToSql + Send + 'static>>) {
         let mut args = vec![];
         let mut query = format!(
@@ -61,7 +65,7 @@ impl FilteredOperationBuilder {
     }
 }
 
-/// Enables the user to create a simple insert query.
+/// Construct a simple insert query.
 pub struct InsertBuilder {
     table: String,
     extra: String,
