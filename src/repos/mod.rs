@@ -1,127 +1,99 @@
+pub mod product;
+pub use self::product::*;
+
+use errors::RepoError;
+
+use futures;
 use futures::prelude::*;
 use futures_state_stream::*;
-use std::sync::{Arc, Mutex};
+use std;
+use std::any::Any;
 use tokio_postgres;
+use tokio_postgres::rows::Row;
+use tokio_postgres::stmt::Statement;
+use tokio_postgres::transaction::Transaction;
+use tokio_postgres::types::ToSql;
 
-use errors::*;
-use log;
-use models::*;
-use types::*;
+pub type BoxedConnection<E> = Box<Connection<E> + Send>;
+pub type ConnectionFuture<T, E> = Box<Future<Item = (T, BoxedConnection<E>), Error = (E, BoxedConnection<E>)> + Send>;
 
-pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
-
-pub trait ProductsRepo {
-    fn get_cart(&self, user_id: i32) -> RepoFuture<Cart>;
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<Cart>;
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<Cart>;
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<Cart>;
+pub trait Connection<E>: Any
+where
+    E: std::convert::From<tokio_postgres::Error>,
+{
+    fn prepare2(self: Box<Self>, query: &str) -> ConnectionFuture<Statement, E>;
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = BoxedConnection<E>, Error = E> + Send>;
+    fn commit2(self: Box<Self>) -> ConnectionFuture<(), E>;
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection;
 }
 
-pub struct ProductsRepoImpl {
-    db_pool: DbPool,
-}
-
-impl ProductsRepoImpl {
-    pub fn new(db_pool: DbPool) -> Self {
-        Self { db_pool }
-    }
-}
-
-impl ProductsRepoImpl {
-    fn _get_cart(
-        conn: tokio_postgres::Connection,
-        user_id: i32,
-    ) -> Box<Future<Item = (Cart, tokio_postgres::Connection), Error = (tokio_postgres::Error, tokio_postgres::Connection)>> {
-        let out = Arc::new(Mutex::new(Cart::default()));
-
+impl Connection<RepoError> for Transaction {
+    fn prepare2(self: Box<Self>, query: &str) -> ConnectionFuture<Statement, RepoError> {
         Box::new(
-            conn.prepare("SELECT * FROM cart_items WHERE user_id = $1")
-                .and_then({
-                    let out = out.clone();
-                    move |(statement, conn)| {
-                        conn.query(&statement, &[&user_id]).for_each({
-                            let out = out.clone();
-                            move |row| {
-                                let product_id = row.get("product_id");
-                                let quantity = row.get("quantity");
-
-                                out.lock().unwrap().products.insert(product_id, quantity);
-                            }
-                        })
-                    }
-                })
-                .map({
-                    let out = out.clone();
-                    move |conn| {
-                        let guard = out.lock().unwrap();
-                        ((*guard).clone(), conn)
-                    }
-                }),
-        )
-    }
-}
-
-impl ProductsRepo for ProductsRepoImpl {
-    fn get_cart(&self, user_id: i32) -> RepoFuture<Cart> {
-        debug!("Getting cart for user {}.", user_id);
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    Self::_get_cart(conn, user_id)
-                })
-                .map_err(RepoError::from),
+            self.prepare(query)
+                .map(|(v, conn)| (v, Box::new(conn) as BoxedConnection<RepoError>))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as BoxedConnection<RepoError>)),
         )
     }
 
-    fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> RepoFuture<Cart> {
-        debug!("Setting item {} to quantity {} in cart for user {}.", product_id, quantity, user_id);
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = BoxedConnection<RepoError>, Error = RepoError> + Send> {
         Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    conn.prepare(
-                        "
-                        INSERT INTO cart_items (user_id, product_id, quantity)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (user_id, product_id)
-                        DO UPDATE SET quantity = $3
-                        ;",
-                    ).and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id, &quantity]))
-                        .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
-                })
-                .map_err(RepoError::from),
+            self.query(statement, &params.iter().map(|v| &**v as &ToSql).collect::<Vec<&ToSql>>())
+                .map_err(RepoError::from)
+                .map_state(|conn| Box::new(conn) as BoxedConnection<RepoError>),
         )
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> RepoFuture<Cart> {
-        debug!("Deleting item {} for user {}", product_id, user_id);
+    fn commit2(self: Box<Self>) -> ConnectionFuture<(), RepoError> {
         Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2;")
-                        .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id, &product_id]))
-                        .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
-                })
-                .map_err(RepoError::from),
+            self.commit()
+                .map(|conn| ((), Box::new(conn) as BoxedConnection<RepoError>))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as BoxedConnection<RepoError>)),
         )
     }
 
-    fn clear_cart(&self, user_id: i32) -> RepoFuture<Cart> {
-        debug!("Clearing cart for user {}", user_id);
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    conn.prepare("DELETE FROM cart_items WHERE user_id = $1;")
-                        .and_then(move |(statement, conn)| conn.execute(&statement, &[&user_id]))
-                        .map(|(_, conn)| conn)
-                        .and_then(move |conn| Self::_get_cart(conn, user_id))
-                })
-                .map_err(RepoError::from),
-        )
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection {
+        unreachable!()
     }
 }
+
+impl Connection<RepoError> for tokio_postgres::Connection {
+    fn prepare2(self: Box<Self>, query: &str) -> ConnectionFuture<Statement, RepoError> {
+        Box::new(
+            self.prepare(query)
+                .map(|(v, conn)| (v, Box::new(conn) as BoxedConnection<RepoError>))
+                .map_err(|(e, conn)| (RepoError::from(e), Box::new(conn) as BoxedConnection<RepoError>)),
+        )
+    }
+
+    fn query2(
+        self: Box<Self>,
+        statement: &Statement,
+        params: Vec<Box<ToSql + Send>>,
+    ) -> Box<StateStream<Item = Row, State = BoxedConnection<RepoError>, Error = RepoError> + Send> {
+        Box::new(
+            self.query(statement, &params.iter().map(|v| &**v as &ToSql).collect::<Vec<&ToSql>>())
+                .map_err(RepoError::from)
+                .map_state(|conn| Box::new(conn) as BoxedConnection<RepoError>),
+        )
+    }
+
+    fn commit2(self: Box<Self>) -> ConnectionFuture<(), RepoError> {
+        Box::new(futures::future::ok(((), self as BoxedConnection<RepoError>)))
+    }
+
+    fn unwrap_tokio_postgres(self: Box<Self>) -> tokio_postgres::Connection {
+        *self
+    }
+}
+
+pub type RepoConnection = BoxedConnection<RepoError>;
+pub type RepoConnectionFuture<T> = ConnectionFuture<T, RepoError>;
