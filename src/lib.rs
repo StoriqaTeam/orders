@@ -47,7 +47,7 @@ pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnect
     bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
 }
 
-/// Starts the server with provided configuration
+/// Starts web server with the provided configuration
 pub fn start_server(config: config::Config) {
     // Prepare logger
     env_logger::init();

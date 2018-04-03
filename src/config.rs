@@ -27,9 +27,12 @@ impl Env {
     }
 }
 
+/// Service configuration
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
+    /// Server listen address
     pub listen: SocketAddr,
+    /// Database address
     pub dsn: String,
 }
 

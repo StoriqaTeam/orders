@@ -11,21 +11,28 @@ use types::*;
 
 pub type ServiceFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
+/// Service that provides operations for interacting with user carts
 pub trait CartService {
+    /// Get user's cart contents
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    /// Set item to desired quantity in user's cart
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart>;
+    /// Delete item from user's cart
     fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
+    /// Clear user's cart
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
 }
 
 type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
 
+/// Default implementation of user cart service
 pub struct CartServiceImpl {
     db_pool: DbPool,
     repo_factory: ProductRepoFactory,
 }
 
 impl CartServiceImpl {
+    /// Create new cart service with provided DB connection pool
     pub fn new(db_pool: DbPool) -> Self {
         Self {
             db_pool,
