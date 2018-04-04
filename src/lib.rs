@@ -11,7 +11,10 @@ extern crate hyper;
 #[macro_use]
 extern crate log as log_crate;
 #[macro_use]
+extern crate maplit;
+#[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 extern crate stq_http;
 extern crate stq_router;
