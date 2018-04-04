@@ -1,5 +1,5 @@
 use std::env;
-use std::net::SocketAddr;
+use std::net::IpAddr;
 
 use config_crate::{Config as RawConfig, ConfigError, Environment, File};
 
@@ -29,11 +29,22 @@ impl Env {
 
 /// Service configuration
 #[derive(Clone, Serialize, Deserialize)]
+pub struct Listen {
+    pub host: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Database {
+    pub dsn: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Server listen address
-    pub listen: SocketAddr,
-    /// Database address
-    pub dsn: String,
+    pub listen: Listen,
+    /// Database settings
+    pub db: Database,
 }
 
 impl Config {
