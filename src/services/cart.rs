@@ -1,10 +1,8 @@
-use failure;
 use futures::future;
 use futures::prelude::*;
 use std;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio_postgres;
 
 use super::types::ServiceFuture;
 use errors::*;
@@ -94,12 +92,7 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({ move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id) })
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| {
-                            (
-                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres(),
-                            )
-                        })
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
                 .map_err(RepoError::from),
         )
@@ -121,12 +114,7 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| {
-                            (
-                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres(),
-                            )
-                        })
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
                 .map_err(RepoError::from),
         )
@@ -147,12 +135,7 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| {
-                            (
-                                tokio_postgres::error::conversion(Box::new(failure::Error::from(e).compat())),
-                                conn.unwrap_tokio_postgres(),
-                            )
-                        })
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
                 .map_err(RepoError::from),
         )
@@ -205,9 +188,9 @@ impl CartService for CartServiceMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config;
     use bb8;
     use bb8_postgres::PostgresConnectionManager;
+    use config;
     use tokio_core::reactor::{Core, Remote};
     use tokio_postgres::TlsMode;
 
