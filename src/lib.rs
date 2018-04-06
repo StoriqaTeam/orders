@@ -74,10 +74,10 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
 
     let serve = Http::new()
         .serve_addr_handle(&listen_address, &core.handle(), move || {
-            let controller = Box::new(controller::ControllerImpl::new(db_pool.clone()));
+            let controller = controller::ControllerImpl::new(db_pool.clone());
 
             // Prepare application
-            let app = Application { controller };
+            let app = Application::new(controller);
 
             Ok(app)
         })
