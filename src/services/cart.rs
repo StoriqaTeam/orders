@@ -192,6 +192,7 @@ mod tests {
     use bb8_postgres::PostgresConnectionManager;
     use config;
     use tokio_core::reactor::{Core, Remote};
+    use tokio_postgres;
     use tokio_postgres::TlsMode;
 
     fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
