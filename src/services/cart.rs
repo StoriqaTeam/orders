@@ -188,19 +188,8 @@ impl CartService for CartServiceMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bb8;
-    use bb8_postgres::PostgresConnectionManager;
-    use config;
-    use tokio_core::reactor::{Core, Remote};
-    use tokio_postgres;
-    use tokio_postgres::TlsMode;
-
-    fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
-        let config = config::Config::new().unwrap();
-        let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
-
-        bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
-    }
+    use prepare_db;
+    use tokio_core::reactor::Core;
 
     #[test]
     fn test_products_repo() {

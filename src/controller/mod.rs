@@ -5,13 +5,16 @@ use hyper::{Delete, Get, Headers, Post, Put, Request};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use stq_http::client::ClientHandle as HttpClientHandle;
 use stq_http::controller::Controller;
 use stq_http::errors::ControllerError;
 use stq_http::request_util::{parse_body, serialize_future, ControllerFuture};
 use stq_router::RouteParser;
 
+use config::*;
 use errors::*;
 use models::*;
+use repos::*;
 use services::*;
 pub mod routing;
 use self::routing::*;
@@ -20,19 +23,41 @@ use types::*;
 pub struct ServiceFactory {
     pub system_factory: Arc<Fn() -> Box<SystemService>>,
     pub cart_factory: Arc<Fn() -> Box<CartService>>,
+    pub order_factory: Arc<Fn() -> Box<OrderService>>,
 }
 
 pub struct ControllerImpl {
-    pub route_parser: Arc<RouteParser<Route>>,
-    pub service_factory: Arc<ServiceFactory>,
+    route_parser: Arc<RouteParser<Route>>,
+    service_factory: Arc<ServiceFactory>,
 }
 
 impl ControllerImpl {
-    pub fn new(db_pool: DbPool) -> Self {
+    pub fn new(db_pool: DbPool, http_client: HttpClientHandle, config: Config) -> Self {
+        let cart_factory = Arc::new({
+            let db_pool = db_pool.clone();
+            move || Box::new(CartServiceImpl::new(db_pool.clone())) as Box<CartService>
+        });
         ControllerImpl {
             service_factory: Arc::new(ServiceFactory {
                 system_factory: Arc::new(|| Box::new(SystemServiceImpl::default())),
-                cart_factory: Arc::new(move || Box::new(CartServiceImpl::new(db_pool.clone()))),
+                order_factory: Arc::new({
+                    let cart_factory = cart_factory.clone();
+                    let http_client = http_client.clone();
+                    let config = config.clone();
+                    move || {
+                        Box::new(OrderServiceImpl {
+                            db_pool: db_pool.clone(),
+                            cart_service_factory: cart_factory.clone(),
+                            order_repo_factory: Arc::new(|| Box::new(OrderRepoImpl::default())),
+                            product_info_source: Arc::new({
+                                let http_client = http_client.clone();
+                                let config = config.clone();
+                                move || Box::new(ProductInfoRepoImpl::new(http_client.clone(), config.services.stores.clone()))
+                            }),
+                        })
+                    }
+                }),
+                cart_factory,
             }),
             route_parser: Arc::new(routing::make_router()),
         }
@@ -79,26 +104,18 @@ impl Controller for ControllerImpl {
                     match (method, route) {
                         (Get, Some(Route::CartProducts)) => serialize_future({
                             debug!("Received request to get cart for user {}", user_id);
-                            Box::new(
-                                (service_factory.cart_factory)()
-                                    .get_cart(user_id)
-                                    .map_err(|e| ControllerError::InternalServerError(e.into())),
-                            )
+                            Box::new((service_factory.cart_factory)().get_cart(user_id).map_err(ControllerError::from))
                         }),
                         (Post, Some(Route::CartClear)) => serialize_future({
                             debug!("Received request to clear cart for user {}", user_id);
-                            Box::new(
-                                (service_factory.cart_factory)()
-                                    .clear_cart(user_id)
-                                    .map_err(|e| ControllerError::InternalServerError(e.into())),
-                            )
+                            Box::new((service_factory.cart_factory)().clear_cart(user_id).map_err(ControllerError::from))
                         }),
                         (Delete, Some(Route::CartProduct { product_id })) => serialize_future({
                             debug!("Received request to delete product {} from user {}'s cart", product_id, user_id);
                             Box::new(
                                 (service_factory.cart_factory)()
                                     .delete_item(user_id, product_id)
-                                    .map_err(|e| ControllerError::InternalServerError(e.into())),
+                                    .map_err(ControllerError::from),
                             )
                         }),
                         (Put, Some(Route::CartProduct { product_id })) => serialize_future(
@@ -112,9 +129,43 @@ impl Controller for ControllerImpl {
                                 .and_then(move |params| {
                                     (service_factory.cart_factory)()
                                         .set_item(user_id, product_id, params.quantity)
-                                        .map_err(|e| ControllerError::InternalServerError(e.into()))
+                                        .map_err(ControllerError::from)
                                 }),
                         ),
+                        (Get, Some(Route::Orders)) => serialize_future({
+                            debug!("Received request to get orders for user {}", user_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .get_orders_for_user(user_id)
+                                    .map_err(ControllerError::from),
+                            )
+                        }),
+                        (Post, Some(Route::OrderFromCart)) => serialize_future({
+                            debug!("Received request to convert cart into orders for user {}", user_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .convert_cart(user_id)
+                                    .map_err(ControllerError::from),
+                            )
+                        }),
+                        (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
+                            debug!("Received request to set order status");
+                            parse_body::<OrderState>(payload).and_then(move |order_status| {
+                                Box::new(
+                                    (service_factory.order_factory)()
+                                        .set_order_state(order_id, order_status)
+                                        .map_err(ControllerError::from),
+                                )
+                            })
+                        }),
+                        (Delete, Some(Route::Order { order_id })) => serialize_future({
+                            debug!("Received request to delete order {}", order_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .delete_order(order_id)
+                                    .map_err(ControllerError::from),
+                            )
+                        }),
                         // Fallback
                         _ => Box::new(future::err(ControllerError::NotFound)),
                     }
@@ -132,12 +183,26 @@ mod tests {
     use serde_json;
     use std::sync::Mutex;
 
-    fn make_test_controller(inner: CartServiceMemoryStorage) -> ControllerImpl {
+    fn make_test_controller(cart_storage: CartServiceMemoryStorage) -> ControllerImpl {
+        let cart_factory = Arc::new(move || {
+            Box::new(CartServiceMemory {
+                inner: cart_storage.clone(),
+            }) as Box<CartService>
+        });
         ControllerImpl {
             route_parser: Arc::new(routing::make_router()),
             service_factory: Arc::new(ServiceFactory {
                 system_factory: Arc::new(|| Box::new(SystemServiceImpl::default())),
-                cart_factory: Arc::new(move || Box::new(CartServiceMemory { inner: inner.clone() })),
+                order_factory: Arc::new({
+                    let cart_factory = cart_factory.clone();
+                    move || {
+                        Box::new(OrderServiceMemory {
+                            inner: Default::default(),
+                            cart_factory: cart_factory.clone(),
+                        })
+                    }
+                }),
+                cart_factory,
             }),
         }
     }

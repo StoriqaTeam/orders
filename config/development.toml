@@ -3,3 +3,5 @@ host = "0.0.0.0"
 port = 8002
 [db]
 dsn = "postgresql://orders:orders@orders-pg/orders"
+[services]
+stores = "http://0.0.0.0:8001"

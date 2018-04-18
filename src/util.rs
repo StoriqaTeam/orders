@@ -1,3 +1,4 @@
+use std;
 use tokio_postgres::types::ToSql;
 
 /// Filtering operation
@@ -10,31 +11,31 @@ pub enum FilteredOperation {
 /// Construct a simple select or delete query.
 pub struct FilteredOperationBuilder {
     op: FilteredOperation,
-    table: String,
-    extra: String,
-    args: Vec<(String, Box<ToSql + Send + 'static>)>,
+    table: &'static str,
+    extra: &'static str,
+    args: Vec<(&'static str, Box<ToSql + Send + 'static>)>,
 }
 
 impl FilteredOperationBuilder {
     /// Create a new builder
-    pub fn new<N: Into<String>>(op: FilteredOperation, table: N) -> Self {
+    pub fn new(op: FilteredOperation, table: &'static str) -> Self {
         Self {
             op,
-            table: table.into(),
+            table,
             extra: Default::default(),
             args: Default::default(),
         }
     }
 
     /// Add filtering arguments
-    pub fn with_arg<C: Into<String>, V: ToSql + Send + 'static>(mut self, column: C, value: V) -> Self {
-        self.args.push((column.into(), Box::new(value)));
+    pub fn with_arg<V: ToSql + Send + 'static>(mut self, column: &'static str, value: V) -> Self {
+        self.args.push((column, Box::new(value)));
         self
     }
 
     /// Add additional statements before the semicolon
-    pub fn with_extra<S: Into<String>>(mut self, statements: S) -> Self {
-        self.extra = statements.into();
+    pub fn with_extra(mut self, extra: &'static str) -> Self {
+        self.extra = extra;
         self
     }
 
@@ -47,7 +48,7 @@ impl FilteredOperationBuilder {
                 FilteredOperation::Select => "SELECT * FROM",
                 FilteredOperation::Delete => "DELETE FROM",
             },
-            self.table.to_string()
+            self.table
         );
 
         for (i, (col, arg)) in self.args.into_iter().enumerate() {
@@ -67,34 +68,35 @@ impl FilteredOperationBuilder {
 
 /// Construct a simple insert query.
 pub struct InsertBuilder {
-    table: String,
-    extra: String,
+    table: &'static str,
+    extra: &'static str,
     values: Vec<(String, Box<ToSql + Send + 'static>)>,
 }
 
 impl InsertBuilder {
-    pub fn new<N: Into<String>>(table: N) -> Self {
+    pub fn new(table: &'static str) -> Self {
         Self {
-            table: table.into(),
+            table,
             extra: Default::default(),
             values: Default::default(),
         }
     }
 
-    pub fn with_arg<K: Into<String>, V: ToSql + Send + 'static>(mut self, k: K, v: V) -> Self {
+    pub fn with_arg<V: ToSql + Send + 'static>(mut self, k: &'static str, v: V) -> Self {
         self.values.push((k.into(), Box::new(v)));
         self
     }
 
-    pub fn with_extra<S: Into<String>>(mut self, s: S) -> Self {
-        self.extra = s.into();
+    /// Add additional statements before the semicolon
+    pub fn with_extra(mut self, extra: &'static str) -> Self {
+        self.extra = extra;
         self
     }
 
     /// Builds a query
     pub fn build(self) -> (String, Vec<Box<ToSql + Send + 'static>>) {
         let mut args = vec![];
-        let mut query = format!("INSERT INTO {}", self.table.to_string());
+        let mut query = format!("INSERT INTO {}", self.table);
 
         let mut col_string = String::new();
         let mut arg_string = String::new();
@@ -110,8 +112,120 @@ impl InsertBuilder {
         }
         query = format!("{} ({}) VALUES ({})", &query, &col_string, &arg_string);
 
-        let out = format!("{} {};", &query, self.extra);
+        if self.extra.len() > 0 {
+            query.push_str(&format!(" {}", &self.extra));
+        }
 
-        (out, args)
+        query.push(';');
+
+        (query, args)
+    }
+}
+
+pub struct UpdateBuilder {
+    table: &'static str,
+    extra: &'static str,
+    values: Vec<(&'static str, Box<ToSql + Send + 'static>)>,
+    filters: Vec<(&'static str, Box<ToSql + Send + 'static>)>,
+}
+
+impl UpdateBuilder {
+    pub fn new(table: &'static str) -> Self {
+        Self {
+            table,
+            extra: Default::default(),
+            values: Default::default(),
+            filters: Default::default(),
+        }
+    }
+
+    /// Add filtering arguments
+    pub fn with_filter<V: ToSql + Send + 'static>(mut self, column: &'static str, value: V) -> Self {
+        self.filters.push((column, Box::new(value)));
+        self
+    }
+
+    /// Add values to set
+    pub fn with_value<V: ToSql + Send + 'static>(mut self, column: &'static str, value: V) -> Self {
+        self.values.push((column, Box::new(value)));
+        self
+    }
+
+    /// Add additional statements before the semicolon
+    pub fn with_extra(mut self, extra: &'static str) -> Self {
+        self.extra = extra;
+        self
+    }
+
+    /// Builds a query
+    pub fn build(self) -> (String, Vec<Box<ToSql + Send + 'static>>) {
+        let mut values = vec![];
+        let mut filters = vec![];
+
+        let mut arg_index = 1;
+
+        let mut value_string = String::new();
+        for (col, arg) in self.values {
+            if value_string.len() == 0 {
+                value_string.push_str("SET ");
+            } else {
+                value_string.push_str(", ");
+            }
+
+            value_string.push_str(&format!("{} = ${}", col, arg_index));
+            arg_index += 1;
+            values.push(arg);
+        }
+
+        let mut filter_string = String::new();
+        for (col, arg) in self.filters {
+            if filter_string.len() == 0 {
+                filter_string.push_str("WHERE ");
+            } else {
+                filter_string.push_str(", ");
+            }
+
+            filter_string.push_str(&format!("{} = ${}", col, arg_index));
+            arg_index += 1;
+            filters.push(arg);
+        }
+
+        let mut query = format!("UPDATE {} {} {}", self.table, &value_string, &filter_string);
+
+        if self.extra.len() > 0 {
+            query.push_str(&format!(" {}", self.extra));
+        }
+
+        query.push(';');
+
+        let args = std::iter::Iterator::chain(values.into_iter(), filters.into_iter()).collect::<Vec<Box<ToSql + Send + 'static>>>();
+
+        (query, args)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_builder() {
+        let res = UpdateBuilder::new("my_table")
+            .with_filter("filter_column1", "c")
+            .with_filter("filter_column2", "d")
+            .with_value("value_column1", "a")
+            .with_value("value_column2", "b")
+            .build();
+
+        let expectation = (
+            "UPDATE my_table SET value_column1 = $1, value_column2 = $2 WHERE filter_column1 = $3, filter_column2 = $4;",
+            vec!["a", "b", "c", "d"]
+                .into_iter()
+                .map(|v| Box::new(v) as Box<ToSql + Send + 'static>)
+                .collect::<Vec<Box<ToSql + Send + 'static>>>(),
+        );
+
+        assert_eq!(res.0, expectation.0);
+        assert_eq!(format!("{:?}", res.1), format!("{:?}", expectation.1));
     }
 }

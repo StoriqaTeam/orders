@@ -1,5 +1,26 @@
 use tokio_postgres::rows::Row;
 
+macro_rules! ID_COLUMN {
+    () => {
+        "id"
+    };
+}
+macro_rules! USER_ID_COLUMN {
+    () => {
+        "user_id"
+    };
+}
+macro_rules! PRODUCT_ID_COLUMN {
+    () => {
+        "product_id"
+    };
+}
+macro_rules! QUANTITY_COLUMN {
+    () => {
+        "quantity"
+    };
+}
+
 #[derive(Clone, Debug)]
 pub struct NewProduct {
     pub user_id: i32,
@@ -18,10 +39,10 @@ pub struct Product {
 impl From<Row> for Product {
     fn from(row: Row) -> Self {
         Self {
-            id: row.get("id"),
-            user_id: row.get("user_id"),
-            product_id: row.get("product_id"),
-            quantity: row.get("quantity"),
+            id: row.get(ID_COLUMN!()),
+            user_id: row.get(USER_ID_COLUMN!()),
+            product_id: row.get(PRODUCT_ID_COLUMN!()),
+            quantity: row.get(QUANTITY_COLUMN!()),
         }
     }
 }

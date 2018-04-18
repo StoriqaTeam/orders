@@ -1,14 +1,11 @@
+pub mod cart;
+pub use self::cart::*;
+
 pub mod product;
 pub use self::product::*;
 
-use std::collections::HashMap;
+pub mod order;
+pub use self::order::*;
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct Cart {
-    pub products: HashMap<i32, i32>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct UpsertCart {
-    pub quantity: i32,
-}
+pub mod product_info;
+pub use self::product_info::*;
