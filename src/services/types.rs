@@ -1,5 +1,3 @@
-use futures::prelude::*;
+use repos::RepoFuture;
 
-use errors::*;
-
-pub type ServiceFuture<T> = Box<Future<Item = T, Error = RepoError>>;
+pub type ServiceFuture<T> = RepoFuture<T>;

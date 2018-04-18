@@ -12,6 +12,7 @@ extern crate hyper;
 extern crate log as log_crate;
 #[macro_use]
 extern crate maplit;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -28,6 +29,7 @@ use hyper::server::Http;
 use std::net::SocketAddr;
 use std::process::exit;
 use std::sync::Arc;
+use stq_http::client::{Client as HttpClient, Config as HttpConfig};
 use tokio_core::reactor::{Core, Remote};
 use tokio_postgres::TlsMode;
 
@@ -55,6 +57,7 @@ pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnect
 /// Starts web server with the provided configuration
 pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<u16>, callback: F) {
     let mut core = Core::new().expect("Unexpected error creating event loop core");
+    let handle = core.handle();
 
     let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
     let db_pool = Arc::new({
@@ -67,14 +70,23 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
         ).expect("Failed to create connection pool")
     });
 
+    let http_config = HttpConfig {
+        http_client_retries: 3,
+        http_client_buffer_size: 3,
+    };
+    let client = HttpClient::new(&http_config, &handle);
+    let client_handle = client.handle();
+    let client_stream = client.stream();
+    handle.spawn(client_stream.for_each(|_| Ok(())));
+
     let listen_address = {
         let port = port.unwrap_or(config.listen.port);
-        SocketAddr::from((config.listen.host, port))
+        SocketAddr::new(config.listen.host, port)
     };
 
     let serve = Http::new()
         .serve_addr_handle(&listen_address, &core.handle(), move || {
-            let controller = controller::ControllerImpl::new(db_pool.clone());
+            let controller = controller::ControllerImpl::new(db_pool.clone(), client_handle.clone(), config.clone());
 
             // Prepare application
             let app = Application::new(controller);

@@ -1,7 +1,13 @@
 pub mod product;
 pub use self::product::*;
 
-use errors::RepoError;
+pub mod order;
+pub use self::order::*;
+
+pub mod product_info;
+pub use self::product_info::*;
+
+pub use errors::RepoError;
 
 use futures;
 use futures::prelude::*;
@@ -16,6 +22,7 @@ use tokio_postgres::types::ToSql;
 
 pub type BoxedConnection<E> = Box<Connection<E> + Send>;
 pub type ConnectionFuture<T, E> = Box<Future<Item = (T, BoxedConnection<E>), Error = (E, BoxedConnection<E>)> + Send>;
+pub type RepoFuture<T> = Box<Future<Item = T, Error = RepoError>>;
 
 pub trait Connection<E>: Any
 where

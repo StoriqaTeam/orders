@@ -28,23 +28,30 @@ impl Env {
 }
 
 /// Service configuration
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Listen {
     pub host: IpAddr,
     pub port: u16,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Database {
     pub dsn: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Services {
+    pub stores: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Server listen address
     pub listen: Listen,
     /// Database settings
     pub db: Database,
+    /// Dependencies
+    pub services: Services,
 }
 
 impl Config {
