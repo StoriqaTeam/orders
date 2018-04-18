@@ -79,7 +79,7 @@ dependencies = [
 [[package]]
 name = "bb8"
 version = "0.1.0"
-source = "git+https://github.com/vorot93/bb8?branch=patch-1#609cb7e80009fb5aa8f1a707aa0f7c483ec9abf3"
+source = "git+https://github.com/khuey/bb8#100af9fac8c25aa0e5c96715a29419d3e3203721"
 dependencies = [
  "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.3.3 (git+https://github.com/khuey/owning-ref-rs?branch=owning_handle_owner)",
@@ -89,9 +89,9 @@ dependencies = [
 [[package]]
 name = "bb8-postgres"
 version = "0.1.0"
-source = "git+https://github.com/vorot93/bb8?branch=patch-1#609cb7e80009fb5aa8f1a707aa0f7c483ec9abf3"
+source = "git+https://github.com/khuey/bb8#100af9fac8c25aa0e5c96715a29419d3e3203721"
 dependencies = [
- "bb8 0.1.0 (git+https://github.com/vorot93/bb8?branch=patch-1)",
+ "bb8 0.1.0 (git+https://github.com/khuey/bb8)",
  "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres-shared 0.4.1 (git+https://github.com/sfackler/rust-postgres)",
  "tokio-core 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -732,8 +732,8 @@ dependencies = [
 name = "orders"
 version = "0.1.0"
 dependencies = [
- "bb8 0.1.0 (git+https://github.com/vorot93/bb8?branch=patch-1)",
- "bb8-postgres 0.1.0 (git+https://github.com/vorot93/bb8?branch=patch-1)",
+ "bb8 0.1.0 (git+https://github.com/khuey/bb8)",
+ "bb8-postgres 0.1.0 (git+https://github.com/khuey/bb8)",
  "chrono 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "config 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -830,6 +830,7 @@ dependencies = [
  "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres-protocol 0.3.2 (git+https://github.com/sfackler/rust-postgres)",
+ "serde_json 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1607,8 +1608,8 @@ dependencies = [
 "checksum backtrace-sys 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)" = "44585761d6161b0f57afc49482ab6bd067e4edef48c12a152c237eb0203f7661"
 "checksum base64 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "96434f987501f0ed4eb336a411e0631ecd1afa11574fe148587adc4ff96143c9"
 "checksum base64 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "229d032f1a99302697f10b27167ae6d03d49d032e6a8e2550e8d3fc13356d2b4"
-"checksum bb8 0.1.0 (git+https://github.com/vorot93/bb8?branch=patch-1)" = "<none>"
-"checksum bb8-postgres 0.1.0 (git+https://github.com/vorot93/bb8?branch=patch-1)" = "<none>"
+"checksum bb8 0.1.0 (git+https://github.com/khuey/bb8)" = "<none>"
+"checksum bb8-postgres 0.1.0 (git+https://github.com/khuey/bb8)" = "<none>"
 "checksum bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
 "checksum bitflags 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b3c30d3802dfb7281680d6285f2ccdaa8c2d8fee41f93805dba5c4cf50dc23cf"
 "checksum block-buffer 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a076c298b9ecdb530ed9d967e74a6027d6a7478924520acddcddc24c1c8ab3ab"

@@ -7,8 +7,8 @@ name = "orders_lib"
 path = "src/lib.rs"
 
 [dependencies]
-bb8 = { git = "https://github.com/vorot93/bb8", branch = "patch-1" }
-bb8-postgres = { git = "https://github.com/vorot93/bb8", branch = "patch-1" }
+bb8 = { git = "https://github.com/khuey/bb8" }
+bb8-postgres = { git = "https://github.com/khuey/bb8" }
 chrono = "*"
 config = "*"
 env_logger = "*"
@@ -26,6 +26,6 @@ serde = "*"
 serde_derive = "*"
 serde_json = "*"
 tokio-core = "*"
-tokio-postgres = { git = "https://github.com/sfackler/rust-postgres" }
+tokio-postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-serde_json"] }
 stq_http = { path = "vendor/libstqbackend/http" }
 stq_router = { path = "vendor/libstqbackend/router" }

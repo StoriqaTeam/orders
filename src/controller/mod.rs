@@ -249,7 +249,7 @@ mod tests {
 
         let mut req = Request::new(Method::Put, Uri::from_str(&format!("/cart/products/{}", product_id)).unwrap());
         req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
-        req.set_body(serde_json::to_string::<serde_json::Value>(&payload).unwrap());
+        req.set_body(serde_json::to_string(&payload).unwrap());
 
         let data = Default::default();
 
