@@ -1,11 +1,11 @@
 use futures::future;
 use futures::prelude::*;
 use futures_state_stream::StateStream;
+use stq_db::statement::*;
 
 use super::{RepoConnection, RepoConnectionFuture};
 use errors::*;
 use models::*;
-use util;
 
 static TABLE: &'static str = "orders";
 
@@ -21,7 +21,7 @@ pub struct OrderRepoImpl;
 
 impl OrderRepo for OrderRepoImpl {
     fn add(&self, conn: RepoConnection, new_order: NewOrder) -> RepoConnectionFuture<Order> {
-        let (statement, args) = util::InsertBuilder::from((TABLE, new_order)).build();
+        let (statement, args) = new_order.into_insert_builder(TABLE).build();
 
         Box::new(
             conn.prepare2(&statement)
@@ -31,7 +31,7 @@ impl OrderRepo for OrderRepoImpl {
     }
 
     fn get(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<Vec<Order>> {
-        let (statement, args) = util::FilteredOperationBuilder::from((util::FilteredOperation::Select, TABLE, mask)).build();
+        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Select, TABLE).build();
 
         Box::new(
             conn.prepare2(&statement)
@@ -41,7 +41,7 @@ impl OrderRepo for OrderRepoImpl {
     }
 
     fn update(&self, conn: RepoConnection, mask: OrderMask, data: OrderUpdateData) -> RepoConnectionFuture<Order> {
-        let (statement, args) = util::UpdateBuilder::from((TABLE, OrderUpdate { mask, data })).build();
+        let (statement, args) = OrderUpdate { mask, data }.into_update_builder(TABLE).build();
 
         Box::new(
             conn.prepare2(&statement)
@@ -57,7 +57,7 @@ impl OrderRepo for OrderRepoImpl {
     }
 
     fn remove(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<()> {
-        let (statement, args) = util::FilteredOperationBuilder::from((util::FilteredOperation::Delete, TABLE, mask)).build();
+        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE).build();
 
         Box::new(
             conn.prepare2(&statement)

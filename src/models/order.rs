@@ -1,10 +1,9 @@
 use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
+use stq_db::statement::*;
 use stq_http::errors::ControllerError;
 use tokio_postgres::rows::Row;
-
-use util;
 
 macro_rules! ORDERS_ID_COLUMN {
     () => {
@@ -151,14 +150,12 @@ impl From<Row> for Order {
     }
 }
 
-impl From<(&'static str, NewOrder)> for util::InsertBuilder {
-    fn from(args: (&'static str, NewOrder)) -> Self {
-        let (table, order) = args;
-
-        let (state_id, state_data) = order.state.into();
-        Self::new(table)
-            .with_arg(ORDERS_USER_ID_COLUMN!(), order.user_id)
-            .with_arg(ORDERS_PRODUCTS_COLUMN!(), serde_json::to_value(order.products).unwrap())
+impl NewOrder {
+    pub fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+        let (state_id, state_data) = self.state.into();
+        InsertBuilder::new(table)
+            .with_arg(ORDERS_USER_ID_COLUMN!(), self.user_id)
+            .with_arg(ORDERS_PRODUCTS_COLUMN!(), serde_json::to_value(self.products).unwrap())
             .with_arg(ORDERS_STATE_ID_COLUMN!(), state_id)
             .with_arg(ORDERS_STATE_DATA_COLUMN!(), state_data)
             .with_extra(ORDERS_RETURNING_EXTRA!())
@@ -172,21 +169,19 @@ pub struct OrderMask {
     pub state_id: Option<String>,
 }
 
-impl From<(util::FilteredOperation, &'static str, OrderMask)> for util::FilteredOperationBuilder {
-    fn from(args: (util::FilteredOperation, &'static str, OrderMask)) -> Self {
-        let (op, table, mask) = args;
+impl OrderMask {
+    pub fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
+        let mut b = FilteredOperationBuilder::new(op, table);
 
-        let mut b = Self::new(op, table);
-
-        if let Some(id) = mask.id {
+        if let Some(id) = self.id {
             b = b.with_arg("id", id);
         }
 
-        if let Some(user_id) = mask.user_id {
+        if let Some(user_id) = self.user_id {
             b = b.with_arg("user_id", user_id);
         }
 
-        if let Some(state_id) = mask.state_id {
+        if let Some(state_id) = self.state_id {
             b = b.with_arg(ORDERS_STATE_ID_COLUMN!(), state_id);
         }
 
@@ -203,13 +198,11 @@ pub struct OrderUpdate {
     pub data: OrderUpdateData,
 }
 
-impl From<(&'static str, OrderUpdate)> for util::UpdateBuilder {
-    fn from(args: (&'static str, OrderUpdate)) -> Self {
-        let (table, update_data) = args;
+impl OrderUpdate {
+    pub fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
+        let OrderUpdate { mask, data } = self;
 
-        let OrderUpdate { mask, data } = update_data;
-
-        let mut b = Self::new(table);
+        let mut b = UpdateBuilder::new(table);
 
         if let Some(id) = mask.id {
             b = b.with_filter(ORDERS_ID_COLUMN!(), id);
