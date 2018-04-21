@@ -17,6 +17,7 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate stq_db;
 extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
@@ -43,7 +44,6 @@ pub mod models;
 pub mod repos;
 pub mod services;
 pub mod types;
-pub mod util;
 
 pub use config::*;
 
