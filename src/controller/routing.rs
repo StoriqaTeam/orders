@@ -4,6 +4,7 @@ use models::*;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Route {
+    Cart,
     CartProducts,
     CartIncrementProduct { product_id: i32 },
     CartProduct { product_id: i32 },
@@ -18,6 +19,7 @@ pub enum Route {
 pub fn make_router() -> RouteParser<Route> {
     let mut route_parser: RouteParser<Route> = Default::default();
     route_parser.add_route(r"^/healthcheck$", || Route::Healthcheck);
+    route_parser.add_route(r"^/cart$", || Route::Cart);
     route_parser.add_route_with_params(r"^/cart/products/(\d+)/increment$", |params| {
         params
             .get(0)

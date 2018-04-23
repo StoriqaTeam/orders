@@ -23,6 +23,8 @@ pub trait CartService {
     fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
     /// Clear user's cart
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    /// Iterate over cart
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts>;
 }
 
 type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
@@ -190,6 +192,30 @@ impl CartService for CartServiceImpl {
                 .map_err(RepoError::from),
         )
     }
+
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+        debug!("Getting {} cart items starting from {} for user {}", count, from, user_id);
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    (repo_factory)(Box::new(conn))
+                        .list(user_id, from, count)
+                        .map(|(products, conn)| {
+                            let mut cart = CartProducts::default();
+                            for product in products.into_iter() {
+                                cart.insert(product.product_id, product.quantity);
+                            }
+                            (cart, conn)
+                        })
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map_err(RepoError::from),
+        )
+    }
 }
 
 pub type CartServiceMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
@@ -236,6 +262,10 @@ impl CartService for CartServiceMemory {
         std::mem::swap(cart, &mut Cart::default());
 
         Box::new(future::ok(cart.clone()))
+    }
+
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+        unimplemented!()
     }
 }
 

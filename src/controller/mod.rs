@@ -102,6 +102,25 @@ impl Controller for ControllerImpl {
             _ => {
                 Box::new(extract_user_id(headers).and_then(move |user_id| {
                     match (method, route) {
+                        (Get, Some(Route::Cart)) => {
+                            if let (Some(from), Some(count)) =
+                                parse_query!(uri.query().unwrap_or_default(), "offset" => i32, "count" => i64)
+                            {
+                                debug!(
+                                    "Received request for user {} to get {} products starting from {}",
+                                    user_id, count, from
+                                );
+                                serialize_future(
+                                    (service_factory.cart_factory)()
+                                        .list(user_id, from, count)
+                                        .map_err(ControllerError::from),
+                                )
+                            } else {
+                                serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(format_err!(
+                                    "Error parsing request from gateway body"
+                                ))))
+                            }
+                        }
                         (Get, Some(Route::CartProducts)) => serialize_future({
                             debug!("Received request to get cart for user {}", user_id);
                             Box::new((service_factory.cart_factory)().get_cart(user_id).map_err(ControllerError::from))
