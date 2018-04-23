@@ -132,6 +132,12 @@ impl Controller for ControllerImpl {
                                         .map_err(ControllerError::from)
                                 }),
                         ),
+                        (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
+                            debug!("Received request to increment product {} quantity for user {}", product_id, user_id);
+                            (service_factory.cart_factory)()
+                                .increment_item(user_id, product_id)
+                                .map_err(ControllerError::from)
+                        }),
                         (Get, Some(Route::Orders)) => serialize_future({
                             debug!("Received request to get orders for user {}", user_id);
                             Box::new(

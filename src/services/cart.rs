@@ -15,6 +15,8 @@ use types::*;
 pub trait CartService {
     /// Get user's cart contents
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    /// Increase item's quantity by 1
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart>;
     /// Delete item from user's cart
@@ -71,6 +73,54 @@ impl CartService for CartServiceImpl {
                             .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                             .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                     }
+                })
+                .map_err(RepoError::from),
+        )
+    }
+
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
+        debug!("Adding 1 item {} into cart for user {}", product_id, user_id);
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    let conn = conn.transaction();
+                    conn.map_err(|(e, trans)| (RepoError::from(e), Box::new(trans) as RepoConnection))
+                        .map(|conn| Box::new(conn) as RepoConnection)
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |conn| {
+                                (repo_factory.clone())(conn).get(ProductMask {
+                                    user_id: Some(user_id),
+                                    product_id: Some(product_id),
+                                })
+                            }
+                        })
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(products, conn)| {
+                                let new_product = if let Some(mut product) = products.first().cloned() {
+                                    product.quantity += 1;
+                                    <(ProductId, NewProduct)>::from(product).1
+                                } else {
+                                    NewProduct {
+                                        user_id,
+                                        product_id,
+                                        quantity: 1,
+                                    }
+                                };
+                                (repo_factory.clone())(conn).insert(new_product)
+                            }
+                        })
+                        .and_then(|(_, conn)| conn.commit2())
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| get_cart_from_repo(repo_factory.clone(), conn, user_id)
+                        })
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
                 .map_err(RepoError::from),
         )
@@ -155,6 +205,10 @@ impl CartService for CartServiceMemory {
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
         Box::new(future::ok(cart.clone()))
+    }
+
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
+        unimplemented!()
     }
 
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
