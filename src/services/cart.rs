@@ -81,7 +81,10 @@ impl CartService for CartServiceImpl {
     }
 
     fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
-        debug!("Adding 1 item {} into cart for user {}", product_id, user_id);
+        debug!(
+            "Adding 1 item {} into cart for user {}",
+            product_id, user_id
+        );
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -129,7 +132,10 @@ impl CartService for CartServiceImpl {
     }
 
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
-        debug!("Setting item {} to quantity {} in cart for user {}.", product_id, quantity, user_id);
+        debug!(
+            "Setting item {} to quantity {} in cart for user {}.",
+            product_id, quantity, user_id
+        );
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -194,7 +200,10 @@ impl CartService for CartServiceImpl {
     }
 
     fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
-        debug!("Getting {} cart items starting from {} for user {}", count, from, user_id);
+        debug!(
+            "Getting {} cart items starting from {} for user {}",
+            count, from, user_id
+        );
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -311,7 +320,9 @@ mod tests {
         // Amend the first product
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.set_item(user_id, set_b.0, set_b.1)).unwrap()
         );
@@ -319,7 +330,9 @@ mod tests {
         // Add the last product
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b, set_c].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b, set_c]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.set_item(user_id, set_c.0, set_c.1)).unwrap()
         );
@@ -327,7 +340,9 @@ mod tests {
         // Check DB contents
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b, set_c].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b, set_c]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.get_cart(user_id)).unwrap()
         );
@@ -335,7 +350,9 @@ mod tests {
         // Delete the last item
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.delete_item(user_id, set_c.0)).unwrap()
         );

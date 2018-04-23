@@ -12,7 +12,9 @@ pub enum RepoError {
 
 impl From<tokio_postgres::Error> for RepoError {
     fn from(v: tokio_postgres::Error) -> Self {
-        RepoError::Connection { reason: format!("{}", v) }
+        RepoError::Connection {
+            reason: format!("{}", v),
+        }
     }
 }
 

@@ -49,7 +49,14 @@ impl ProductRepo for ProductRepoImpl {
             self.connection
                 .prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)),
+                .map(|(rows, conn)| {
+                    (
+                        rows.into_iter()
+                            .map(Product::from)
+                            .collect::<Vec<Product>>(),
+                        conn,
+                    )
+                }),
         )
     }
 
@@ -101,7 +108,14 @@ impl ProductRepo for ProductRepoImpl {
             self.connection
                 .prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(rows, conn)| (rows.into_iter().map(Product::from).collect::<Vec<Product>>(), conn)),
+                .map(|(rows, conn)| {
+                    (
+                        rows.into_iter()
+                            .map(Product::from)
+                            .collect::<Vec<Product>>(),
+                        conn,
+                    )
+                }),
         )
     }
 }
