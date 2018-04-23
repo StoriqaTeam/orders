@@ -96,7 +96,6 @@ impl Controller for ControllerImpl {
         match (&method, route) {
             // GET /healthcheck
             (&Get, Some(Route::Healthcheck)) => {
-                debug!("Received healthcheck request");
                 serialize_future((service_factory.system_factory)().healthcheck())
             }
             _ => {
