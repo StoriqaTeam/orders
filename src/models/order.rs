@@ -66,8 +66,14 @@ impl From<OrderState> for (String, Value) {
         match v {
             OrderState::New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
             OrderState::Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::NeedPayment(data) => ("need_payment".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Processing(data) => ("processing".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::NeedPayment(data) => (
+                "need_payment".to_string(),
+                serde_json::to_value(data).unwrap(),
+            ),
+            OrderState::Processing(data) => (
+                "processing".to_string(),
+                serde_json::to_value(data).unwrap(),
+            ),
             OrderState::Confirmed(data) => ("confirmed".to_string(), serde_json::to_value(data).unwrap()),
             OrderState::Complete(data) => ("complete".to_string(), serde_json::to_value(data).unwrap()),
         }
@@ -84,7 +90,9 @@ impl OrderState {
             "processing" => Ok(OrderState::Processing(serde_json::from_value(state_data)?)),
             "confirmed" => Ok(OrderState::Confirmed(serde_json::from_value(state_data)?)),
             "complete" => Ok(OrderState::Complete(serde_json::from_value(state_data)?)),
-            &_ => Err(ControllerError::UnprocessableEntity(format_err!("Could not parse state"))),
+            &_ => Err(ControllerError::UnprocessableEntity(format_err!(
+                "Could not parse state"
+            ))),
         }
     }
 }
@@ -155,7 +163,10 @@ impl NewOrder {
         let (state_id, state_data) = self.state.into();
         InsertBuilder::new(table)
             .with_arg(ORDERS_USER_ID_COLUMN!(), self.user_id)
-            .with_arg(ORDERS_PRODUCTS_COLUMN!(), serde_json::to_value(self.products).unwrap())
+            .with_arg(
+                ORDERS_PRODUCTS_COLUMN!(),
+                serde_json::to_value(self.products).unwrap(),
+            )
             .with_arg(ORDERS_STATE_ID_COLUMN!(), state_id)
             .with_arg(ORDERS_STATE_DATA_COLUMN!(), state_data)
             .with_extra(ORDERS_RETURNING_EXTRA!())

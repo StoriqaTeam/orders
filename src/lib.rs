@@ -18,6 +18,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate stq_db;
+#[macro_use]
 extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
@@ -51,7 +52,9 @@ pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnect
     let config = config::Config::new().unwrap();
     let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
 
-    bb8::Pool::builder().min_idle(Some(10)).build(manager, remote)
+    bb8::Pool::builder()
+        .min_idle(Some(10))
+        .build(manager, remote)
 }
 
 /// Starts web server with the provided configuration
@@ -104,7 +107,10 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
             .for_each({
                 let handle = handle.clone();
                 move |conn| {
-                    handle.spawn(conn.map(|_| ()).map_err(|why| error!("Server Error: {:?}", why)));
+                    handle.spawn(
+                        conn.map(|_| ())
+                            .map_err(|why| error!("Server Error: {:?}", why)),
+                    );
                     Ok(())
                 }
             })

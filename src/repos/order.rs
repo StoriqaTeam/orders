@@ -31,17 +31,25 @@ impl OrderRepo for OrderRepoImpl {
     }
 
     fn get(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<Vec<Order>> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Select, TABLE).build();
+        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Select, TABLE)
+            .build();
 
         Box::new(
             conn.prepare2(&statement)
                 .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(rows, connection)| (rows.into_iter().map(Order::from).collect::<Vec<Order>>(), connection)),
+                .map(|(rows, connection)| {
+                    (
+                        rows.into_iter().map(Order::from).collect::<Vec<Order>>(),
+                        connection,
+                    )
+                }),
         )
     }
 
     fn update(&self, conn: RepoConnection, mask: OrderMask, data: OrderUpdateData) -> RepoConnectionFuture<Order> {
-        let (statement, args) = OrderUpdate { mask, data }.into_update_builder(TABLE).build();
+        let (statement, args) = OrderUpdate { mask, data }
+            .into_update_builder(TABLE)
+            .build();
 
         Box::new(
             conn.prepare2(&statement)
@@ -57,7 +65,8 @@ impl OrderRepo for OrderRepoImpl {
     }
 
     fn remove(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<()> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE).build();
+        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE)
+            .build();
 
         Box::new(
             conn.prepare2(&statement)

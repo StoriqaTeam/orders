@@ -11,7 +11,7 @@ extern crate tokio_core;
 pub mod common;
 
 use hyper::Method;
-use lib::models::Cart;
+use lib::models::*;
 
 #[test]
 fn healthcheck_returns_ok() {
@@ -24,7 +24,8 @@ fn healthcheck_returns_ok() {
     let uri = format!("{}/healthcheck", base_url);
 
     assert_eq!(
-        core.run(http_client.request::<String>(Method::Get, uri, None, None,)).unwrap(),
+        core.run(http_client.request::<String>(Method::Get, uri, None, None,))
+            .unwrap(),
         "Ok"
     );
 }
@@ -42,7 +43,10 @@ fn test_carts_service() {
     let quantity = 9000;
 
     let product_id_2 = 67890;
-    let quantity_2 = 9001;
+    let mut quantity_2 = 0;
+
+    let product_id_3 = 88888;
+    let quantity_3 = 9002;
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
@@ -68,11 +72,30 @@ fn test_carts_service() {
         }
     );
 
+    quantity_2 += 1;
+
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Put,
-            format!("{}/cart/products/{}", base_url, product_id_2),
-            Some(serde_json::to_string(&json!({ "quantity": quantity_2 })).unwrap()),
+            Method::Post,
+            format!("{}/cart/products/{}/increment", base_url, product_id_2),
+            None,
+            Some(user_id.to_string()),
+        )).unwrap(),
+        Cart {
+            products: hashmap!{
+                product_id => quantity,
+                product_id_2 => quantity_2,
+            },
+        }
+    );
+
+    quantity_2 += 1;
+
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<Cart>(
+            Method::Post,
+            format!("{}/cart/products/{}/increment", base_url, product_id_2),
+            None,
             Some(user_id.to_string()),
         )).unwrap(),
         Cart {
@@ -85,6 +108,35 @@ fn test_carts_service() {
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
+            Method::Put,
+            format!("{}/cart/products/{}", base_url, product_id_3),
+            Some(serde_json::to_string(&json!({ "quantity": quantity_3 })).unwrap()),
+            Some(user_id.to_string()),
+        )).unwrap(),
+        Cart {
+            products: hashmap!{
+                product_id => quantity,
+                product_id_2 => quantity_2,
+                product_id_3 => quantity_3,
+            },
+        }
+    );
+
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<CartProducts>(
+            Method::Get,
+            format!("{}/cart?offset=0&count=2", base_url),
+            None,
+            Some(user_id.to_string()),
+        )).unwrap(),
+        hashmap! {
+            product_id => quantity,
+            product_id_2 => quantity_2,
+        },
+    );
+
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<Cart>(
             Method::Delete,
             format!("{}/cart/products/{}", base_url, product_id),
             None,
@@ -93,6 +145,7 @@ fn test_carts_service() {
         Cart {
             products: hashmap!{
                 product_id_2 => quantity_2,
+                product_id_3 => quantity_3,
             },
         }
     );
@@ -104,6 +157,8 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart { products: hashmap!{} },
+        Cart {
+            products: hashmap!{},
+        },
     );
 }

@@ -15,12 +15,16 @@ use types::*;
 pub trait CartService {
     /// Get user's cart contents
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    /// Increase item's quantity by 1
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart>;
     /// Delete item from user's cart
     fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
     /// Clear user's cart
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    /// Iterate over cart
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts>;
 }
 
 type ProductRepoFactory = Arc<Fn(RepoConnection) -> Box<ProductRepo> + Send + Sync>;
@@ -76,8 +80,62 @@ impl CartService for CartServiceImpl {
         )
     }
 
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
+        debug!(
+            "Adding 1 item {} into cart for user {}",
+            product_id, user_id
+        );
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    let conn = conn.transaction();
+                    conn.map_err(|(e, trans)| (RepoError::from(e), Box::new(trans) as RepoConnection))
+                        .map(|conn| Box::new(conn) as RepoConnection)
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |conn| {
+                                (repo_factory.clone())(conn).get(ProductMask {
+                                    user_id: Some(user_id),
+                                    product_id: Some(product_id),
+                                })
+                            }
+                        })
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(products, conn)| {
+                                let new_product = if let Some(mut product) = products.first().cloned() {
+                                    product.quantity += 1;
+                                    <(ProductId, NewProduct)>::from(product).1
+                                } else {
+                                    NewProduct {
+                                        user_id,
+                                        product_id,
+                                        quantity: 1,
+                                    }
+                                };
+                                (repo_factory.clone())(conn).insert(new_product)
+                            }
+                        })
+                        .and_then(|(_, conn)| conn.commit2())
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| get_cart_from_repo(repo_factory.clone(), conn, user_id)
+                        })
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map_err(RepoError::from),
+        )
+    }
+
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
-        debug!("Setting item {} to quantity {} in cart for user {}.", product_id, quantity, user_id);
+        debug!(
+            "Setting item {} to quantity {} in cart for user {}.",
+            product_id, quantity, user_id
+        );
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -140,6 +198,33 @@ impl CartService for CartServiceImpl {
                 .map_err(RepoError::from),
         )
     }
+
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+        debug!(
+            "Getting {} cart items starting from {} for user {}",
+            count, from, user_id
+        );
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    (repo_factory)(Box::new(conn))
+                        .list(user_id, from, count)
+                        .map(|(products, conn)| {
+                            let mut cart = CartProducts::default();
+                            for product in products.into_iter() {
+                                cart.insert(product.product_id, product.quantity);
+                            }
+                            (cart, conn)
+                        })
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map_err(RepoError::from),
+        )
+    }
 }
 
 pub type CartServiceMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
@@ -155,6 +240,10 @@ impl CartService for CartServiceMemory {
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
         Box::new(future::ok(cart.clone()))
+    }
+
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
+        unimplemented!()
     }
 
     fn set_item(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Cart> {
@@ -182,6 +271,10 @@ impl CartService for CartServiceMemory {
         std::mem::swap(cart, &mut Cart::default());
 
         Box::new(future::ok(cart.clone()))
+    }
+
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+        unimplemented!()
     }
 }
 
@@ -227,7 +320,9 @@ mod tests {
         // Amend the first product
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.set_item(user_id, set_b.0, set_b.1)).unwrap()
         );
@@ -235,7 +330,9 @@ mod tests {
         // Add the last product
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b, set_c].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b, set_c]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.set_item(user_id, set_c.0, set_c.1)).unwrap()
         );
@@ -243,7 +340,9 @@ mod tests {
         // Check DB contents
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b, set_c].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b, set_c]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.get_cart(user_id)).unwrap()
         );
@@ -251,7 +350,9 @@ mod tests {
         // Delete the last item
         assert_eq!(
             Cart {
-                products: vec![set_a, set_b].into_iter().collect::<HashMap<i32, i32>>(),
+                products: vec![set_a, set_b]
+                    .into_iter()
+                    .collect::<HashMap<i32, i32>>(),
             },
             core.run(repo.delete_item(user_id, set_c.0)).unwrap()
         );

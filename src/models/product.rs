@@ -1,5 +1,7 @@
 use tokio_postgres::rows::Row;
 
+pub type ProductId = i32;
+
 macro_rules! ID_COLUMN {
     () => {
         "id"
@@ -23,17 +25,30 @@ macro_rules! QUANTITY_COLUMN {
 
 #[derive(Clone, Debug)]
 pub struct NewProduct {
-    pub user_id: i32,
+    pub user_id: ProductId,
     pub product_id: i32,
     pub quantity: i32,
 }
 
 #[derive(Clone, Debug)]
 pub struct Product {
-    pub id: i32,
+    pub id: ProductId,
     pub user_id: i32,
     pub product_id: i32,
     pub quantity: i32,
+}
+
+impl From<Product> for (ProductId, NewProduct) {
+    fn from(product: Product) -> Self {
+        (
+            product.id,
+            NewProduct {
+                user_id: product.user_id,
+                product_id: product.product_id,
+                quantity: product.quantity,
+            },
+        )
+    }
 }
 
 impl From<Row> for Product {
