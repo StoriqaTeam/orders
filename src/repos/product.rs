@@ -5,6 +5,8 @@ use stq_db::statement::*;
 use models::*;
 use repos::{RepoConnection, RepoConnectionFuture};
 
+static TABLE: &'static str = "cart_items";
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ProductMask {
     pub user_id: Option<i32>,
@@ -29,7 +31,7 @@ impl ProductRepoImpl {
 
 impl ProductRepo for ProductRepoImpl {
     fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
-        let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Select, "cart_items");
+        let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Select, TABLE);
 
         if let Some(v) = mask.user_id {
             query_builder = query_builder.with_arg("user_id", v);
@@ -50,7 +52,7 @@ impl ProductRepo for ProductRepoImpl {
     }
 
     fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()> {
-        let (statement, args) = InsertBuilder::new("cart_items")
+        let (statement, args) = InsertBuilder::new(TABLE)
             .with_arg("user_id", item.user_id)
             .with_arg("product_id", item.product_id)
             .with_arg("quantity", item.quantity)
@@ -66,7 +68,7 @@ impl ProductRepo for ProductRepoImpl {
     }
 
     fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()> {
-        let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Delete, "cart_items");
+        let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Delete, TABLE);
 
         if let Some(v) = mask.user_id {
             query_builder = query_builder.with_arg("user_id", v);
