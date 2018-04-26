@@ -15,24 +15,17 @@ pub struct ProductMask {
 }
 
 pub trait ProductRepo {
-    fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
-    fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()>;
-    fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()>;
-    fn list(self: Box<Self>, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<Product>>;
+    fn get(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
+    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<()>;
+    fn remove(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<()>;
+    fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<Product>>;
 }
 
-pub struct ProductRepoImpl {
-    connection: RepoConnection,
-}
-
-impl ProductRepoImpl {
-    pub fn new(connection: RepoConnection) -> Self {
-        Self { connection }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct ProductRepoImpl;
 
 impl ProductRepo for ProductRepoImpl {
-    fn get(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
+    fn get(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>> {
         let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Select, TABLE);
 
         if let Some(v) = mask.user_id {
@@ -46,8 +39,7 @@ impl ProductRepo for ProductRepoImpl {
         let (statement, args) = query_builder.build();
 
         Box::new(
-            self.connection
-                .prepare2(&statement)
+            conn.prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
                 .map(|(rows, conn)| {
                     (
@@ -60,7 +52,7 @@ impl ProductRepo for ProductRepoImpl {
         )
     }
 
-    fn insert(self: Box<Self>, item: NewProduct) -> RepoConnectionFuture<()> {
+    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<()> {
         let (statement, args) = InsertBuilder::new(TABLE)
             .with_arg("user_id", item.user_id)
             .with_arg("product_id", item.product_id)
@@ -69,14 +61,13 @@ impl ProductRepo for ProductRepoImpl {
             .build();
 
         Box::new(
-            self.connection
-                .prepare2(&statement)
+            conn.prepare2(&statement)
                 .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
                 .map(|(_rows, conn)| ((), conn)),
         )
     }
 
-    fn remove(self: Box<Self>, mask: ProductMask) -> RepoConnectionFuture<()> {
+    fn remove(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<()> {
         let mut query_builder = FilteredOperationBuilder::new(FilteredOperation::Delete, TABLE);
 
         if let Some(v) = mask.user_id {
@@ -90,14 +81,13 @@ impl ProductRepo for ProductRepoImpl {
         let (statement, args) = query_builder.build();
 
         Box::new(
-            self.connection
-                .prepare2(&statement)
+            conn.prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
                 .map(|(_rows, conn)| ((), conn)),
         )
     }
 
-    fn list(self: Box<Self>, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<Product>> {
+    fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<Product>> {
         let statement = format!(
             "SELECT * FROM {} WHERE {} = $1 AND {} >= $2 LIMIT $3;",
             TABLE, "user_id", "product_id"
@@ -105,8 +95,7 @@ impl ProductRepo for ProductRepoImpl {
         let args: Vec<Box<ToSql + Send>> = vec![Box::new(user_id), Box::new(from), Box::new(count)];
 
         Box::new(
-            self.connection
-                .prepare2(&statement)
+            conn.prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
                 .map(|(rows, conn)| {
                     (
