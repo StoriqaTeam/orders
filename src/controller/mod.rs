@@ -75,7 +75,7 @@ pub fn extract_user_id(headers: Headers) -> Box<Future<Item = i32, Error = Contr
             headers
                 .get::<hyper::header::Authorization<String>>()
                 .map(|auth| auth.0.clone())
-                .ok_or_else(|| ControllerError::BadRequest(AuthorizationError::Missing.into()))
+                .ok_or_else(|| ControllerError::Forbidden(AuthorizationError::Missing.into()))
                 .and_then(|string_id| {
                     i32::from_str(&string_id).map_err(|e| {
                         ControllerError::BadRequest(
@@ -262,7 +262,7 @@ mod tests {
         match run_controller_op(Default::default(), req).wait() {
             Ok(v) => panic!("Expected error, received {}", v),
             Err(e) => match e {
-                ControllerError::BadRequest(e) => {
+                ControllerError::Forbidden(e) => {
                     let e = e.downcast().unwrap();
                     match e {
                         AuthorizationError::Missing => {
