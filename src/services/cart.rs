@@ -24,7 +24,7 @@ pub trait CartService {
     /// Clear user's cart
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
     /// Iterate over cart
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts>;
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart>;
 }
 
 type ProductRepoFactory = Arc<Fn() -> Box<ProductRepo> + Send + Sync>;
@@ -58,7 +58,7 @@ fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, us
             .map(|(products, conn)| {
                 let mut cart = Cart::default();
                 for product in products.into_iter() {
-                    cart.products.insert(product.product_id, product.quantity);
+                    cart.insert(product.product_id, product.quantity);
                 }
                 (cart, conn)
             }),
@@ -214,7 +214,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
         debug!(
             "Getting {} cart items starting from {} for user {}",
             count, from, user_id
@@ -228,7 +228,7 @@ impl CartService for CartServiceImpl {
                     (repo_factory)()
                         .list(Box::new(conn), user_id, from, count)
                         .map(|(products, conn)| {
-                            let mut cart = CartProducts::default();
+                            let mut cart = Cart::default();
                             for product in products.into_iter() {
                                 cart.insert(product.product_id, product.quantity);
                             }
@@ -265,7 +265,7 @@ impl CartService for CartServiceMemory {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
-        cart.products.insert(product_id, quantity);
+        cart.insert(product_id, quantity);
 
         Box::new(future::ok(cart.clone()))
     }
@@ -274,7 +274,7 @@ impl CartService for CartServiceMemory {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
-        cart.products.remove(&product_id);
+        cart.remove(&product_id);
 
         Box::new(future::ok(cart.clone()))
     }
@@ -288,7 +288,7 @@ impl CartService for CartServiceMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<CartProducts> {
+    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 }
@@ -318,57 +318,45 @@ mod tests {
 
         // Add the first product
         assert_eq!(
-            Cart {
-                products: vec![set_a].into_iter().collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a].into_iter().collect::<Cart>(),
             core.run(repo.set_item(user_id, set_a.0, set_a.1)).unwrap()
         );
 
         // Check DB contents
         assert_eq!(
-            Cart {
-                products: vec![set_a].into_iter().collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a].into_iter().collect::<Cart>(),
             core.run(repo.get_cart(user_id)).unwrap()
         );
 
         // Amend the first product
         assert_eq!(
-            Cart {
-                products: vec![set_a, set_b]
-                    .into_iter()
-                    .collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a, set_b]
+                .into_iter()
+                .collect::<Cart>(),
             core.run(repo.set_item(user_id, set_b.0, set_b.1)).unwrap()
         );
 
         // Add the last product
         assert_eq!(
-            Cart {
-                products: vec![set_a, set_b, set_c]
-                    .into_iter()
-                    .collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a, set_b, set_c]
+                .into_iter()
+                .collect::<Cart>(),
             core.run(repo.set_item(user_id, set_c.0, set_c.1)).unwrap()
         );
 
         // Check DB contents
         assert_eq!(
-            Cart {
-                products: vec![set_a, set_b, set_c]
-                    .into_iter()
-                    .collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a, set_b, set_c]
+                .into_iter()
+                .collect::<Cart>(),
             core.run(repo.get_cart(user_id)).unwrap()
         );
 
         // Delete the last item
         assert_eq!(
-            Cart {
-                products: vec![set_a, set_b]
-                    .into_iter()
-                    .collect::<HashMap<i32, i32>>(),
-            },
+            vec![set_a, set_b]
+                .into_iter()
+                .collect::<Cart>(),
             core.run(repo.delete_item(user_id, set_c.0)).unwrap()
         );
 

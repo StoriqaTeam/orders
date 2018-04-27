@@ -306,9 +306,7 @@ mod tests {
     #[test]
     fn test_get_cart() {
         let user_id = 12345;
-        let cart = Cart {
-            products: hashmap!{555 => 9000},
-        };
+        let cart = hashmap!{555 => 9000};
         let storage = hashmap!{user_id => cart.clone()};
 
         let mut req = Request::new(Method::Get, Uri::from_str("/cart/products").unwrap());
@@ -357,9 +355,7 @@ mod tests {
         let quantity = 9000;
         let payload = json!({ "quantity": quantity });
 
-        let expected_cart = Cart {
-            products: hashmap!{ product_id => quantity },
-        };
+        let expected_cart = hashmap!{ product_id => quantity };
         let expected_storage = hashmap!{ user_id => expected_cart.clone() };
 
         let mut req = Request::new(
@@ -385,20 +381,16 @@ mod tests {
         let quantity_keep = 9000;
         let product_id_remove = 555;
         let quantity_remove = 9100;
-        let cart = Cart {
-            products: hashmap! {
-                product_id_keep => quantity_keep,
-                product_id_remove => quantity_remove,
-            },
+        let cart = hashmap!{
+            product_id_keep => quantity_keep,
+            product_id_remove => quantity_remove,
         };
-        let storage = hashmap! {
+        let storage = hashmap!{
             user_id => cart.clone(),
         };
 
-        let expected_cart = Cart {
-            products: hashmap! {
-                product_id_keep => quantity_keep,
-            },
+        let expected_cart = hashmap!{
+            product_id_keep => quantity_keep,
         };
         let expected_storage = hashmap! {
             user_id => expected_cart.clone(),
@@ -422,17 +414,15 @@ mod tests {
     #[test]
     fn test_clear_cart() {
         let user_id = 12345;
-        let data = Arc::new(Mutex::new(hashmap! {
-            user_id => Cart {
-                products: hashmap! {
-                    444 => 9000,
-                    555 => 9010,
-                    666 => 9020,
-                },
+        let data = Arc::new(Mutex::new(hashmap!{
+            user_id => hashmap! {
+                444 => 9000,
+                555 => 9010,
+                666 => 9020,
             },
         }));
-        let expected_cart = Cart::default();
-        let expected_storage = hashmap! {
+        let expected_cart = hashmap!{};
+        let expected_storage = hashmap!{
             user_id => expected_cart.clone(),
         };
 

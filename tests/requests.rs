@@ -55,7 +55,7 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string())
         )).unwrap(),
-        Cart::default()
+        hashmap!{},
     );
 
     assert_eq!(
@@ -65,11 +65,9 @@ fn test_carts_service() {
             Some(serde_json::to_string(&json!({ "quantity": quantity })).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{
-                product_id => quantity,
-            },
-        }
+        hashmap!{
+            product_id => quantity,
+        },
     );
 
     quantity_2 += 1;
@@ -81,12 +79,10 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{
-                product_id => quantity,
-                product_id_2 => quantity_2,
-            },
-        }
+        hashmap!{
+            product_id => quantity,
+            product_id_2 => quantity_2,
+        },
     );
 
     quantity_2 += 1;
@@ -98,12 +94,10 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{
-                product_id => quantity,
-                product_id_2 => quantity_2,
-            },
-        }
+        hashmap!{
+            product_id => quantity,
+            product_id_2 => quantity_2,
+        },
     );
 
     assert_eq!(
@@ -113,23 +107,21 @@ fn test_carts_service() {
             Some(serde_json::to_string(&json!({ "quantity": quantity_3 })).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{
-                product_id => quantity,
-                product_id_2 => quantity_2,
-                product_id_3 => quantity_3,
-            },
-        }
+        hashmap!{
+            product_id => quantity,
+            product_id_2 => quantity_2,
+            product_id_3 => quantity_3,
+        },
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<CartProducts>(
+        core.run(http_client.request_with_auth_header::<Cart>(
             Method::Get,
             format!("{}/cart?offset=0&count=2", base_url),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap! {
+        hashmap!{
             product_id => quantity,
             product_id_2 => quantity_2,
         },
@@ -142,12 +134,10 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{
-                product_id_2 => quantity_2,
-                product_id_3 => quantity_3,
-            },
-        }
+        hashmap!{
+            product_id_2 => quantity_2,
+            product_id_3 => quantity_3,
+        },
     );
 
     assert_eq!(
@@ -157,8 +147,6 @@ fn test_carts_service() {
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        Cart {
-            products: hashmap!{},
-        },
+        hashmap!{},
     );
 }
