@@ -59,58 +59,58 @@ fn test_carts_service() {
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
+        core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Put,
             format!("{}/cart/products/{}", base_url, product_id),
             Some(serde_json::to_string(&json!({ "quantity": quantity })).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap!{
-            product_id => quantity,
+        CartItem {
+            product_id,
+            quantity,
         },
     );
 
     quantity_2 += 1;
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
+        core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap!{
-            product_id => quantity,
-            product_id_2 => quantity_2,
+        CartItem {
+            product_id: product_id_2,
+            quantity: quantity_2,
         },
     );
 
     quantity_2 += 1;
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
+        core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap!{
-            product_id => quantity,
-            product_id_2 => quantity_2,
+        CartItem {
+            product_id: product_id_2,
+            quantity: quantity_2,
         },
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
+        core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Put,
             format!("{}/cart/products/{}", base_url, product_id_3),
             Some(serde_json::to_string(&json!({ "quantity": quantity_3 })).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap!{
-            product_id => quantity,
-            product_id_2 => quantity_2,
-            product_id_3 => quantity_3,
+        CartItem {
+            product_id: product_id_3,
+            quantity: quantity_3,
         },
     );
 
@@ -128,15 +128,15 @@ fn test_carts_service() {
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
+        core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Delete,
             format!("{}/cart/products/{}", base_url, product_id),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        hashmap!{
-            product_id_2 => quantity_2,
-            product_id_3 => quantity_3,
+        CartItem {
+            product_id,
+            quantity: 0,
         },
     );
 
