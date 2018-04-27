@@ -45,8 +45,7 @@ impl OrderService for OrderServiceImpl {
                 // Get store ID for each cart product
                 .and_then(|cart| {
                             future::join_all(
-                                cart.products
-                                    .into_iter()
+                                cart.into_iter()
                                     .map(move |(product_id, quantity)| {
                                         Box::new(
                                             (product_info_source)()
