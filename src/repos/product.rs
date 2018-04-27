@@ -16,7 +16,7 @@ pub struct ProductMask {
 
 pub trait ProductRepo {
     fn get(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<Vec<Product>>;
-    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<()>;
+    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<Product>;
     fn remove(&self, conn: RepoConnection, mask: ProductMask) -> RepoConnectionFuture<()>;
     fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<Product>>;
 }
@@ -52,18 +52,18 @@ impl ProductRepo for ProductRepoImpl {
         )
     }
 
-    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<()> {
+    fn insert(&self, conn: RepoConnection, item: NewProduct) -> RepoConnectionFuture<Product> {
         let (statement, args) = InsertBuilder::new(TABLE)
             .with_arg("user_id", item.user_id)
             .with_arg("product_id", item.product_id)
             .with_arg("quantity", item.quantity)
-            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $3")
+            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $3 RETURNING *")
             .build();
 
         Box::new(
             conn.prepare2(&statement)
                 .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(_rows, conn)| ((), conn)),
+                .map(|(mut rows, conn)| (Product::from(rows.remove(0)), conn)),
         )
     }
 

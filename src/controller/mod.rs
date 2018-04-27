@@ -355,8 +355,15 @@ mod tests {
         let quantity = 9000;
         let payload = json!({ "quantity": quantity });
 
-        let expected_cart = hashmap!{ product_id => quantity };
-        let expected_storage = hashmap!{ user_id => expected_cart.clone() };
+        let expected_reply = CartItem {
+            product_id,
+            quantity,
+        };
+        let expected_storage = hashmap!{
+            user_id => hashmap! {
+                product_id => quantity,
+            },
+        };
 
         let mut req = Request::new(
             Method::Put,
@@ -371,7 +378,10 @@ mod tests {
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 
         assert_eq!(*data.lock().unwrap(), expected_storage);
-        assert_eq!(serde_json::from_str::<Cart>(&resp).unwrap(), expected_cart);
+        assert_eq!(
+            serde_json::from_str::<CartItem>(&resp).unwrap(),
+            expected_reply
+        );
     }
 
     #[test]
@@ -389,11 +399,14 @@ mod tests {
             user_id => cart.clone(),
         };
 
-        let expected_cart = hashmap!{
-            product_id_keep => quantity_keep,
+        let expected_reply = CartItem {
+            product_id: product_id_remove,
+            quantity: 0,
         };
         let expected_storage = hashmap! {
-            user_id => expected_cart.clone(),
+            user_id => hashmap! {
+                product_id_keep => quantity_keep,
+            }
         };
 
         let mut req = Request::new(
@@ -408,7 +421,10 @@ mod tests {
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 
         assert_eq!(*data.lock().unwrap(), expected_storage);
-        assert_eq!(serde_json::from_str::<Cart>(&resp).unwrap(), expected_cart);
+        assert_eq!(
+            serde_json::from_str::<CartItem>(&resp).unwrap(),
+            expected_reply
+        );
     }
 
     #[test]
