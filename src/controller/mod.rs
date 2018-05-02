@@ -150,17 +150,31 @@ impl Controller for ControllerImpl {
                                     .map_err(ControllerError::from),
                             )
                         }),
-                        (Put, Some(Route::CartProduct { product_id })) => serialize_future(
-                            parse_body::<UpsertCart>(payload)
+                        (Put, Some(Route::CartProductQuantity { product_id })) => serialize_future(
+                            parse_body::<CartProductQuantityPayload>(payload)
                                 .inspect(move |params| {
                                     debug!(
                                         "Received request to set product {} in user {}'s cart to quantity {}",
-                                        product_id, user_id, params.quantity
+                                        product_id, user_id, params.value
                                     );
                                 })
                                 .and_then(move |params| {
                                     (service_factory.cart_factory)()
-                                        .set_item(user_id, product_id, params.quantity)
+                                        .set_quantity(user_id, product_id, params.value)
+                                        .map_err(ControllerError::from)
+                                }),
+                        ),
+                        (Put, Some(Route::CartProductSelection { product_id })) => serialize_future(
+                            parse_body::<CartProductSelectionPayload>(payload)
+                                .inspect(move |params| {
+                                    debug!(
+                                        "Received request to set product {}'s selection in user {}'s cart to {}",
+                                        product_id, user_id, params.value
+                                    )
+                                })
+                                .and_then(move |params| {
+                                    (service_factory.cart_factory)()
+                                        .set_selection(user_id, product_id, params.value)
                                         .map_err(ControllerError::from)
                                 }),
                         ),
@@ -225,6 +239,7 @@ mod tests {
     use hyper::header::Authorization;
     use hyper::{Method, Uri};
     use serde_json;
+    use std::collections::HashMap;
     use std::sync::Mutex;
 
     fn make_test_controller(cart_storage: CartServiceMemoryStorage) -> ControllerImpl {
@@ -306,7 +321,10 @@ mod tests {
     #[test]
     fn test_get_cart() {
         let user_id = 12345;
-        let cart = hashmap!{555 => 9000};
+        let cart = hashmap!{555 => CartItemInfo {
+            quantity: 9000,
+            selected: true,
+        }};
         let storage = hashmap!{user_id => cart.clone()};
 
         let mut req = Request::new(Method::Get, Uri::from_str("/cart/products").unwrap());
@@ -322,13 +340,13 @@ mod tests {
     }
 
     #[test]
-    fn test_set_cart_nopayload() {
+    fn test_set_cart_quantity_nopayload() {
         let user_id = 12345;
         let product_id = 555;
 
         let mut req = Request::new(
             Method::Put,
-            Uri::from_str(&format!("/cart/products/{}", product_id)).unwrap(),
+            Uri::from_str(&format!("/cart/products/{}/quantity", product_id)).unwrap(),
         );
         req.headers_mut()
             .set::<Authorization<String>>(Authorization(user_id.to_string()));
@@ -349,25 +367,29 @@ mod tests {
     }
 
     #[test]
-    fn test_set_cart() {
+    fn test_set_quantity() {
         let user_id = 12345;
         let product_id = 555;
         let quantity = 9000;
-        let payload = json!({ "quantity": quantity });
+        let payload = CartProductQuantityPayload { value: quantity };
 
         let expected_reply = CartItem {
             product_id,
             quantity,
+            selected: true,
         };
-        let expected_storage = hashmap!{
+        let expected_storage: HashMap<UserId, Cart> = hashmap!{
             user_id => hashmap! {
-                product_id => quantity,
+                product_id => CartItemInfo {
+                    quantity,
+                    selected: true,
+                }
             },
         };
 
         let mut req = Request::new(
             Method::Put,
-            Uri::from_str(&format!("/cart/products/{}", product_id)).unwrap(),
+            Uri::from_str(&format!("/cart/products/{}/quantity", product_id)).unwrap(),
         );
         req.headers_mut()
             .set::<Authorization<String>>(Authorization(user_id.to_string()));
@@ -391,9 +413,15 @@ mod tests {
         let quantity_keep = 9000;
         let product_id_remove = 555;
         let quantity_remove = 9100;
-        let cart = hashmap!{
-            product_id_keep => quantity_keep,
-            product_id_remove => quantity_remove,
+        let cart: Cart = hashmap!{
+            product_id_keep => CartItemInfo {
+                quantity: quantity_keep,
+                selected: true,
+            },
+            product_id_remove => CartItemInfo {
+                quantity: quantity_remove,
+                selected: true,
+            },
         };
         let storage = hashmap!{
             user_id => cart.clone(),
@@ -402,10 +430,14 @@ mod tests {
         let expected_reply = CartItem {
             product_id: product_id_remove,
             quantity: 0,
+            selected: true,
         };
         let expected_storage = hashmap! {
             user_id => hashmap! {
-                product_id_keep => quantity_keep,
+                product_id_keep => CartItemInfo {
+                    quantity: quantity_keep,
+                    selected: true,
+                }
             }
         };
 
@@ -432,12 +464,21 @@ mod tests {
         let user_id = 12345;
         let data = Arc::new(Mutex::new(hashmap!{
             user_id => hashmap! {
-                444 => 9000,
-                555 => 9010,
-                666 => 9020,
+                444 => CartItemInfo {
+                    quantity: 9000,
+                    selected: true,
+                },
+                555 => CartItemInfo {
+                    quantity: 9010,
+                    selected: true,
+                },
+                666 => CartItemInfo {
+                    quantity: 9020,
+                    selected: true,
+                },
             },
         }));
-        let expected_cart = hashmap!{};
+        let expected_cart = Cart::default();
         let expected_storage = hashmap!{
             user_id => expected_cart.clone(),
         };
