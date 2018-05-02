@@ -46,11 +46,11 @@ impl OrderService for OrderServiceImpl {
                 .and_then(|cart| {
                             future::join_all(
                                 cart.into_iter()
-                                    .map(move |(product_id, quantity)| {
+                                    .map(move |(product_id, cart_item_info)| {
                                         Box::new(
                                             (product_info_source)()
                                                 .get_store_id(product_id)
-                                                .map(move |store_id| OrderItem {product_id, store_id, quantity})
+                                                .map(move |store_id| OrderItem {product_id, store_id, quantity: cart_item_info.quantity})
                                         ) as Box<Future<Item=OrderItem, Error=RepoError>>
                                     })
                             )

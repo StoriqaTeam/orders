@@ -5,37 +5,11 @@ use stq_db::statement::*;
 use stq_http::errors::ControllerError;
 use tokio_postgres::rows::Row;
 
-macro_rules! ORDERS_ID_COLUMN {
-    () => {
-        "id"
-    };
-}
-macro_rules! ORDERS_USER_ID_COLUMN {
-    () => {
-        "user_id"
-    };
-}
-macro_rules! ORDERS_PRODUCTS_COLUMN {
-    () => {
-        "products"
-    };
-}
-macro_rules! ORDERS_STATE_ID_COLUMN {
-    () => {
-        "state_id"
-    };
-}
-macro_rules! ORDERS_STATE_DATA_COLUMN {
-    () => {
-        "state_data"
-    };
-}
-
-macro_rules! ORDERS_RETURNING_EXTRA {
-    () => {
-        "RETURNING *"
-    };
-}
+const ID_COLUMN: &'static str = "id";
+const USER_ID_COLUMN: &'static str = "user_id";
+const PRODUCTS_COLUMN: &'static str = "products";
+const STATE_ID_COLUMN: &'static str = "state_id";
+const STATE_DATA_COLUMN: &'static str = "state_data";
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct NewData;
@@ -147,12 +121,12 @@ impl From<Order> for (OrderId, NewOrder) {
 
 impl From<Row> for Order {
     fn from(row: Row) -> Self {
-        let state_id: String = row.get(ORDERS_STATE_ID_COLUMN!());
-        let state_data: Value = row.get(ORDERS_STATE_DATA_COLUMN!());
+        let state_id: String = row.get(STATE_ID_COLUMN);
+        let state_data: Value = row.get(STATE_DATA_COLUMN);
         Self {
-            id: row.get(ORDERS_ID_COLUMN!()),
-            user_id: row.get(ORDERS_USER_ID_COLUMN!()),
-            products: serde_json::from_value(row.get(ORDERS_PRODUCTS_COLUMN!())).unwrap(),
+            id: row.get(ID_COLUMN),
+            user_id: row.get(USER_ID_COLUMN),
+            products: serde_json::from_value(row.get(PRODUCTS_COLUMN)).unwrap(),
             state: OrderState::from((state_id.as_str(), state_data)),
         }
     }
@@ -162,14 +136,13 @@ impl NewOrder {
     pub fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         let (state_id, state_data) = self.state.into();
         InsertBuilder::new(table)
-            .with_arg(ORDERS_USER_ID_COLUMN!(), self.user_id)
+            .with_arg(USER_ID_COLUMN, self.user_id)
             .with_arg(
-                ORDERS_PRODUCTS_COLUMN!(),
+                PRODUCTS_COLUMN,
                 serde_json::to_value(self.products).unwrap(),
             )
-            .with_arg(ORDERS_STATE_ID_COLUMN!(), state_id)
-            .with_arg(ORDERS_STATE_DATA_COLUMN!(), state_data)
-            .with_extra(ORDERS_RETURNING_EXTRA!())
+            .with_arg(STATE_ID_COLUMN, state_id)
+            .with_arg(STATE_DATA_COLUMN, state_data)
     }
 }
 
@@ -185,15 +158,15 @@ impl OrderMask {
         let mut b = FilteredOperationBuilder::new(op, table);
 
         if let Some(id) = self.id {
-            b = b.with_arg("id", id);
+            b = b.with_arg(ID_COLUMN, id);
         }
 
         if let Some(user_id) = self.user_id {
-            b = b.with_arg("user_id", user_id);
+            b = b.with_arg(USER_ID_COLUMN, user_id);
         }
 
         if let Some(state_id) = self.state_id {
-            b = b.with_arg(ORDERS_STATE_ID_COLUMN!(), state_id);
+            b = b.with_arg(STATE_ID_COLUMN, state_id);
         }
 
         b
@@ -216,24 +189,22 @@ impl OrderUpdate {
         let mut b = UpdateBuilder::new(table);
 
         if let Some(id) = mask.id {
-            b = b.with_filter(ORDERS_ID_COLUMN!(), id);
+            b = b.with_filter(ID_COLUMN, id);
         }
 
         if let Some(user_id) = mask.user_id {
-            b = b.with_filter(ORDERS_USER_ID_COLUMN!(), user_id);
+            b = b.with_filter(USER_ID_COLUMN, user_id);
         }
 
         if let Some(state_id) = mask.state_id {
-            b = b.with_filter(ORDERS_STATE_ID_COLUMN!(), state_id);
+            b = b.with_filter(STATE_ID_COLUMN, state_id);
         }
 
         if let Some(state) = data.state {
             let (state_id, state_data) = state.into();
-            b = b.with_value(ORDERS_STATE_ID_COLUMN!(), state_id)
-                .with_value(ORDERS_STATE_DATA_COLUMN!(), state_data);
+            b = b.with_value(STATE_ID_COLUMN, state_id)
+                .with_value(STATE_DATA_COLUMN, state_data);
         }
-
-        b = b.with_extra(ORDERS_RETURNING_EXTRA!());
 
         b
     }
