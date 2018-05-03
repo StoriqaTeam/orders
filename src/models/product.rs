@@ -1,3 +1,5 @@
+use super::*;
+
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 
@@ -32,7 +34,7 @@ impl NewCartProduct {
 pub struct CartProduct {
     pub id: CartProductId,
     pub user_id: i32,
-    pub product_id: i32,
+    pub product_id: ProductId,
     pub quantity: i32,
     pub selected: bool,
 }
@@ -95,10 +97,13 @@ impl CartProductMask {
     }
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct CartProductUpdateData {
+    pub quantity: Option<i32>,
     pub selected: Option<bool>,
 }
 
+#[derive(Clone, Debug)]
 pub struct CartProductUpdate {
     pub mask: CartProductMask,
     pub data: CartProductUpdateData,
@@ -124,6 +129,10 @@ impl CartProductUpdate {
 
         if let Some(selected) = data.selected {
             b = b.with_value(SELECTED_COLUMN, selected);
+        }
+
+        if let Some(quantity) = data.quantity {
+            b = b.with_value(QUANTITY_COLUMN, quantity);
         }
 
         b

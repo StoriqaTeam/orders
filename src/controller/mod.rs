@@ -395,7 +395,14 @@ mod tests {
             .set::<Authorization<String>>(Authorization(user_id.to_string()));
         req.set_body(serde_json::to_string(&payload).unwrap());
 
-        let data = Default::default();
+        let data = Arc::new(Mutex::new(hashmap! {
+            user_id => hashmap! {
+                product_id => CartItemInfo {
+                    quantity: 1,
+                    selected: true,
+                },
+            },
+        }));
 
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 
@@ -429,7 +436,7 @@ mod tests {
 
         let expected_reply = CartItem {
             product_id: product_id_remove,
-            quantity: 0,
+            quantity: quantity_remove,
             selected: true,
         };
         let expected_storage = hashmap! {

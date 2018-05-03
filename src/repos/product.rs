@@ -12,7 +12,7 @@ pub trait ProductRepo {
     fn get(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>>;
     fn insert(&self, conn: RepoConnection, item: NewCartProduct) -> RepoConnectionFuture<CartProduct>;
     fn update(&self, conn: RepoConnection, mask: CartProductMask, data: CartProductUpdateData) -> RepoConnectionFuture<Vec<CartProduct>>;
-    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<()>;
+    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>>;
     fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<CartProduct>>;
 }
 
@@ -69,14 +69,21 @@ impl ProductRepo for ProductRepoImpl {
         )
     }
 
-    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<()> {
+    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>> {
         let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE)
             .build();
 
         Box::new(
             conn.prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(_rows, conn)| ((), conn)),
+                .map(|(rows, conn)| {
+                    (
+                        rows.into_iter()
+                            .map(CartProduct::from)
+                            .collect::<Vec<CartProduct>>(),
+                        conn,
+                    )
+                }),
         )
     }
 
