@@ -16,13 +16,13 @@ pub trait CartService {
     /// Get user's cart contents
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
     /// Increase item's quantity by 1
-    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem>;
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
-    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<CartItem>;
+    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>>;
     /// Set selection of the item in user's cart
     fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>>;
     /// Delete item from user's cart
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem>;
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>>;
     /// Clear user's cart
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
     /// Iterate over cart
@@ -91,7 +91,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem> {
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
         debug!(
             "Adding 1 item {} into cart for user {}",
             product_id, user_id
@@ -138,9 +138,29 @@ impl CartService for CartServiceImpl {
                                     (repo_factory)().insert(conn, new_product)
                                 }
                             })
-                            .map(|(product, conn)| (CartItem::from(product), conn))
-                            .inspect(move |&(ref cart_item, ref conn)| {
-                                *output.lock().unwrap() = Some(cart_item.clone());
+                            .and_then({
+                                let repo_factory = repo_factory.clone();
+                                move |(_, conn)| {
+                                    (repo_factory)().get(
+                                        conn,
+                                        CartProductMask {
+                                            user_id: Some(user_id),
+                                            ..Default::default()
+                                        },
+                                    )
+                                }
+                            })
+                            .map({
+                                let output = output.clone();
+                                move |(rows, conn)| {
+                                    *output.lock().unwrap() = Some(
+                                        rows.into_iter()
+                                            .map(CartProduct::from)
+                                            .map(<(ProductId, CartItemInfo)>::from)
+                                            .collect::<Cart>(),
+                                    );
+                                    ((), conn)
+                                }
                             })
                             .and_then(|(_, conn)| conn.commit2())
                             .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
@@ -158,33 +178,41 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<CartItem> {
+    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>> {
         debug!(
-            "Setting item {} to quantity {} in cart for user {}.",
-            product_id, quantity, user_id
+            "Setting quantity for item {} for user {} to {}",
+            product_id, user_id, quantity
         );
 
         let repo_factory = self.repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    log::acquired_db_connection(&conn);
-                    repo_factory()
-                        .insert(
-                            Box::new(conn),
-                            NewCartProduct {
-                                user_id,
-                                product_id,
-                                quantity,
-                                selected: true,
-                            },
-                        )
-                        .map(|(product, conn)| (CartItem::from(product), conn))
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+        Box::new(self.db_pool.run(move |conn| {
+            log::acquired_db_connection(&conn);
+            (repo_factory)()
+                .update(
+                    Box::new(conn),
+                    CartProductMask {
+                        user_id: Some(user_id),
+                        product_id: Some(product_id),
+                        ..Default::default()
+                    },
+                    CartProductUpdateData {
+                        quantity: Some(quantity),
+                        ..Default::default()
+                    },
+                )
+                .map(|(mut v, conn)| {
+                    (
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.remove(0).into())
+                        },
+                        conn,
+                    )
                 })
-                .map_err(RepoError::from),
-        )
+                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+        }))
     }
 
     fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
@@ -206,6 +234,7 @@ impl CartService for CartServiceImpl {
                     },
                     CartProductUpdateData {
                         selected: Some(selected),
+                        ..Default::default()
                     },
                 )
                 .map(|(mut v, conn)| {
@@ -223,7 +252,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>> {
         debug!("Deleting item {} for user {}", product_id, user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -240,12 +269,12 @@ impl CartService for CartServiceImpl {
                                 ..Default::default()
                             },
                         )
-                        .map(move |(_, conn)| {
+                        .map(move |(mut rows, conn)| {
                             (
-                                CartItem {
-                                    product_id,
-                                    quantity: 0,
-                                    selected: true,
+                                if rows.is_empty() {
+                                    None
+                                } else {
+                                    Some(CartItem::from(rows.remove(0)))
                                 },
                                 conn,
                             )
@@ -325,38 +354,32 @@ impl CartService for CartServiceMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem> {
+    fn increment_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 
-    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<CartItem> {
+    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
-        let info = cart.entry(product_id).or_insert(CartItemInfo {
-            quantity: 0,
-            selected: true,
-        });
-        info.quantity = quantity;
-
-        Box::new(future::ok(CartItem::from((product_id, info.clone()))))
+        Box::new(future::ok(cart.get_mut(&product_id).map(|info| {
+            info.quantity = quantity;
+            CartItem::from((product_id, info.clone()))
+        })))
     }
 
     fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
         unimplemented!()
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<CartItem> {
+    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>> {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
-        cart.remove(&product_id);
-
-        Box::new(future::ok(CartItem {
-            product_id,
-            quantity: 0,
-            selected: true,
-        }))
+        Box::new(future::ok(
+            cart.remove(&product_id)
+                .map(|info| CartItem::from((product_id, info))),
+        ))
     }
 
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
@@ -398,12 +421,24 @@ mod tests {
 
         // Add the first product
         assert_eq!(
+            hashmap! {
+                set_a.0 => CartItemInfo {
+                    quantity: 1,
+                    selected: true,
+                },
+            },
+            core.run(repo.increment_item(user_id, set_a.0)).unwrap()
+        );
+
+        // Set the first product
+        assert_eq!(
             CartItem {
                 product_id: set_a.0,
                 quantity: set_a.1,
                 selected: true,
             },
             core.run(repo.set_quantity(user_id, set_a.0, set_a.1))
+                .unwrap()
                 .unwrap()
         );
 
@@ -427,9 +462,25 @@ mod tests {
             },
             core.run(repo.set_quantity(user_id, set_b.0, set_b.1))
                 .unwrap()
+                .unwrap()
         );
 
         // Add the last product
+        assert_eq!(
+            hashmap! {
+                set_b.0 => CartItemInfo {
+                    quantity: set_b.1,
+                    selected: true,
+                },
+                set_c.0 => CartItemInfo {
+                    quantity: 1,
+                    selected: true,
+                },
+            },
+            core.run(repo.increment_item(user_id, set_c.0)).unwrap()
+        );
+
+        // Set the last product
         assert_eq!(
             CartItem {
                 product_id: set_c.0,
@@ -437,6 +488,7 @@ mod tests {
                 selected: true,
             },
             core.run(repo.set_quantity(user_id, set_c.0, set_c.1))
+                .unwrap()
                 .unwrap()
         );
 
@@ -459,10 +511,12 @@ mod tests {
         assert_eq!(
             CartItem {
                 product_id: set_c.0,
-                quantity: 0,
+                quantity: set_c.1,
                 selected: true,
             },
-            core.run(repo.delete_item(user_id, set_c.0)).unwrap()
+            core.run(repo.delete_item(user_id, set_c.0))
+                .unwrap()
+                .unwrap()
         );
 
         // Clear user cart

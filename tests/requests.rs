@@ -59,6 +59,21 @@ fn test_carts_service() {
     );
 
     assert_eq!(
+        core.run(http_client.request_with_auth_header::<Cart>(
+            Method::Post,
+            format!("{}/cart/products/{}/increment", base_url, product_id),
+            None,
+            Some(user_id.to_string()),
+        )).unwrap(),
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity: 1,
+                selected: true,
+            },
+        },
+    );
+
+    assert_eq!(
         core.run(http_client.request_with_auth_header::<CartItem>(
             Method::Put,
             format!("{}/cart/products/{}/quantity", base_url, product_id),
@@ -89,47 +104,53 @@ fn test_carts_service() {
     quantity_2 += 1;
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<CartItem>(
+        core.run(http_client.request_with_auth_header::<Cart>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        CartItem {
-            product_id: product_id_2,
-            quantity: quantity_2,
-            selected: true,
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity,
+                selected: false,
+            },
+            product_id_2 => CartItemInfo {
+                quantity: quantity_2,
+                selected: true,
+            },
         },
     );
 
     quantity_2 += 1;
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<CartItem>(
+        core.run(http_client.request_with_auth_header::<Cart>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
             None,
             Some(user_id.to_string()),
         )).unwrap(),
-        CartItem {
-            product_id: product_id_2,
-            quantity: quantity_2,
-            selected: true,
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity,
+                selected: false,
+            },
+            product_id_2 => CartItemInfo {
+                quantity: quantity_2,
+                selected: true,
+            },
         },
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<CartItem>(
+        core.run(http_client.request_with_auth_header::<Option<CartItem>>(
             Method::Put,
             format!("{}/cart/products/{}/quantity", base_url, product_id_3),
             Some(serde_json::to_string(&CartProductQuantityPayload { value: quantity_3 }).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
-        CartItem {
-            product_id: product_id_3,
-            quantity: quantity_3,
-            selected: true,
-        },
+        None,
     );
 
     assert_eq!(
@@ -160,8 +181,8 @@ fn test_carts_service() {
         )).unwrap(),
         CartItem {
             product_id,
-            quantity: 0,
-            selected: true,
+            quantity,
+            selected: false,
         },
     );
 

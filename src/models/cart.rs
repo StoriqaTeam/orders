@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use super::*;
 
-pub type ProductId = i32;
-
 fn return_true() -> bool {
     true
 }
@@ -22,7 +20,7 @@ pub type CartProductSelectionPayload = SetterPayload<bool>;
 /// Model for vectorized cart
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CartItem {
-    pub product_id: i32,
+    pub product_id: ProductId,
     pub quantity: i32,
     pub selected: bool,
 }
