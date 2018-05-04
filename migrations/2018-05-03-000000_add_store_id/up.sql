@@ -1,0 +1,1 @@
+ALTER TABLE cart_items ADD COLUMN store_id INTEGER NOT NULL;

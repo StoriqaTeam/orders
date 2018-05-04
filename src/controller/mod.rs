@@ -179,13 +179,15 @@ impl Controller for ControllerImpl {
                                 }),
                         ),
                         (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
-                            debug!(
-                                "Received request to increment product {} quantity for user {}",
-                                product_id, user_id
-                            );
-                            (service_factory.cart_factory)()
-                                .increment_item(user_id, product_id)
-                                .map_err(ControllerError::from)
+                            parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
+                                debug!(
+                                    "Received request to increment product {} quantity for user {}",
+                                    product_id, user_id
+                                );
+                                (service_factory.cart_factory)()
+                                    .increment_item(user_id, product_id, data.store_id)
+                                    .map_err(ControllerError::from)
+                            })
                         }),
                         (Get, Some(Route::Orders)) => serialize_future({
                             debug!("Received request to get orders for user {}", user_id);
@@ -321,9 +323,11 @@ mod tests {
     #[test]
     fn test_get_cart() {
         let user_id = 12345;
+        let store_id = 1337;
         let cart = hashmap!{555 => CartItemInfo {
             quantity: 9000,
             selected: true,
+            store_id,
         }};
         let storage = hashmap!{user_id => cart.clone()};
 
@@ -371,18 +375,21 @@ mod tests {
         let user_id = 12345;
         let product_id = 555;
         let quantity = 9000;
+        let store_id = 1337;
         let payload = CartProductQuantityPayload { value: quantity };
 
         let expected_reply = CartItem {
             product_id,
             quantity,
             selected: true,
+            store_id,
         };
         let expected_storage: HashMap<UserId, Cart> = hashmap!{
             user_id => hashmap! {
                 product_id => CartItemInfo {
                     quantity,
                     selected: true,
+                    store_id,
                 }
             },
         };
@@ -400,6 +407,7 @@ mod tests {
                 product_id => CartItemInfo {
                     quantity: 1,
                     selected: true,
+                    store_id,
                 },
             },
         }));
@@ -416,6 +424,8 @@ mod tests {
     #[test]
     fn test_delete_item() {
         let user_id = 12345;
+        let store_id = 1337;
+
         let product_id_keep = 444;
         let quantity_keep = 9000;
         let product_id_remove = 555;
@@ -424,10 +434,12 @@ mod tests {
             product_id_keep => CartItemInfo {
                 quantity: quantity_keep,
                 selected: true,
+                store_id,
             },
             product_id_remove => CartItemInfo {
                 quantity: quantity_remove,
                 selected: true,
+                store_id,
             },
         };
         let storage = hashmap!{
@@ -438,12 +450,14 @@ mod tests {
             product_id: product_id_remove,
             quantity: quantity_remove,
             selected: true,
+            store_id,
         };
         let expected_storage = hashmap! {
             user_id => hashmap! {
                 product_id_keep => CartItemInfo {
                     quantity: quantity_keep,
                     selected: true,
+                    store_id,
                 }
             }
         };
@@ -469,19 +483,24 @@ mod tests {
     #[test]
     fn test_clear_cart() {
         let user_id = 12345;
+        let store_id = 1337;
+
         let data = Arc::new(Mutex::new(hashmap!{
             user_id => hashmap! {
                 444 => CartItemInfo {
                     quantity: 9000,
                     selected: true,
+                    store_id,
                 },
                 555 => CartItemInfo {
                     quantity: 9010,
                     selected: true,
+                    store_id,
                 },
                 666 => CartItemInfo {
                     quantity: 9020,
                     selected: true,
+                    store_id,
                 },
             },
         }));
