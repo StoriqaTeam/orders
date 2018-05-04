@@ -3,6 +3,7 @@ use futures_state_stream::StateStream;
 use stq_db::statement::*;
 use tokio_postgres::types::ToSql;
 
+use errors::RepoError;
 use models::*;
 use repos::{RepoConnection, RepoConnectionFuture};
 
@@ -45,8 +46,26 @@ impl ProductRepo for ProductRepoImpl {
 
         Box::new(
             conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(mut rows, conn)| (CartProduct::from(rows.remove(0)), conn)),
+                .and_then({
+                    let statement = statement.clone();
+                    move |(statement, conn)| conn.query2(&statement, args).collect()
+                })
+                .and_then({
+                    let statement = statement.clone();
+                    move |(mut rows, conn)| {
+                        if rows.is_empty() {
+                            Err((
+                                RepoError::Other {
+                                    error: format_err!("Insertion query returned a zero-length result"),
+                                    statement: Some(statement.clone()),
+                                },
+                                conn,
+                            ))
+                        } else {
+                            Ok((CartProduct::from(rows.remove(0)), conn))
+                        }
+                    }
+                }),
         )
     }
 

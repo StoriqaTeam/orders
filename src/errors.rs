@@ -8,6 +8,11 @@ pub enum RepoError {
     NotFound,
     #[fail(display = "Connection: {}", reason)]
     Connection { reason: String },
+    #[fail(display = "Other: {}, statement: {:?}", error, statement)]
+    Other {
+        error: Error,
+        statement: Option<String>,
+    },
 }
 
 impl From<tokio_postgres::Error> for RepoError {
