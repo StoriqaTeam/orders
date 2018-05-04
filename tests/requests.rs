@@ -39,6 +39,7 @@ fn test_carts_service() {
     } = common::setup();
 
     let user_id = 777;
+    let store_id = 1337;
     let product_id = 12345;
     let quantity = 9000;
 
@@ -62,13 +63,14 @@ fn test_carts_service() {
         core.run(http_client.request_with_auth_header::<Cart>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id),
-            None,
+            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
                 quantity: 1,
                 selected: true,
+                store_id,
             },
         },
     );
@@ -84,6 +86,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: true,
+            store_id,
         },
     );
 
@@ -98,6 +101,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            store_id,
         }
     );
 
@@ -107,17 +111,19 @@ fn test_carts_service() {
         core.run(http_client.request_with_auth_header::<Cart>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
-            None,
+            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                store_id,
             },
         },
     );
@@ -128,17 +134,19 @@ fn test_carts_service() {
         core.run(http_client.request_with_auth_header::<Cart>(
             Method::Post,
             format!("{}/cart/products/{}/increment", base_url, product_id_2),
-            None,
+            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
             Some(user_id.to_string()),
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                store_id,
             },
         },
     );
@@ -164,10 +172,12 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                store_id,
             },
         },
     );
@@ -183,6 +193,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            store_id,
         },
     );
 

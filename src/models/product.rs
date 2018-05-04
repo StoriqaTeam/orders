@@ -10,6 +10,7 @@ const USER_ID_COLUMN: &'static str = "user_id";
 const PRODUCT_ID_COLUMN: &'static str = "product_id";
 const QUANTITY_COLUMN: &'static str = "quantity";
 const SELECTED_COLUMN: &'static str = "selected";
+const STORE_ID_COLUMN: &'static str = "store_id";
 
 #[derive(Clone, Debug)]
 pub struct NewCartProduct {
@@ -17,6 +18,7 @@ pub struct NewCartProduct {
     pub product_id: i32,
     pub quantity: i32,
     pub selected: bool,
+    pub store_id: i32,
 }
 
 impl NewCartProduct {
@@ -26,6 +28,7 @@ impl NewCartProduct {
             .with_arg(PRODUCT_ID_COLUMN, self.product_id)
             .with_arg(QUANTITY_COLUMN, self.quantity)
             .with_arg(SELECTED_COLUMN, self.selected)
+            .with_arg(STORE_ID_COLUMN, self.store_id)
     }
 }
 
@@ -37,6 +40,7 @@ pub struct CartProduct {
     pub product_id: ProductId,
     pub quantity: i32,
     pub selected: bool,
+    pub store_id: i32,
 }
 
 impl From<CartProduct> for (CartProductId, NewCartProduct) {
@@ -48,6 +52,7 @@ impl From<CartProduct> for (CartProductId, NewCartProduct) {
                 product_id: product.product_id,
                 quantity: product.quantity,
                 selected: product.selected,
+                store_id: product.store_id,
             },
         )
     }
@@ -61,6 +66,7 @@ impl From<Row> for CartProduct {
             product_id: row.get(PRODUCT_ID_COLUMN),
             quantity: row.get(QUANTITY_COLUMN),
             selected: row.get(SELECTED_COLUMN),
+            store_id: row.get(STORE_ID_COLUMN),
         }
     }
 }
@@ -71,6 +77,7 @@ pub struct CartProductMask {
     pub product_id: Option<i32>,
     pub user_id: Option<i32>,
     pub selected: Option<bool>,
+    pub store_id: Option<i32>,
 }
 
 impl CartProductMask {
@@ -91,6 +98,10 @@ impl CartProductMask {
 
         if let Some(selected) = self.selected {
             b = b.with_arg(SELECTED_COLUMN, selected);
+        }
+
+        if let Some(store_id) = self.store_id {
+            b = b.with_arg(STORE_ID_COLUMN, store_id);
         }
 
         b
