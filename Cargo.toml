@@ -7,8 +7,8 @@ name = "orders_lib"
 path = "src/lib.rs"
 
 [dependencies]
-bb8 = { git = "https://github.com/khuey/bb8" }
-bb8-postgres = { git = "https://github.com/khuey/bb8" }
+bb8 = { git = "https://github.com/StoriqaTeam/bb8" }
+bb8-postgres = { git = "https://github.com/StoriqaTeam/bb8" }
 chrono = "*"
 config = "*"
 env_logger = "*"
@@ -20,13 +20,13 @@ hyper = "0.11"
 hyper-tls="0.1"
 log = "*"
 maplit = "*"
-postgres = { git = "https://github.com/sfackler/rust-postgres" }
+postgres = { git = "https://github.com/StoriqaTeam/rust-postgres" }
 rand = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
 tokio-core = "*"
-tokio-postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-serde_json"] }
+tokio-postgres = { git = "https://github.com/StoriqaTeam/rust-postgres", features = ["with-serde_json-1"] }
 stq_db = { path = "vendor/libstqbackend/db" }
 stq_http = { path = "vendor/libstqbackend/http" }
 stq_router = { path = "vendor/libstqbackend/router" }
