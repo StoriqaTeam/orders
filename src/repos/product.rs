@@ -41,7 +41,7 @@ impl ProductRepo for ProductRepoImpl {
 
     fn insert(&self, conn: RepoConnection, item: NewCartProduct) -> RepoConnectionFuture<CartProduct> {
         let (statement, args) = item.into_insert_builder(TABLE)
-            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $3")
+            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2")
             .build();
 
         Box::new(
