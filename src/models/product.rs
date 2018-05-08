@@ -1,5 +1,6 @@
 use super::*;
 
+use stq_db::repo::*;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 
@@ -21,14 +22,32 @@ pub struct NewCartProduct {
     pub store_id: i32,
 }
 
-impl NewCartProduct {
-    pub fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+impl Inserter for NewCartProduct {
+    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         InsertBuilder::new(table)
             .with_arg(USER_ID_COLUMN, self.user_id)
             .with_arg(PRODUCT_ID_COLUMN, self.product_id)
             .with_arg(QUANTITY_COLUMN, self.quantity)
             .with_arg(SELECTED_COLUMN, self.selected)
             .with_arg(STORE_ID_COLUMN, self.store_id)
+    }
+}
+
+pub struct UpsertCartProduct {
+    pub inner: NewCartProduct,
+}
+
+impl Inserter for UpsertCartProduct {
+    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+        self.inner
+            .into_insert_builder(table)
+            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2")
+    }
+}
+
+impl From<NewCartProduct> for UpsertCartProduct {
+    fn from(v: NewCartProduct) -> Self {
+        Self { inner: v }
     }
 }
 
@@ -80,8 +99,8 @@ pub struct CartProductMask {
     pub store_id: Option<i32>,
 }
 
-impl CartProductMask {
-    pub fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
+impl Filter for CartProductMask {
+    fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
         let mut b = FilteredOperationBuilder::new(op, table);
 
         if let Some(id) = self.id {
@@ -120,23 +139,11 @@ pub struct CartProductUpdate {
     pub data: CartProductUpdateData,
 }
 
-impl CartProductUpdate {
-    pub fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
+impl Updater for CartProductUpdate {
+    fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
         let Self { mask, data } = self;
 
-        let mut b = UpdateBuilder::new(table);
-
-        if let Some(id) = mask.id {
-            b = b.with_filter(ID_COLUMN, id);
-        }
-
-        if let Some(product_id) = mask.product_id {
-            b = b.with_filter(PRODUCT_ID_COLUMN, product_id);
-        }
-
-        if let Some(user_id) = mask.user_id {
-            b = b.with_filter(USER_ID_COLUMN, user_id);
-        }
+        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(FilteredOperation::Select, table));
 
         if let Some(selected) = data.selected {
             b = b.with_value(SELECTED_COLUMN, selected);

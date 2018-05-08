@@ -1,11 +1,12 @@
 use futures::future;
 use futures::prelude::*;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::sync::{Arc, Mutex};
+use stq_db::repo::*;
 
-use super::types::ServiceFuture;
 use super::CartService;
+use super::types::ServiceFuture;
 use models::*;
 use repos::*;
 use types::*;
@@ -23,7 +24,7 @@ pub type CartServiceFactory = Arc<Fn() -> Box<CartService> + Send + Sync>;
 pub struct OrderServiceImpl {
     pub cart_service_factory: CartServiceFactory,
     pub order_repo_factory: Arc<Fn() -> Box<OrderRepo + Send + Sync> + Send + Sync>,
-    pub product_info_source: Arc<Fn() -> Box<ProductInfoRepo> + Send + Sync>,
+    pub product_info_source: Arc<Fn() -> Box<ProductInfoHttpRepo> + Send + Sync>,
     pub db_pool: DbPool,
 }
 
@@ -51,7 +52,7 @@ impl OrderService for OrderServiceImpl {
                                             (product_info_source)()
                                                 .get_store_id(product_id)
                                                 .map(move |store_id| OrderItem {product_id, store_id, quantity: cart_item_info.quantity})
-                                        ) as Box<Future<Item=OrderItem, Error=RepoError>>
+                                        ) as RepoFuture<OrderItem>
                                     })
                             )
                 })
@@ -89,7 +90,7 @@ impl OrderService for OrderServiceImpl {
                                         out = Box::new(out.and_then({
                                             let order_repo_factory = order_repo_factory.clone();
                                             move |(out_data, conn)| {
-                                                (order_repo_factory)().add(conn, new_order).map({
+                                                (order_repo_factory)().create(conn, new_order).map({
                                                     let out_data = out_data.clone();
                                                     move |(order, conn)| {
                                                         out_data.lock().unwrap().insert(store_id, order);
@@ -173,7 +174,7 @@ impl OrderService for OrderServiceImpl {
                         ..Default::default()
                     },
                 )
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                .map(|(v, conn)| ((), conn.unwrap_tokio_postgres()))
                 .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
         }))
     }
@@ -184,12 +185,18 @@ impl OrderService for OrderServiceImpl {
             (order_repo_factory)()
                 .update(
                     Box::new(conn),
-                    OrderMask {
-                        id: Some(order_id),
-                        ..Default::default()
+                    OrderUpdate {
+                        mask: OrderMask {
+                            id: Some(order_id),
+                            ..Default::default()
+                        },
+                        data: OrderUpdateData { state: Some(state) },
                     },
-                    OrderUpdateData { state: Some(state) },
                 )
+                .and_then(|(mut v, conn)| match v.pop() {
+                    Some(order) => Ok((order, conn)),
+                    None => Err((format_err!("Order not found"), conn)),
+                })
                 .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                 .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
         }))

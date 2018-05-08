@@ -3,9 +3,9 @@ use futures::prelude::*;
 use std;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use stq_db::repo::*;
 
 use super::types::ServiceFuture;
-use errors::*;
 use log;
 use models::*;
 use repos::*;
@@ -42,7 +42,7 @@ impl CartServiceImpl {
     pub fn new(db_pool: DbPool) -> Self {
         Self {
             db_pool,
-            repo_factory: Arc::new(|| Box::new(ProductRepoImpl)),
+            repo_factory: Arc::new(|| Box::new(make_product_repo())),
         }
     }
 }
@@ -71,19 +71,15 @@ fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, us
 impl CartService for CartServiceImpl {
     fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
         debug!("Getting cart for user {}.", user_id);
-        Box::new(
-            self.db_pool
-                .run({
-                    let repo_factory = self.repo_factory.clone();
-                    move |conn| {
-                        log::acquired_db_connection(&conn);
-                        get_cart_from_repo(repo_factory, Box::new(conn), user_id)
-                            .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                            .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-                    }
-                })
-                .map_err(RepoError::from),
-        )
+        Box::new(self.db_pool.run({
+            let repo_factory = self.repo_factory.clone();
+            move |conn| {
+                log::acquired_db_connection(&conn);
+                get_cart_from_repo(repo_factory, Box::new(conn), user_id)
+                    .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                    .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+            }
+        }))
     }
 
     fn increment_item(&self, user_id: i32, product_id: i32, store_id: i32) -> ServiceFuture<Cart> {
@@ -131,7 +127,7 @@ impl CartService for CartServiceImpl {
                                             store_id,
                                         }
                                     };
-                                    (repo_factory)().insert(conn, new_product)
+                                    (repo_factory)().create(conn, new_product.into())
                                 }
                             })
                             .and_then({
@@ -186,14 +182,16 @@ impl CartService for CartServiceImpl {
             (repo_factory)()
                 .update(
                     Box::new(conn),
-                    CartProductMask {
-                        user_id: Some(user_id),
-                        product_id: Some(product_id),
-                        ..Default::default()
-                    },
-                    CartProductUpdateData {
-                        quantity: Some(quantity),
-                        ..Default::default()
+                    CartProductUpdate {
+                        mask: CartProductMask {
+                            user_id: Some(user_id),
+                            product_id: Some(product_id),
+                            ..Default::default()
+                        },
+                        data: CartProductUpdateData {
+                            quantity: Some(quantity),
+                            ..Default::default()
+                        },
                     },
                 )
                 .map(|(mut v, conn)| {
@@ -223,14 +221,16 @@ impl CartService for CartServiceImpl {
             (repo_factory)()
                 .update(
                     Box::new(conn),
-                    CartProductMask {
-                        user_id: Some(user_id),
-                        product_id: Some(product_id),
-                        ..Default::default()
-                    },
-                    CartProductUpdateData {
-                        selected: Some(selected),
-                        ..Default::default()
+                    CartProductUpdate {
+                        mask: CartProductMask {
+                            user_id: Some(user_id),
+                            product_id: Some(product_id),
+                            ..Default::default()
+                        },
+                        data: CartProductUpdateData {
+                            selected: Some(selected),
+                            ..Default::default()
+                        },
                     },
                 )
                 .map(|(mut v, conn)| {

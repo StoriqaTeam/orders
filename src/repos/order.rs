@@ -1,84 +1,22 @@
-use futures::future;
-use futures::prelude::*;
-use futures_state_stream::StateStream;
-use stq_db::statement::*;
+use stq_db::repo::*;
 
-use super::{RepoConnection, RepoConnectionFuture};
-use errors::*;
 use models::*;
 
 static TABLE: &'static str = "orders";
 
-pub trait OrderRepo {
-    fn add(&self, conn: RepoConnection, new_order: NewOrder) -> RepoConnectionFuture<Order>;
-    fn get(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<Vec<Order>>;
-    fn update(&self, conn: RepoConnection, mask: OrderMask, data: OrderUpdateData) -> RepoConnectionFuture<Order>;
-    fn remove(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<()>;
-}
+pub trait OrderRepo: DbRepo<Order, NewOrder, OrderMask, OrderUpdate, RepoError> {}
 
-#[derive(Clone, Debug, Default)]
-pub struct OrderRepoImpl;
+pub type OrderRepoImpl = DbRepoImpl<Order, NewOrder, OrderMask, OrderUpdate>;
+impl OrderRepo for OrderRepoImpl {}
 
-impl OrderRepo for OrderRepoImpl {
-    fn add(&self, conn: RepoConnection, new_order: NewOrder) -> RepoConnectionFuture<Order> {
-        let (statement, args) = new_order.into_insert_builder(TABLE).build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(mut rows, connection)| (Order::from(rows.remove(0)), connection)),
-        )
-    }
-
-    fn get(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<Vec<Order>> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Select, TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(rows, connection)| {
-                    (
-                        rows.into_iter().map(Order::from).collect::<Vec<Order>>(),
-                        connection,
-                    )
-                }),
-        )
-    }
-
-    fn update(&self, conn: RepoConnection, mask: OrderMask, data: OrderUpdateData) -> RepoConnectionFuture<Order> {
-        let (statement, args) = OrderUpdate { mask, data }
-            .into_update_builder(TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .and_then(|(mut rows, connection)| {
-                    if rows.is_empty() {
-                        future::err((RepoError::NotFound, connection))
-                    } else {
-                        future::ok((Order::from(rows.remove(0)), connection))
-                    }
-                }),
-        )
-    }
-
-    fn remove(&self, conn: RepoConnection, mask: OrderMask) -> RepoConnectionFuture<()> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(_rows, connection)| ((), connection)),
-        )
-    }
+pub fn make_order_repo() -> OrderRepoImpl {
+    DbRepoImpl::new(TABLE)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::*;
     use prepare_db;
     use std::sync::Arc;
     use tokio_core::reactor::Core;
@@ -103,7 +41,7 @@ mod tests {
                 let conn = Box::new(conn);
 
                 future::ok(())
-                    .and_then(move |_| OrderRepoImpl::default().add(conn, new_order))
+                    .and_then(move |_| make_order_repo().create(conn, new_order))
                     .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                     .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
             }

@@ -1,6 +1,7 @@
 use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
+use stq_db::repo::*;
 use stq_db::statement::*;
 use stq_http::errors::ControllerError;
 use tokio_postgres::rows::Row;
@@ -132,8 +133,8 @@ impl From<Row> for Order {
     }
 }
 
-impl NewOrder {
-    pub fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+impl Inserter for NewOrder {
+    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         let (state_id, state_data) = self.state.into();
         InsertBuilder::new(table)
             .with_arg(USER_ID_COLUMN, self.user_id)
@@ -153,8 +154,8 @@ pub struct OrderMask {
     pub state_id: Option<String>,
 }
 
-impl OrderMask {
-    pub fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
+impl Filter for OrderMask {
+    fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
         let mut b = FilteredOperationBuilder::new(op, table);
 
         if let Some(id) = self.id {
@@ -182,23 +183,11 @@ pub struct OrderUpdate {
     pub data: OrderUpdateData,
 }
 
-impl OrderUpdate {
-    pub fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
+impl Updater for OrderUpdate {
+    fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
         let OrderUpdate { mask, data } = self;
 
-        let mut b = UpdateBuilder::new(table);
-
-        if let Some(id) = mask.id {
-            b = b.with_filter(ID_COLUMN, id);
-        }
-
-        if let Some(user_id) = mask.user_id {
-            b = b.with_filter(USER_ID_COLUMN, user_id);
-        }
-
-        if let Some(state_id) = mask.state_id {
-            b = b.with_filter(STATE_ID_COLUMN, state_id);
-        }
+        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(FilteredOperation::Select, table));
 
         if let Some(state) = data.state {
             let (state_id, state_data) = state.into();
