@@ -4,7 +4,7 @@ pipeline:
     commands:
     - export BRANCH_SRC=origin/${DRONE_COMMIT_REFSPEC%%:*} BRANCH_DST=origin/${DRONE_BRANCH}
     - cp -rpf .git .git.bak
-    - git fetch && git checkout $BRANCH_SRC && git merge $BRANCH_SRC
+    - git fetch && git checkout $BRANCH_SRC && git merge $BRANCH_DST
     - rm -rf .git && mv -f .git.bak .git
     when:
       event: pull_request
@@ -19,7 +19,11 @@ pipeline:
     commands:
     - rustup component add rustfmt-preview
     - cargo fmt --all -- --write-mode=diff
-    - apt-get update && apt-get install -y ca-certificates
+    - apt-get update && apt-get install -y ca-certificates wget gnupg2
+    - wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | apt-key add -
+    - echo "deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main" >> /etc/apt/sources.list.d/pgdg.list
+    - apt-get update && apt-get install -y libpq5 postgresql-client-10
+    - psql -U postgres -h db-postgresql -c "CREATE ROLE orders WITH PASSWORD 'orders' LOGIN REPLICATION" -c "CREATE DATABASE orders OWNER orders"
     - update-ca-certificates
     - cargo test
     when:
