@@ -12,10 +12,10 @@ pipeline:
   test:
     image: rust:1.25-stretch
     environment:
-    - PGPASSWORD=a1a1a1a1
     - RUN_MODE=k8s
     - DATABASE_HOST=db-postgresql
     - DATABASE_URL=postgresql://orders:orders@db-postgresql/orders
+    - RUST_BACKTRACE=1
     commands:
     - rustup component add rustfmt-preview
     - cargo fmt --all -- --write-mode=diff
