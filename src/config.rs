@@ -3,30 +3,6 @@ use std::net::IpAddr;
 
 use config_crate::{Config as RawConfig, ConfigError, Environment, File};
 
-enum Env {
-    Development,
-    Test,
-    Production,
-}
-
-impl Env {
-    fn new() -> Self {
-        match env::var("RUN_MODE") {
-            Ok(ref s) if s == "test" => Env::Test,
-            Ok(ref s) if s == "production" => Env::Production,
-            _ => Env::Development,
-        }
-    }
-
-    fn to_string(&self) -> &'static str {
-        match self {
-            &Env::Development => "development",
-            &Env::Production => "production",
-            &Env::Test => "test",
-        }
-    }
-}
-
 /// Service configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Listen {
@@ -54,20 +30,26 @@ pub struct Config {
     pub services: Services,
 }
 
-impl Config {
-    /// Creates config from base.toml, which are overwritten by <env>.toml, where
-    /// env is one of development, test, production. After that it could be overwritten
-    /// by env variables like STQ_ORDERS_LISTEN (this will override `listen` field in config)
-    pub fn new() -> Result<Self, ConfigError> {
-        let env = Env::new();
-        let mut s = RawConfig::new();
+static ENV_PREFIX: &'static str = "STQ_ORDERS";
 
+/// Creates new app config struct
+/// #Examples
+/// ```
+/// use orders_lib::*;
+///
+/// let config = Config::new();
+/// ```
+impl Config {
+    pub fn new() -> Result<Self, ConfigError> {
+        let mut s = RawConfig::new();
         s.merge(File::with_name("config/base"))?;
-        // Optional file specific for environment
-        s.merge(File::with_name(&format!("config/{}", env.to_string())).required(false))?;
+
+        // Note that this file is _optional_
+        let env = env::var("RUN_MODE").unwrap_or("development".into());
+        s.merge(File::with_name(&format!("config/{}", env)).required(false))?;
 
         // Add in settings from the environment (with a prefix of STQ_ORDERS)
-        s.merge(Environment::with_prefix("STQ_ORDERS"))?;
+        s.merge(Environment::with_prefix(ENV_PREFIX))?;
 
         s.try_into()
     }
