@@ -16,6 +16,7 @@ pipeline:
     - DATABASE_HOST=db-postgresql
     - DATABASE_URL=postgresql://orders:orders@db-postgresql/orders
     - RUST_BACKTRACE=1
+    - PGPASSWORD=a1a1a1a1
     commands:
     - rustup component add rustfmt-preview
     - cargo fmt --all -- --write-mode=diff
