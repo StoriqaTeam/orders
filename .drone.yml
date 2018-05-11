@@ -25,7 +25,9 @@ pipeline:
     - echo "deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main" >> /etc/apt/sources.list.d/pgdg.list
     - apt-get update && apt-get install -y libpq5 postgresql-client-10
     - psql -U postgres -h db-postgresql -c "CREATE ROLE orders WITH PASSWORD 'orders' LOGIN REPLICATION" -c "CREATE DATABASE orders OWNER orders"
+    - cargo install diesel_cli
     - update-ca-certificates
+    - diesel migration run
     - cargo test
     when:
       event: pull_request
