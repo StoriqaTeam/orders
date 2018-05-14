@@ -1,111 +1,21 @@
 use futures::prelude::*;
 use futures_state_stream::StateStream;
-use stq_db::statement::*;
+use stq_db::repo::*;
 use tokio_postgres::types::ToSql;
 
-use errors::RepoError;
 use models::*;
-use repos::{RepoConnection, RepoConnectionFuture};
 
 static TABLE: &'static str = "cart_items";
 
-pub trait ProductRepo {
-    fn get(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>>;
-    fn insert(&self, conn: RepoConnection, item: NewCartProduct) -> RepoConnectionFuture<CartProduct>;
-    fn update(&self, conn: RepoConnection, mask: CartProductMask, data: CartProductUpdateData) -> RepoConnectionFuture<Vec<CartProduct>>;
-    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>>;
+pub trait ProductRepo
+    : DbRepo<CartProduct, UpsertCartProduct, CartProductMask, CartProductUpdate, RepoError>
+    {
     fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<CartProduct>>;
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct ProductRepoImpl;
+pub type ProductRepoImpl = DbRepoImpl<CartProduct, UpsertCartProduct, CartProductMask, CartProductUpdate>;
 
 impl ProductRepo for ProductRepoImpl {
-    fn get(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Select, TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(rows, conn)| {
-                    (
-                        rows.into_iter()
-                            .map(CartProduct::from)
-                            .collect::<Vec<CartProduct>>(),
-                        conn,
-                    )
-                }),
-        )
-    }
-
-    fn insert(&self, conn: RepoConnection, item: NewCartProduct) -> RepoConnectionFuture<CartProduct> {
-        let (statement, args) = item.into_insert_builder(TABLE)
-            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2")
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then({
-                    let statement = statement.clone();
-                    move |(statement, conn)| conn.query2(&statement, args).collect()
-                })
-                .and_then({
-                    let statement = statement.clone();
-                    move |(mut rows, conn)| {
-                        if rows.is_empty() {
-                            Err((
-                                RepoError::Other {
-                                    error: format_err!("Insertion query returned a zero-length result"),
-                                    statement: Some(statement.clone()),
-                                },
-                                conn,
-                            ))
-                        } else {
-                            Ok((CartProduct::from(rows.remove(0)), conn))
-                        }
-                    }
-                }),
-        )
-    }
-
-    fn update(&self, conn: RepoConnection, mask: CartProductMask, data: CartProductUpdateData) -> RepoConnectionFuture<Vec<CartProduct>> {
-        let (statement, args) = CartProductUpdate { mask, data }
-            .into_update_builder(TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then(move |(statement, conn)| conn.query2(&statement, args).collect())
-                .map(|(rows, conn)| {
-                    (
-                        rows.into_iter()
-                            .map(CartProduct::from)
-                            .collect::<Vec<CartProduct>>(),
-                        conn,
-                    )
-                }),
-        )
-    }
-
-    fn remove(&self, conn: RepoConnection, mask: CartProductMask) -> RepoConnectionFuture<Vec<CartProduct>> {
-        let (statement, args) = mask.into_filtered_operation_builder(FilteredOperation::Delete, TABLE)
-            .build();
-
-        Box::new(
-            conn.prepare2(&statement)
-                .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(rows, conn)| {
-                    (
-                        rows.into_iter()
-                            .map(CartProduct::from)
-                            .collect::<Vec<CartProduct>>(),
-                        conn,
-                    )
-                }),
-        )
-    }
-
     fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<CartProduct>> {
         let statement = format!(
             "SELECT * FROM {} WHERE {} = $1 AND {} >= $2 LIMIT $3;",
@@ -116,14 +26,11 @@ impl ProductRepo for ProductRepoImpl {
         Box::new(
             conn.prepare2(&statement)
                 .and_then({ move |(statement, conn)| conn.query2(&statement, args).collect() })
-                .map(|(rows, conn)| {
-                    (
-                        rows.into_iter()
-                            .map(CartProduct::from)
-                            .collect::<Vec<CartProduct>>(),
-                        conn,
-                    )
-                }),
+                .map(|(rows, conn)| (rows.into_iter().map(From::from).collect::<_>(), conn)),
         )
     }
+}
+
+pub fn make_product_repo() -> ProductRepoImpl {
+    ProductRepoImpl::new(TABLE)
 }

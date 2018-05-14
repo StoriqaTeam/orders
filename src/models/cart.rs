@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use super::*;
+use std::collections::HashMap;
 
 fn return_true() -> bool {
     true

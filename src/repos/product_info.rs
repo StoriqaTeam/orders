@@ -1,22 +1,22 @@
 use futures::future;
 use futures::prelude::*;
 use hyper::Method::Get;
+use stq_db::repo::*;
 use stq_http::client::ClientHandle as HttpClientHandle;
 
-use super::{RepoError, RepoFuture};
 use models::*;
 
-pub trait ProductInfoRepo {
+pub trait ProductInfoHttpRepo {
     fn get_store_id(&self, product_id: i32) -> RepoFuture<i32>;
 }
 
 #[derive(Clone)]
-pub struct ProductInfoRepoImpl {
+pub struct ProductInfoHttpRepoImpl {
     http_client: HttpClientHandle,
     stores_addr: String,
 }
 
-impl ProductInfoRepoImpl {
+impl ProductInfoHttpRepoImpl {
     pub fn new(http_client: HttpClientHandle, stores_addr: String) -> Self {
         Self {
             stores_addr,
@@ -25,7 +25,7 @@ impl ProductInfoRepoImpl {
     }
 }
 
-impl ProductInfoRepo for ProductInfoRepoImpl {
+impl ProductInfoHttpRepo for ProductInfoHttpRepoImpl {
     fn get_store_id(&self, product_id: i32) -> RepoFuture<i32> {
         Box::new(
             future::ok(())
@@ -56,9 +56,7 @@ impl ProductInfoRepo for ProductInfoRepoImpl {
                         )
                     }
                 })
-                .map_err(|e| RepoError::Connection {
-                    reason: e.to_string(),
-                })
+                .map_err(From::from)
                 .map(|base_product_info| base_product_info.store_id),
         )
     }

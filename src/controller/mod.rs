@@ -48,12 +48,12 @@ impl ControllerImpl {
                         Box::new(OrderServiceImpl {
                             db_pool: db_pool.clone(),
                             cart_service_factory: cart_factory.clone(),
-                            order_repo_factory: Arc::new(|| Box::new(OrderRepoImpl::default())),
+                            order_repo_factory: Arc::new(|| Box::new(make_order_repo())),
                             product_info_source: Arc::new({
                                 let http_client = http_client.clone();
                                 let config = config.clone();
                                 move || {
-                                    Box::new(ProductInfoRepoImpl::new(
+                                    Box::new(ProductInfoHttpRepoImpl::new(
                                         http_client.clone(),
                                         config.services.stores.clone(),
                                     ))
@@ -100,7 +100,11 @@ impl Controller for ControllerImpl {
         let route = route_parser.test(uri.path());
         match (&method, route) {
             // GET /healthcheck
-            (&Get, Some(Route::Healthcheck)) => serialize_future((service_factory.system_factory)().healthcheck()),
+            (&Get, Some(Route::Healthcheck)) => serialize_future(
+                (service_factory.system_factory)()
+                    .healthcheck()
+                    .map_err(ControllerError::InternalServerError),
+            ),
             _ => {
                 Box::new(extract_user_id(headers).and_then(move |user_id| {
                     match (method, route) {
@@ -115,7 +119,7 @@ impl Controller for ControllerImpl {
                                 serialize_future(
                                     (service_factory.cart_factory)()
                                         .list(user_id, from, count)
-                                        .map_err(ControllerError::from),
+                                        .map_err(ControllerError::InternalServerError),
                                 )
                             } else {
                                 serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(
@@ -128,7 +132,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.cart_factory)()
                                     .get_cart(user_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         (Post, Some(Route::CartClear)) => serialize_future({
@@ -136,7 +140,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.cart_factory)()
                                     .clear_cart(user_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         (Delete, Some(Route::CartProduct { product_id })) => serialize_future({
@@ -147,7 +151,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.cart_factory)()
                                     .delete_item(user_id, product_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         (Put, Some(Route::CartProductQuantity { product_id })) => serialize_future(
@@ -161,7 +165,7 @@ impl Controller for ControllerImpl {
                                 .and_then(move |params| {
                                     (service_factory.cart_factory)()
                                         .set_quantity(user_id, product_id, params.value)
-                                        .map_err(ControllerError::from)
+                                        .map_err(ControllerError::InternalServerError)
                                 }),
                         ),
                         (Put, Some(Route::CartProductSelection { product_id })) => serialize_future(
@@ -175,7 +179,7 @@ impl Controller for ControllerImpl {
                                 .and_then(move |params| {
                                     (service_factory.cart_factory)()
                                         .set_selection(user_id, product_id, params.value)
-                                        .map_err(ControllerError::from)
+                                        .map_err(ControllerError::InternalServerError)
                                 }),
                         ),
                         (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
@@ -186,7 +190,7 @@ impl Controller for ControllerImpl {
                                 );
                                 (service_factory.cart_factory)()
                                     .increment_item(user_id, product_id, data.store_id)
-                                    .map_err(ControllerError::from)
+                                    .map_err(ControllerError::InternalServerError)
                             })
                         }),
                         (Get, Some(Route::Orders)) => serialize_future({
@@ -194,7 +198,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.order_factory)()
                                     .get_orders_for_user(user_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         (Post, Some(Route::OrderFromCart)) => serialize_future({
@@ -205,7 +209,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.order_factory)()
                                     .convert_cart(user_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
@@ -214,7 +218,7 @@ impl Controller for ControllerImpl {
                                 Box::new(
                                     (service_factory.order_factory)()
                                         .set_order_state(order_id, order_status)
-                                        .map_err(ControllerError::from),
+                                        .map_err(ControllerError::InternalServerError),
                                 )
                             })
                         }),
@@ -223,7 +227,7 @@ impl Controller for ControllerImpl {
                             Box::new(
                                 (service_factory.order_factory)()
                                     .delete_order(order_id)
-                                    .map_err(ControllerError::from),
+                                    .map_err(ControllerError::InternalServerError),
                             )
                         }),
                         // Fallback
