@@ -33,21 +33,23 @@ impl Inserter for NewCartProduct {
     }
 }
 
-pub struct UpsertCartProduct {
-    pub inner: NewCartProduct,
-}
+pub struct UpsertCartProduct(pub NewCartProduct);
 
 impl Inserter for UpsertCartProduct {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        self.inner
+        self.0
             .into_insert_builder(table)
             .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2")
     }
 }
 
-impl From<NewCartProduct> for UpsertCartProduct {
-    fn from(v: NewCartProduct) -> Self {
-        Self { inner: v }
+pub struct CartProductNewInserter(pub NewCartProduct);
+
+impl Inserter for CartProductNewInserter {
+    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+        self.0
+            .into_insert_builder(table)
+            .with_extra("ON CONFLICT (user_id, product_id) DO NOTHING")
     }
 }
 
@@ -74,6 +76,12 @@ impl From<CartProduct> for (CartProductId, NewCartProduct) {
                 store_id: product.store_id,
             },
         )
+    }
+}
+
+impl CartProduct {
+    pub fn decompose(self) -> (CartProductId, NewCartProduct) {
+        <(CartProductId, NewCartProduct)>::from(self)
     }
 }
 

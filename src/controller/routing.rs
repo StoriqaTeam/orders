@@ -15,12 +15,10 @@ pub enum Route {
     Orders,
     Order { order_id: OrderId },
     OrderStatus { order_id: OrderId },
-    Healthcheck,
 }
 
 pub fn make_router() -> RouteParser<Route> {
     let mut route_parser: RouteParser<Route> = Default::default();
-    route_parser.add_route(r"^/healthcheck$", || Route::Healthcheck);
     route_parser.add_route(r"^/cart$", || Route::Cart);
     route_parser.add_route_with_params(r"^/cart/products/(\d+)$", |params| {
         params

@@ -29,7 +29,7 @@ pub trait CartService {
     fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart>;
 }
 
-type ProductRepoFactory = Arc<Fn() -> Box<ProductRepo> + Send + Sync>;
+pub type ProductRepoFactory = Arc<Fn() -> Box<ProductRepo> + Send + Sync>;
 
 /// Default implementation of user cart service
 pub struct CartServiceImpl {
@@ -50,7 +50,7 @@ impl CartServiceImpl {
 fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: i32) -> RepoConnectionFuture<Cart> {
     Box::new(
         (repo_factory)()
-            .get(
+            .select(
                 conn,
                 CartProductMask {
                     user_id: Some(user_id),
@@ -89,11 +89,9 @@ impl CartService for CartServiceImpl {
         );
 
         let repo_factory = self.repo_factory.clone();
-        let output = Arc::new(Mutex::new(None));
         Box::new(
             self.db_pool
                 .run({
-                    let output = output.clone();
                     move |conn| {
                         log::acquired_db_connection(&conn);
                         let conn = conn.transaction();
@@ -102,7 +100,7 @@ impl CartService for CartServiceImpl {
                             .and_then({
                                 let repo_factory = repo_factory.clone();
                                 move |conn| {
-                                    (repo_factory)().get(
+                                    (repo_factory)().select(
                                         conn,
                                         CartProductMask {
                                             user_id: Some(user_id),
@@ -127,13 +125,13 @@ impl CartService for CartServiceImpl {
                                             store_id,
                                         }
                                     };
-                                    (repo_factory)().create(conn, new_product.into())
+                                    (repo_factory)().insert_exactly_one(conn, UpsertCartProduct(new_product))
                                 }
                             })
                             .and_then({
                                 let repo_factory = repo_factory.clone();
                                 move |(_, conn)| {
-                                    (repo_factory)().get(
+                                    (repo_factory)().select(
                                         conn,
                                         CartProductMask {
                                             user_id: Some(user_id),
@@ -143,27 +141,19 @@ impl CartService for CartServiceImpl {
                                 }
                             })
                             .map({
-                                let output = output.clone();
                                 move |(rows, conn)| {
-                                    *output.lock().unwrap() = Some(
+                                    (
                                         rows.into_iter()
                                             .map(CartProduct::from)
                                             .map(<(ProductId, CartItemInfo)>::from)
                                             .collect::<Cart>(),
-                                    );
-                                    ((), conn)
+                                        conn,
+                                    )
                                 }
                             })
-                            .and_then(|(_, conn)| conn.commit2())
+                            .and_then(|(output, conn)| conn.commit2().map(move |(_, conn)| (output, conn)))
                             .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                             .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-                    }
-                })
-                .map({
-                    let output = output.clone();
-                    move |_| {
-                        let g = output.lock().unwrap();
-                        g.clone().unwrap()
                     }
                 })
                 .map_err(RepoError::from),
@@ -257,7 +247,7 @@ impl CartService for CartServiceImpl {
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
                     (repo_factory)()
-                        .remove(
+                        .delete(
                             Box::new(conn),
                             CartProductMask {
                                 user_id: Some(user_id),
@@ -291,7 +281,7 @@ impl CartService for CartServiceImpl {
                 .run(move |conn| {
                     log::acquired_db_connection(&conn);
                     (repo_factory)()
-                        .remove(
+                        .delete(
                             Box::new(conn),
                             CartProductMask {
                                 user_id: Some(user_id),
