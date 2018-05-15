@@ -14,23 +14,6 @@ use hyper::Method;
 use lib::models::*;
 
 #[test]
-fn healthcheck_returns_ok() {
-    let common::Context {
-        mut core,
-        http_client,
-        base_url,
-    } = common::setup();
-
-    let uri = format!("{}/healthcheck", base_url);
-
-    assert_eq!(
-        core.run(http_client.request::<String>(Method::Get, uri, None, None,))
-            .unwrap(),
-        "Ok"
-    );
-}
-
-#[test]
 fn test_carts_service() {
     let common::Context {
         mut core,

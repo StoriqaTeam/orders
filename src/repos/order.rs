@@ -6,7 +6,7 @@ static TABLE: &'static str = "orders";
 
 pub trait OrderRepo: DbRepo<Order, NewOrder, OrderMask, OrderUpdate, RepoError> {}
 
-pub type OrderRepoImpl = DbRepoImpl<Order, NewOrder, OrderMask, OrderUpdate>;
+pub type OrderRepoImpl = DbRepoImpl;
 impl OrderRepo for OrderRepoImpl {}
 
 pub fn make_order_repo() -> OrderRepoImpl {
@@ -35,13 +35,13 @@ mod tests {
         let remote = core.remote();
         let pool = Arc::new(core.run(prepare_db(remote)).unwrap());
 
-        let created_order = pool.run({
+        let created_order: Order = pool.run({
             let new_order = new_order.clone();
             move |conn| {
                 let conn = Box::new(conn);
 
                 future::ok(())
-                    .and_then(move |_| make_order_repo().create(conn, new_order))
+                    .and_then(move |_| make_order_repo().insert_exactly_one(conn, new_order))
                     .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                     .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
             }

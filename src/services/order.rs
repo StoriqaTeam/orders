@@ -90,7 +90,7 @@ impl OrderService for OrderServiceImpl {
                                         out = Box::new(out.and_then({
                                             let order_repo_factory = order_repo_factory.clone();
                                             move |(out_data, conn)| {
-                                                (order_repo_factory)().create(conn, new_order).map({
+                                                (order_repo_factory)().insert_exactly_one(conn, new_order).map({
                                                     let out_data = out_data.clone();
                                                     move |(order, conn)| {
                                                         out_data.lock().unwrap().insert(store_id, order);
@@ -134,7 +134,7 @@ impl OrderService for OrderServiceImpl {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)()
-                .get(
+                .select(
                     Box::new(conn),
                     OrderMask {
                         id: Some(order_id),
@@ -151,7 +151,7 @@ impl OrderService for OrderServiceImpl {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)()
-                .get(
+                .select(
                     Box::new(conn),
                     OrderMask {
                         user_id: Some(user_id),
@@ -167,7 +167,7 @@ impl OrderService for OrderServiceImpl {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)()
-                .remove(
+                .delete(
                     Box::new(conn),
                     OrderMask {
                         id: Some(order_id),
