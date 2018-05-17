@@ -23,6 +23,11 @@ pub struct CartProductIncrementPayload {
     pub store_id: i32,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CartMergePayload {
+    pub user_from: i32,
+}
+
 /// Model for vectorized cart
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CartItem {

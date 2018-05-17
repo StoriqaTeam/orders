@@ -27,6 +27,8 @@ pub trait CartService {
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
     /// Iterate over cart
     fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart>;
+    /// Merge carts
+    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart>;
 }
 
 pub type ProductRepoFactory = Arc<Fn() -> Box<ProductRepo> + Send + Sync>;
@@ -323,6 +325,58 @@ impl CartService for CartServiceImpl {
                 .map_err(RepoError::from),
         )
     }
+
+    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart> {
+        debug!("Merging cart contents from user {} to user {}", from, to);
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    conn.transaction()
+                        .map_err(|(e, trans)| (RepoError::from(e), Box::new(trans) as RepoConnection))
+                        .map(|conn| Box::new(conn) as RepoConnection)
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |conn| {
+                                (repo_factory)().delete(
+                                    conn,
+                                    CartProductMask {
+                                        user_id: Some(from),
+                                        ..Default::default()
+                                    },
+                                )
+                            }
+                        })
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(from_products, conn)| {
+                                let mut b: RepoConnectionFuture<()> = Box::new(future::ok(((), conn)));
+                                for product in from_products {
+                                    let repo_factory = repo_factory.clone();
+                                    b = Box::new(b.and_then(move |(_, conn)| {
+                                        let mut new_cart_product = product.decompose().1;
+                                        new_cart_product.user_id = to;
+                                        (repo_factory)()
+                                            .insert(conn, CartProductNewInserter(new_cart_product))
+                                            .map(|(_, conn)| ((), conn))
+                                    }));
+                                }
+                                b
+                            }
+                        })
+                        .and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| get_cart_from_repo(repo_factory.clone(), conn, to)
+                        })
+                        .and_then(move |(cart, conn)| conn.commit2().map(move |(_, conn)| (cart, conn)))
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map_err(RepoError::from),
+        )
+    }
 }
 
 pub type CartServiceMemoryStorage = Arc<Mutex<HashMap<i32, Cart>>>;
@@ -378,6 +432,10 @@ impl CartService for CartServiceMemory {
     }
 
     fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
+        unimplemented!()
+    }
+
+    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 }
