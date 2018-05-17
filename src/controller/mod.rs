@@ -181,6 +181,18 @@ impl Controller for ControllerImpl {
                             .map_err(ControllerError::InternalServerError)
                     })
                 }),
+                (Post, Some(Route::CartMerge)) => serialize_future({
+                    parse_body::<CartMergePayload>(payload).and_then(move |data| {
+                        let user_to = user_id;
+                        debug!(
+                            "Received request to merge cart from user {} to user {}",
+                            data.user_from, user_to
+                        );
+                        (service_factory.cart_factory)()
+                            .merge(data.user_from, user_to)
+                            .map_err(ControllerError::InternalServerError)
+                    })
+                }),
                 (Get, Some(Route::Orders)) => serialize_future({
                     debug!("Received request to get orders for user {}", user_id);
                     Box::new(
