@@ -7,9 +7,10 @@ use models::*;
 
 static TABLE: &'static str = "cart_items";
 
-pub trait ProductRepo
-    : DbRepo<CartProduct, UpsertCartProduct, CartProductMask, CartProductUpdate, RepoError>
-    + DbRepoInsert<CartProduct, CartProductNewInserter, RepoError> {
+pub trait ProductRepo:
+    DbRepo<CartProduct, UpsertCartProduct, CartProductMask, CartProductUpdate, RepoError>
+    + DbRepoInsert<CartProduct, CartProductNewInserter, RepoError>
+{
     fn list(&self, conn: RepoConnection, user_id: i32, from: i32, count: i64) -> RepoConnectionFuture<Vec<CartProduct>>;
 }
 
