@@ -67,15 +67,18 @@ impl ControllerImpl {
     }
 }
 
-pub fn extract_user_id(headers: Headers) -> Box<Future<Item = i32, Error = ControllerError>> {
+pub fn extract_user_id(headers: Headers) -> Box<Future<Item = UserId, Error = ControllerError>> {
     Box::new(
         future::result(
             headers
                 .get::<hyper::header::Authorization<String>>()
                 .map(|auth| auth.0.clone())
+                .or(headers
+                    .get::<hyper::header::Cookie>()
+                    .and_then(|c| c.get("SESSION_ID").map(|v| v.to_string())))
                 .ok_or_else(|| ControllerError::Forbidden(AuthorizationError::Missing.into()))
                 .and_then(|string_id| {
-                    i32::from_str(&string_id).map_err(|e| {
+                    UserId::from_str(&string_id).map_err(|e| {
                         ControllerError::BadRequest(
                             AuthorizationError::Parse {
                                 raw: string_id,
