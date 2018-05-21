@@ -83,27 +83,26 @@ impl OrderService for OrderServiceImpl {
                             let db_pool = self.db_pool.clone();
                             move |new_orders_by_store| {
                                 db_pool.run(move |conn| {
-                                    let mut out: RepoConnectionFuture<Arc<Mutex<HashMap<i32, Order>>>>;
-
+                                    let mut out: RepoConnectionFuture<HashMap<i32, Order>>;
                                     out = Box::new(future::ok((Default::default(), Box::new(conn) as RepoConnection)));
+
                                     for (store_id, new_order) in new_orders_by_store.into_iter() {
                                         out = Box::new(out.and_then({
                                             let order_repo_factory = order_repo_factory.clone();
-                                            move |(out_data, conn)| {
+                                            move |(mut out_data, conn)| {
                                                 (order_repo_factory)().insert_exactly_one(conn, new_order).map({
-                                                    let out_data = out_data.clone();
                                                     move |(order, conn)| {
-                                                        out_data.lock().unwrap().insert(store_id, order);
-                                                        (out_data.clone(), conn)
+                                                        out_data.insert(store_id, order);
+                                                        (out_data, conn)
                                                     }
                                                 })
                                             }
                                         }));
                                     }
 
-                                    out.map(|(out_data, conn)| {
-                                        (Arc::try_unwrap(out_data).unwrap().into_inner().unwrap(), conn.unwrap_tokio_postgres())
-                                    }).map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                                    out
+                                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                                 })
                             }
                         })
