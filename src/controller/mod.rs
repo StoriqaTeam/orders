@@ -50,12 +50,7 @@ impl ControllerImpl {
                             product_info_source: Arc::new({
                                 let http_client = http_client.clone();
                                 let config = config.clone();
-                                move || {
-                                    Box::new(ProductInfoHttpRepoImpl::new(
-                                        http_client.clone(),
-                                        config.services.stores.clone(),
-                                    ))
-                                }
+                                move || Box::new(ProductInfoHttpRepoImpl::new(http_client.clone(), config.services.stores.clone()))
                             }),
                         })
                     }
@@ -113,9 +108,9 @@ impl Controller for ControllerImpl {
                                 .map_err(ControllerError::InternalServerError),
                         )
                     } else {
-                        serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(
-                            format_err!("Error parsing request from gateway body"),
-                        )))
+                        serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(format_err!(
+                            "Error parsing request from gateway body"
+                        ))))
                     }
                 }
                 (Get, Some(Route::CartProducts)) => serialize_future({
@@ -135,10 +130,7 @@ impl Controller for ControllerImpl {
                     )
                 }),
                 (Delete, Some(Route::CartProduct { product_id })) => serialize_future({
-                    debug!(
-                        "Received request to delete product {} from user {}'s cart",
-                        product_id, user_id
-                    );
+                    debug!("Received request to delete product {} from user {}'s cart", product_id, user_id);
                     Box::new(
                         (service_factory.cart_factory)()
                             .delete_item(user_id, product_id)
@@ -175,10 +167,7 @@ impl Controller for ControllerImpl {
                 ),
                 (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
                     parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
-                        debug!(
-                            "Received request to increment product {} quantity for user {}",
-                            product_id, user_id
-                        );
+                        debug!("Received request to increment product {} quantity for user {}", product_id, user_id);
                         (service_factory.cart_factory)()
                             .increment_item(user_id, product_id, data.store_id)
                             .map_err(ControllerError::InternalServerError)
@@ -187,10 +176,7 @@ impl Controller for ControllerImpl {
                 (Post, Some(Route::CartMerge)) => serialize_future({
                     parse_body::<CartMergePayload>(payload).and_then(move |data| {
                         let user_to = user_id;
-                        debug!(
-                            "Received request to merge cart from user {} to user {}",
-                            data.user_from, user_to
-                        );
+                        debug!("Received request to merge cart from user {} to user {}", data.user_from, user_to);
                         (service_factory.cart_factory)()
                             .merge(data.user_from, user_to)
                             .map_err(ControllerError::InternalServerError)
@@ -205,10 +191,7 @@ impl Controller for ControllerImpl {
                     )
                 }),
                 (Post, Some(Route::OrderFromCart)) => serialize_future({
-                    debug!(
-                        "Received request to convert cart into orders for user {}",
-                        user_id
-                    );
+                    debug!("Received request to convert cart into orders for user {}", user_id);
                     Box::new(
                         (service_factory.order_factory)()
                             .convert_cart(user_id)
@@ -300,8 +283,7 @@ mod tests {
     #[test]
     fn test_invalid_auth_header() {
         let mut req = Request::new(Method::Get, Uri::default());
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization("12345abc".into()));
+        req.headers_mut().set::<Authorization<String>>(Authorization("12345abc".into()));
 
         let data = Default::default();
 
@@ -336,8 +318,7 @@ mod tests {
         let storage = hashmap!{user_id => cart.clone()};
 
         let mut req = Request::new(Method::Get, Uri::from_str("/cart/products").unwrap());
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization(user_id.to_string()));
+        req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
 
         let data = Arc::new(Mutex::new(storage));
 
@@ -356,8 +337,7 @@ mod tests {
             Method::Put,
             Uri::from_str(&format!("/cart/products/{}/quantity", product_id)).unwrap(),
         );
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization(user_id.to_string()));
+        req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
 
         let data = Default::default();
 
@@ -402,8 +382,7 @@ mod tests {
             Method::Put,
             Uri::from_str(&format!("/cart/products/{}/quantity", product_id)).unwrap(),
         );
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization(user_id.to_string()));
+        req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
         req.set_body(serde_json::to_string(&payload).unwrap());
 
         let data = Arc::new(Mutex::new(hashmap! {
@@ -419,10 +398,7 @@ mod tests {
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 
         assert_eq!(*data.lock().unwrap(), expected_storage);
-        assert_eq!(
-            serde_json::from_str::<CartItem>(&resp).unwrap(),
-            expected_reply
-        );
+        assert_eq!(serde_json::from_str::<CartItem>(&resp).unwrap(), expected_reply);
     }
 
     #[test]
@@ -470,18 +446,14 @@ mod tests {
             Method::Delete,
             Uri::from_str(&format!("/cart/products/{}", product_id_remove)).unwrap(),
         );
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization(user_id.to_string()));
+        req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
 
         let data = Arc::new(Mutex::new(storage));
 
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 
         assert_eq!(*data.lock().unwrap(), expected_storage);
-        assert_eq!(
-            serde_json::from_str::<CartItem>(&resp).unwrap(),
-            expected_reply
-        );
+        assert_eq!(serde_json::from_str::<CartItem>(&resp).unwrap(), expected_reply);
     }
 
     #[test]
@@ -514,8 +486,7 @@ mod tests {
         };
 
         let mut req = Request::new(Method::Post, Uri::from_str("/cart/clear").unwrap());
-        req.headers_mut()
-            .set::<Authorization<String>>(Authorization(user_id.to_string()));
+        req.headers_mut().set::<Authorization<String>>(Authorization(user_id.to_string()));
 
         let resp = run_controller_op(Arc::clone(&data), req).wait().unwrap();
 

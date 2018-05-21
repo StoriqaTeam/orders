@@ -41,14 +41,8 @@ impl From<OrderState> for (String, Value) {
         match v {
             OrderState::New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
             OrderState::Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::NeedPayment(data) => (
-                "need_payment".to_string(),
-                serde_json::to_value(data).unwrap(),
-            ),
-            OrderState::Processing(data) => (
-                "processing".to_string(),
-                serde_json::to_value(data).unwrap(),
-            ),
+            OrderState::NeedPayment(data) => ("need_payment".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::Processing(data) => ("processing".to_string(), serde_json::to_value(data).unwrap()),
             OrderState::Confirmed(data) => ("confirmed".to_string(), serde_json::to_value(data).unwrap()),
             OrderState::Complete(data) => ("complete".to_string(), serde_json::to_value(data).unwrap()),
         }
@@ -65,9 +59,7 @@ impl OrderState {
             "processing" => Ok(OrderState::Processing(serde_json::from_value(state_data)?)),
             "confirmed" => Ok(OrderState::Confirmed(serde_json::from_value(state_data)?)),
             "complete" => Ok(OrderState::Complete(serde_json::from_value(state_data)?)),
-            &_ => Err(ControllerError::UnprocessableEntity(format_err!(
-                "Could not parse state"
-            ))),
+            &_ => Err(ControllerError::UnprocessableEntity(format_err!("Could not parse state"))),
         }
     }
 }
@@ -138,10 +130,7 @@ impl Inserter for NewOrder {
         let (state_id, state_data) = self.state.into();
         InsertBuilder::new(table)
             .with_arg(USER_ID_COLUMN, self.user_id)
-            .with_arg(
-                PRODUCTS_COLUMN,
-                serde_json::to_value(self.products).unwrap(),
-            )
+            .with_arg(PRODUCTS_COLUMN, serde_json::to_value(self.products).unwrap())
             .with_arg(STATE_ID_COLUMN, state_id)
             .with_arg(STATE_DATA_COLUMN, state_data)
     }
@@ -191,8 +180,7 @@ impl Updater for OrderUpdate {
 
         if let Some(state) = data.state {
             let (state_id, state_data) = state.into();
-            b = b.with_value(STATE_ID_COLUMN, state_id)
-                .with_value(STATE_DATA_COLUMN, state_data);
+            b = b.with_value(STATE_ID_COLUMN, state_id).with_value(STATE_DATA_COLUMN, state_data);
         }
 
         b

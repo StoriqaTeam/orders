@@ -85,10 +85,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn increment_item(&self, user_id: i32, product_id: i32, store_id: i32) -> ServiceFuture<Cart> {
-        debug!(
-            "Adding 1 item {} into cart for user {}",
-            product_id, user_id
-        );
+        debug!("Adding 1 item {} into cart for user {}", product_id, user_id);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -163,10 +160,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>> {
-        debug!(
-            "Setting quantity for item {} for user {} to {}",
-            product_id, user_id, quantity
-        );
+        debug!("Setting quantity for item {} for user {} to {}", product_id, user_id, quantity);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -186,26 +180,14 @@ impl CartService for CartServiceImpl {
                         },
                     },
                 )
-                .map(|(mut v, conn)| {
-                    (
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.remove(0).into())
-                        },
-                        conn,
-                    )
-                })
+                .map(|(mut v, conn)| (if v.is_empty() { None } else { Some(v.remove(0).into()) }, conn))
                 .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                 .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
         }))
     }
 
     fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
-        debug!(
-            "Setting selection for item {} for user {} to {}",
-            product_id, user_id, selected
-        );
+        debug!("Setting selection for item {} for user {} to {}", product_id, user_id, selected);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -225,16 +207,7 @@ impl CartService for CartServiceImpl {
                         },
                     },
                 )
-                .map(|(mut v, conn)| {
-                    (
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v.remove(0).into())
-                        },
-                        conn,
-                    )
-                })
+                .map(|(mut v, conn)| (if v.is_empty() { None } else { Some(v.remove(0).into()) }, conn))
                 .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                 .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
         }))
@@ -299,10 +272,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
-        debug!(
-            "Getting {} cart items starting from {} for user {}",
-            count, from, user_id
-        );
+        debug!("Getting {} cart items starting from {} for user {}", count, from, user_id);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -416,10 +386,7 @@ impl CartService for CartServiceMemory {
         let mut inner = self.inner.lock().unwrap();
         let cart = inner.entry(user_id).or_insert(Cart::default());
 
-        Box::new(future::ok(
-            cart.remove(&product_id)
-                .map(|info| CartItem::from((product_id, info))),
-        ))
+        Box::new(future::ok(cart.remove(&product_id).map(|info| CartItem::from((product_id, info)))))
     }
 
     fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
@@ -473,8 +440,7 @@ mod tests {
                     store_id,
                 },
             },
-            core.run(repo.increment_item(user_id, set_a.0, store_id))
-                .unwrap()
+            core.run(repo.increment_item(user_id, set_a.0, store_id)).unwrap()
         );
 
         // Set the first product
@@ -485,9 +451,7 @@ mod tests {
                 selected: true,
                 store_id,
             },
-            core.run(repo.set_quantity(user_id, set_a.0, set_a.1))
-                .unwrap()
-                .unwrap()
+            core.run(repo.set_quantity(user_id, set_a.0, set_a.1)).unwrap().unwrap()
         );
 
         // Check DB contents
@@ -510,9 +474,7 @@ mod tests {
                 selected: true,
                 store_id,
             },
-            core.run(repo.set_quantity(user_id, set_b.0, set_b.1))
-                .unwrap()
-                .unwrap()
+            core.run(repo.set_quantity(user_id, set_b.0, set_b.1)).unwrap().unwrap()
         );
 
         // Add the last product
@@ -529,8 +491,7 @@ mod tests {
                     store_id,
                 },
             },
-            core.run(repo.increment_item(user_id, set_c.0, store_id))
-                .unwrap()
+            core.run(repo.increment_item(user_id, set_c.0, store_id)).unwrap()
         );
 
         // Set the last product
@@ -541,9 +502,7 @@ mod tests {
                 selected: true,
                 store_id,
             },
-            core.run(repo.set_quantity(user_id, set_c.0, set_c.1))
-                .unwrap()
-                .unwrap()
+            core.run(repo.set_quantity(user_id, set_c.0, set_c.1)).unwrap().unwrap()
         );
 
         // Check DB contents
@@ -571,9 +530,7 @@ mod tests {
                 selected: true,
                 store_id,
             },
-            core.run(repo.delete_item(user_id, set_c.0))
-                .unwrap()
-                .unwrap()
+            core.run(repo.delete_item(user_id, set_c.0)).unwrap().unwrap()
         );
 
         // Clear user cart

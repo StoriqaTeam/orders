@@ -18,10 +18,7 @@ pub struct ProductInfoHttpRepoImpl {
 
 impl ProductInfoHttpRepoImpl {
     pub fn new(http_client: HttpClientHandle, stores_addr: String) -> Self {
-        Self {
-            stores_addr,
-            http_client,
-        }
+        Self { stores_addr, http_client }
     }
 }
 
@@ -32,14 +29,7 @@ impl ProductInfoHttpRepo for ProductInfoHttpRepoImpl {
                 .and_then({
                     let http_client = self.http_client.clone();
                     let stores_addr = self.stores_addr.clone();
-                    move |_| {
-                        http_client.request::<ProductInfo>(
-                            Get,
-                            format!("{}/products/{}", stores_addr, product_id),
-                            None,
-                            None,
-                        )
-                    }
+                    move |_| http_client.request::<ProductInfo>(Get, format!("{}/products/{}", stores_addr, product_id), None, None)
                 })
                 .and_then({
                     let http_client = self.http_client.clone();
@@ -47,10 +37,7 @@ impl ProductInfoHttpRepo for ProductInfoHttpRepoImpl {
                     move |product_info| {
                         http_client.request::<BaseProductInfo>(
                             Get,
-                            format!(
-                                "{}/base_products/{}",
-                                stores_addr, product_info.base_product_id
-                            ),
+                            format!("{}/base_products/{}", stores_addr, product_info.base_product_id),
                             None,
                             None,
                         )

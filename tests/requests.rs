@@ -199,10 +199,7 @@ fn test_carts_service() {
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
-                format!(
-                    "{}/cart/products/{}/increment",
-                    base_url, from_existing_product_id
-                ),
+                format!("{}/cart/products/{}/increment", base_url, from_existing_product_id),
                 Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
                 Some(user_from.to_string()),
             )).unwrap(),
@@ -220,10 +217,7 @@ fn test_carts_service() {
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
-                format!(
-                    "{}/cart/products/{}/increment",
-                    base_url, from_new_product_id
-                ),
+                format!("{}/cart/products/{}/increment", base_url, from_new_product_id),
                 Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
                 Some(user_from.to_string()),
             )).unwrap(),
@@ -245,14 +239,11 @@ fn test_carts_service() {
             core.run(
                 http_client.request_with_auth_header::<Option<CartItem>>(
                     Method::Put,
-                    format!(
-                        "{}/cart/products/{}/quantity",
-                        base_url, from_existing_product_id
-                    ),
+                    format!("{}/cart/products/{}/quantity", base_url, from_existing_product_id),
                     Some(
                         serde_json::to_string(&CartProductQuantityPayload {
                             value: from_existing_product_quantity,
-                        }).unwrap()
+                        }).unwrap(),
                     ),
                     Some(user_from.to_string()),
                 )
@@ -269,14 +260,11 @@ fn test_carts_service() {
             core.run(
                 http_client.request_with_auth_header::<Option<CartItem>>(
                     Method::Put,
-                    format!(
-                        "{}/cart/products/{}/quantity",
-                        base_url, from_new_product_id
-                    ),
+                    format!("{}/cart/products/{}/quantity", base_url, from_new_product_id),
                     Some(
                         serde_json::to_string(&CartProductQuantityPayload {
                             value: from_new_product_quantity,
-                        }).unwrap()
+                        }).unwrap(),
                     ),
                     Some(user_from.to_string()),
                 )
