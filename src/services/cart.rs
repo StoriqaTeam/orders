@@ -163,54 +163,60 @@ impl CartService for CartServiceImpl {
         debug!("Setting quantity for item {} for user {} to {}", product_id, user_id, quantity);
 
         let repo_factory = self.repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            log::acquired_db_connection(&conn);
-            (repo_factory)()
-                .update(
-                    Box::new(conn),
-                    CartProductUpdate {
-                        mask: CartProductMask {
-                            user_id: Some(user_id),
-                            product_id: Some(product_id),
-                            ..Default::default()
-                        },
-                        data: CartProductUpdateData {
-                            quantity: Some(quantity),
-                            ..Default::default()
-                        },
-                    },
-                )
-                .map(|(mut v, conn)| (if v.is_empty() { None } else { Some(v.remove(0).into()) }, conn))
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    (repo_factory)()
+                        .update(
+                            Box::new(conn),
+                            CartProductUpdate {
+                                mask: CartProductMask {
+                                    user_id: Some(user_id),
+                                    product_id: Some(product_id),
+                                    ..Default::default()
+                                },
+                                data: CartProductUpdateData {
+                                    quantity: Some(quantity),
+                                    ..Default::default()
+                                },
+                            },
+                        )
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map(|mut v| if v.is_empty() { None } else { Some(v.remove(0).into()) }),
+        )
     }
 
     fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
         debug!("Setting selection for item {} for user {} to {}", product_id, user_id, selected);
 
         let repo_factory = self.repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            log::acquired_db_connection(&conn);
-            (repo_factory)()
-                .update(
-                    Box::new(conn),
-                    CartProductUpdate {
-                        mask: CartProductMask {
-                            user_id: Some(user_id),
-                            product_id: Some(product_id),
-                            ..Default::default()
-                        },
-                        data: CartProductUpdateData {
-                            selected: Some(selected),
-                            ..Default::default()
-                        },
-                    },
-                )
-                .map(|(mut v, conn)| (if v.is_empty() { None } else { Some(v.remove(0).into()) }, conn))
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    log::acquired_db_connection(&conn);
+                    (repo_factory)()
+                        .update(
+                            Box::new(conn),
+                            CartProductUpdate {
+                                mask: CartProductMask {
+                                    user_id: Some(user_id),
+                                    product_id: Some(product_id),
+                                    ..Default::default()
+                                },
+                                data: CartProductUpdateData {
+                                    selected: Some(selected),
+                                    ..Default::default()
+                                },
+                            },
+                        )
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map(|mut v| if v.is_empty() { None } else { Some(v.remove(0).into()) }),
+        )
     }
 
     fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>> {
@@ -230,19 +236,10 @@ impl CartService for CartServiceImpl {
                                 ..Default::default()
                             },
                         )
-                        .map(move |(mut rows, conn)| {
-                            (
-                                if rows.is_empty() {
-                                    None
-                                } else {
-                                    Some(CartItem::from(rows.remove(0)))
-                                },
-                                conn,
-                            )
-                        })
                         .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
                         .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
+                .map(|mut rows| rows.pop().map(CartItem::from))
                 .map_err(RepoError::from),
         )
     }
