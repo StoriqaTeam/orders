@@ -131,19 +131,22 @@ impl OrderService for OrderServiceImpl {
 
     fn get_order(&self, order_id: OrderId) -> ServiceFuture<Option<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)()
-                .select(
-                    Box::new(conn),
-                    OrderMask {
-                        id: Some(order_id),
-                        ..Default::default()
-                    },
-                )
-                .map(|(orders, conn)| (orders.first().cloned(), conn))
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (order_repo_factory)()
+                        .select(
+                            Box::new(conn),
+                            OrderMask {
+                                id: Some(order_id),
+                                ..Default::default()
+                            },
+                        )
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map(|orders| orders.first().cloned()),
+        )
     }
 
     fn get_orders_for_user(&self, user_id: i32) -> ServiceFuture<Vec<Order>> {
@@ -164,41 +167,48 @@ impl OrderService for OrderServiceImpl {
 
     fn delete_order(&self, order_id: OrderId) -> ServiceFuture<()> {
         let order_repo_factory = self.order_repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)()
-                .delete(
-                    Box::new(conn),
-                    OrderMask {
-                        id: Some(order_id),
-                        ..Default::default()
-                    },
-                )
-                .map(|(v, conn)| ((), conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (order_repo_factory)()
+                        .delete(
+                            Box::new(conn),
+                            OrderMask {
+                                id: Some(order_id),
+                                ..Default::default()
+                            },
+                        )
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                })
+                .map(|_| ()),
+        )
     }
 
     fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order> {
         let order_repo_factory = self.order_repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)()
-                .update(
-                    Box::new(conn),
-                    OrderUpdate {
-                        mask: OrderMask {
-                            id: Some(order_id),
-                            ..Default::default()
-                        },
-                        data: OrderUpdateData { state: Some(state) },
-                    },
-                )
-                .and_then(|(mut v, conn)| match v.pop() {
-                    Some(order) => Ok((order, conn)),
-                    None => Err((format_err!("Order not found"), conn)),
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (order_repo_factory)()
+                        .update(
+                            Box::new(conn),
+                            OrderUpdate {
+                                mask: OrderMask {
+                                    id: Some(order_id),
+                                    ..Default::default()
+                                },
+                                data: OrderUpdateData { state: Some(state) },
+                            },
+                        )
+                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-        }))
+                .and_then(|mut v| match v.pop() {
+                    Some(order) => Ok(order),
+                    None => Err(format_err!("Order not found")),
+                }),
+        )
     }
 }
 
