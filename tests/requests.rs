@@ -3,14 +3,13 @@ extern crate hyper;
 #[macro_use]
 extern crate maplit;
 extern crate orders_lib as lib;
-#[macro_use]
 extern crate serde_json;
 extern crate stq_http;
 extern crate tokio_core;
 
 pub mod common;
 
-use hyper::Method;
+use hyper::{Headers, Method, header::{Authorization, Cookie}};
 use lib::models::*;
 
 #[test]
@@ -52,6 +51,72 @@ fn test_carts_service() {
             format!("{}/cart/products/{}/increment", base_url, product_id),
             Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
             Some(user_id.to_string()),
+        )).unwrap(),
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity: 1,
+                selected: true,
+                store_id,
+            },
+        },
+    );
+
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<Cart>(
+            Method::Get,
+            format!("{}/cart/products", base_url),
+            None,
+            Some(user_id.to_string()),
+        )).unwrap(),
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity: 1,
+                selected: true,
+                store_id,
+            },
+        },
+    );
+
+    assert_eq!(
+        core.run(http_client.request::<Cart>(
+            Method::Get,
+            format!("{}/cart/products", base_url),
+            None,
+            Some({
+                let mut h = Headers::new();
+
+                let mut c = Cookie::new();
+                c.set("SESSION_ID", user_id.to_string());
+
+                h.set(c);
+                h
+            }),
+        )).unwrap(),
+        hashmap! {
+            product_id => CartItemInfo {
+                quantity: 1,
+                selected: true,
+                store_id,
+            },
+        },
+    );
+
+    assert_eq!(
+        core.run(http_client.request::<Cart>(
+            Method::Get,
+            format!("{}/cart/products", base_url),
+            None,
+            Some({
+                let mut h = Headers::new();
+
+                h.set(Authorization(user_id.to_string()));
+
+                let mut c = Cookie::new();
+                c.set("SESSION_ID", (user_id + 1000).to_string());
+
+                h.set(c);
+                h
+            }),
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
