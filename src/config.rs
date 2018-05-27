@@ -16,18 +16,11 @@ pub struct Database {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Services {
-    pub stores: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Server listen address
     pub listen: Listen,
     /// Database settings
     pub db: Database,
-    /// Dependencies
-    pub services: Services,
 }
 
 static ENV_PREFIX: &'static str = "STQ_ORDERS";

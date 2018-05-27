@@ -24,7 +24,6 @@ pub type CartServiceFactory = Arc<Fn() -> Box<CartService> + Send + Sync>;
 pub struct OrderServiceImpl {
     pub cart_service_factory: CartServiceFactory,
     pub order_repo_factory: Arc<Fn() -> Box<OrderRepo + Send + Sync> + Send + Sync>,
-    pub product_info_source: Arc<Fn() -> Box<ProductInfoHttpRepo> + Send + Sync>,
     pub db_pool: DbPool,
 }
 
@@ -36,7 +35,6 @@ struct OrderItem {
 
 impl OrderService for OrderServiceImpl {
     fn convert_cart(&self, user_id: i32) -> ServiceFuture<HashMap<i32, Order>> {
-        let product_info_source = self.product_info_source.clone();
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
@@ -44,17 +42,18 @@ impl OrderService for OrderServiceImpl {
             (cart_service_factory)()
                 .get_cart(user_id)
                 // Get store ID for each cart product
-                .and_then(|cart| {
-                            future::join_all(
-                                cart.into_iter()
-                                    .map(move |(product_id, cart_item_info)| {
-                                        Box::new(
-                                            (product_info_source)()
-                                                .get_store_id(product_id)
-                                                .map(move |store_id| OrderItem {product_id, store_id, quantity: cart_item_info.quantity})
-                                        ) as RepoFuture<OrderItem>
-                                    })
-                            )
+                .and_then(|cart: Cart| {
+                    future::result(cart.into_iter().map(|(product_id, cart_item_info)| {
+                        if cart_item_info.store_id < 0 {
+                            return Err(format_err!("Invalid store ID for product {}: {}", product_id, cart_item_info.store_id)).into()
+                        }
+
+                        Ok(OrderItem {
+                            product_id,
+                            store_id: cart_item_info.store_id,
+                            quantity: cart_item_info.quantity,
+                        })
+                    }).collect::<Result<Vec<_>, RepoError>>())
                 })
                 // Bin cart products into separate orders based on store ID
                 .map(move |cart: Vec<OrderItem>| {
@@ -111,7 +110,7 @@ impl OrderService for OrderServiceImpl {
                             let cart_service_factory = cart_service_factory.clone();
                             move |out_data| {
                                 let mut out: ServiceFuture<()> = Box::new(future::ok(()));
-                                for (store_id, order) in &out_data {
+                                for (_store_id, order) in &out_data {
                                     for (product_id, _) in &order.products {
                                         out = Box::new(out.and_then({
                                             let user_id = user_id.clone();
@@ -221,23 +220,23 @@ pub struct OrderServiceMemory {
 }
 
 impl OrderService for OrderServiceMemory {
-    fn convert_cart(&self, user_id: i32) -> ServiceFuture<HashMap<i32, Order>> {
+    fn convert_cart(&self, _user_id: i32) -> ServiceFuture<HashMap<i32, Order>> {
         unimplemented!()
     }
 
-    fn get_order(&self, order_id: OrderId) -> ServiceFuture<Option<Order>> {
+    fn get_order(&self, _order_id: OrderId) -> ServiceFuture<Option<Order>> {
         unimplemented!()
     }
 
-    fn get_orders_for_user(&self, user_id: i32) -> ServiceFuture<Vec<Order>> {
+    fn get_orders_for_user(&self, _user_id: i32) -> ServiceFuture<Vec<Order>> {
         unimplemented!()
     }
 
-    fn delete_order(&self, order_id: OrderId) -> ServiceFuture<()> {
+    fn delete_order(&self, _order_id: OrderId) -> ServiceFuture<()> {
         unimplemented!()
     }
 
-    fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order> {
+    fn set_order_state(&self, _order_id: OrderId, _state: OrderState) -> ServiceFuture<Order> {
         unimplemented!()
     }
 }
