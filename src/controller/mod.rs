@@ -5,7 +5,6 @@ use hyper::{Delete, Get, Headers, Post, Put, Request};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use stq_http::client::ClientHandle as HttpClientHandle;
 use stq_http::controller::Controller;
 use stq_http::errors::ControllerError;
 use stq_http::request_util::{parse_body, serialize_future, ControllerFuture};
@@ -31,7 +30,7 @@ pub struct ControllerImpl {
 }
 
 impl ControllerImpl {
-    pub fn new(db_pool: DbPool, http_client: HttpClientHandle, config: Config) -> Self {
+    pub fn new(db_pool: DbPool, _config: Config) -> Self {
         let cart_factory = Arc::new({
             let db_pool = db_pool.clone();
             move || Box::new(CartServiceImpl::new(db_pool.clone())) as Box<CartService>
@@ -40,18 +39,11 @@ impl ControllerImpl {
             service_factory: Arc::new(ServiceFactory {
                 order_factory: Arc::new({
                     let cart_factory = cart_factory.clone();
-                    let http_client = http_client.clone();
-                    let config = config.clone();
                     move || {
                         Box::new(OrderServiceImpl {
                             db_pool: db_pool.clone(),
                             cart_service_factory: cart_factory.clone(),
                             order_repo_factory: Arc::new(|| Box::new(make_order_repo())),
-                            product_info_source: Arc::new({
-                                let http_client = http_client.clone();
-                                let config = config.clone();
-                                move || Box::new(ProductInfoHttpRepoImpl::new(http_client.clone(), config.services.stores.clone()))
-                            }),
                         })
                     }
                 }),

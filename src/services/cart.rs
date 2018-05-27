@@ -361,7 +361,7 @@ impl CartService for CartServiceMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn increment_item(&self, user_id: i32, product_id: i32, store_id: i32) -> ServiceFuture<Cart> {
+    fn increment_item(&self, _user_id: i32, _product_id: i32, _store_id: i32) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 
@@ -375,7 +375,7 @@ impl CartService for CartServiceMemory {
         })))
     }
 
-    fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
+    fn set_selection(&self, _user_id: i32, _product_id: i32, _selected: bool) -> ServiceFuture<Option<CartItem>> {
         unimplemented!()
     }
 
@@ -395,11 +395,11 @@ impl CartService for CartServiceMemory {
         Box::new(future::ok(cart.clone()))
     }
 
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
+    fn list(&self, _user_id: i32, _from: i32, _count: i64) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 
-    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart> {
+    fn merge(&self, _from: i32, _to: i32) -> ServiceFuture<Cart> {
         unimplemented!()
     }
 }
