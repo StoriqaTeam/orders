@@ -14,7 +14,7 @@ RUN apt-get update \
   && mkdir -p /app/migrations \
   && mkdir -p /usr/local/cargo/bin/ \
 
-COPY target/release/orders /app
+COPY target/release/orders /app/orders
 COPY diesel /usr/local/cargo/bin/diesel
 COPY config /app/config
 COPY migrations /app/migrations
