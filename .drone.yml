@@ -109,7 +109,7 @@ pipeline:
     kind: deployment
     object: orders
     img_names: storiqateam/stq-orders
-    img_tags: ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    img_tags: ${DRONE_BRANCH//\//_}${DRONE_PARENT_BUILD_NUMBER}
     img_cnts: orders
     user: admin
     addr: https://api.stable.stq.cloud
