@@ -12,7 +12,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/ \
   && mkdir -p /app/config \
   && mkdir -p /app/migrations \
-  && mkdir -p /usr/local/cargo/bin/ \
+  && mkdir -p /usr/local/cargo/bin/
 
 COPY target/release/orders /app
 COPY diesel /usr/local/cargo/bin/diesel
