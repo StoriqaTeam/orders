@@ -22,7 +22,7 @@ COPY Cargo.toml /app/Cargo.toml
 
 # Running as user app
 RUN adduser --disabled-password --gecos "" --home /app --no-create-home -u 5000 app \
-  && chown -R app: /app
+  && chown -R app: /app && chmod +x /app/orders
 
 USER app
 WORKDIR /app
