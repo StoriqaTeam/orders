@@ -1,12 +1,12 @@
 use futures::future;
 use futures::prelude::*;
-use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use stq_db::repo::*;
 
-use super::CartService;
 use super::types::ServiceFuture;
+use super::CartService;
 use models::*;
 use repos::*;
 use types::*;
