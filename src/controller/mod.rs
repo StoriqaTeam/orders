@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use futures::future;
 use futures::prelude::*;
 use hyper;
@@ -80,138 +81,154 @@ pub fn extract_user_id(headers: Headers) -> Box<Future<Item = UserId, Error = Co
 
 impl Controller for ControllerImpl {
     fn call(&self, request: Request) -> ControllerFuture {
+        let dt = Local::now();
         let (method, uri, _, headers, payload) = request.deconstruct();
 
         let service_factory = self.service_factory.clone();
         let route_parser = self.route_parser.clone();
 
         let route = route_parser.test(uri.path());
-        Box::new(extract_user_id(headers).and_then(move |user_id| {
-            match (method, route) {
-                (Get, Some(Route::Cart)) => {
-                    if let (Some(from), Some(count)) = parse_query!(uri.query().unwrap_or_default(), "offset" => i32, "count" => i64) {
-                        debug!(
-                            "Received request for user {} to get {} products starting from {}",
-                            user_id, count, from
-                        );
-                        serialize_future(
-                            (service_factory.cart_factory)()
-                                .list(user_id, from, count)
-                                .map_err(ControllerError::InternalServerError),
-                        )
-                    } else {
-                        serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(format_err!(
-                            "Error parsing request from gateway body"
-                        ))))
-                    }
-                }
-                (Get, Some(Route::CartProducts)) => serialize_future({
-                    debug!("Received request to get cart for user {}", user_id);
-                    Box::new(
-                        (service_factory.cart_factory)()
-                            .get_cart(user_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                (Post, Some(Route::CartClear)) => serialize_future({
-                    debug!("Received request to clear cart for user {}", user_id);
-                    Box::new(
-                        (service_factory.cart_factory)()
-                            .clear_cart(user_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                (Delete, Some(Route::CartProduct { product_id })) => serialize_future({
-                    debug!("Received request to delete product {} from user {}'s cart", product_id, user_id);
-                    Box::new(
-                        (service_factory.cart_factory)()
-                            .delete_item(user_id, product_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                (Put, Some(Route::CartProductQuantity { product_id })) => serialize_future(
-                    parse_body::<CartProductQuantityPayload>(payload)
-                        .inspect(move |params| {
-                            debug!(
-                                "Received request to set product {} in user {}'s cart to quantity {}",
-                                product_id, user_id, params.value
-                            );
-                        })
-                        .and_then(move |params| {
-                            (service_factory.cart_factory)()
-                                .set_quantity(user_id, product_id, params.value)
-                                .map_err(ControllerError::InternalServerError)
-                        }),
-                ),
-                (Put, Some(Route::CartProductSelection { product_id })) => serialize_future(
-                    parse_body::<CartProductSelectionPayload>(payload)
-                        .inspect(move |params| {
-                            debug!(
-                                "Received request to set product {}'s selection in user {}'s cart to {}",
-                                product_id, user_id, params.value
+        Box::new(
+            extract_user_id(headers)
+                .and_then(move |user_id| {
+                    match (method, route) {
+                        (Get, Some(Route::Cart)) => {
+                            if let (Some(from), Some(count)) =
+                                parse_query!(uri.query().unwrap_or_default(), "offset" => i32, "count" => i64)
+                            {
+                                debug!(
+                                    "Received request for user {} to get {} products starting from {}",
+                                    user_id, count, from
+                                );
+                                serialize_future(
+                                    (service_factory.cart_factory)()
+                                        .list(user_id, from, count)
+                                        .map_err(ControllerError::InternalServerError),
+                                )
+                            } else {
+                                serialize_future::<String, _, _>(future::err(ControllerError::UnprocessableEntity(format_err!(
+                                    "Error parsing request from gateway body"
+                                ))))
+                            }
+                        }
+                        (Get, Some(Route::CartProducts)) => serialize_future({
+                            debug!("Received request to get cart for user {}", user_id);
+                            Box::new(
+                                (service_factory.cart_factory)()
+                                    .get_cart(user_id)
+                                    .map_err(ControllerError::InternalServerError),
                             )
-                        })
-                        .and_then(move |params| {
-                            (service_factory.cart_factory)()
-                                .set_selection(user_id, product_id, params.value)
-                                .map_err(ControllerError::InternalServerError)
                         }),
-                ),
-                (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
-                    parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
-                        debug!("Received request to increment product {} quantity for user {}", product_id, user_id);
-                        (service_factory.cart_factory)()
-                            .increment_item(user_id, product_id, data.store_id)
-                            .map_err(ControllerError::InternalServerError)
-                    })
+                        (Post, Some(Route::CartClear)) => serialize_future({
+                            debug!("Received request to clear cart for user {}", user_id);
+                            Box::new(
+                                (service_factory.cart_factory)()
+                                    .clear_cart(user_id)
+                                    .map_err(ControllerError::InternalServerError),
+                            )
+                        }),
+                        (Delete, Some(Route::CartProduct { product_id })) => serialize_future({
+                            debug!("Received request to delete product {} from user {}'s cart", product_id, user_id);
+                            Box::new(
+                                (service_factory.cart_factory)()
+                                    .delete_item(user_id, product_id)
+                                    .map_err(ControllerError::InternalServerError),
+                            )
+                        }),
+                        (Put, Some(Route::CartProductQuantity { product_id })) => serialize_future(
+                            parse_body::<CartProductQuantityPayload>(payload)
+                                .inspect(move |params| {
+                                    debug!(
+                                        "Received request to set product {} in user {}'s cart to quantity {}",
+                                        product_id, user_id, params.value
+                                    );
+                                })
+                                .and_then(move |params| {
+                                    (service_factory.cart_factory)()
+                                        .set_quantity(user_id, product_id, params.value)
+                                        .map_err(ControllerError::InternalServerError)
+                                }),
+                        ),
+                        (Put, Some(Route::CartProductSelection { product_id })) => serialize_future(
+                            parse_body::<CartProductSelectionPayload>(payload)
+                                .inspect(move |params| {
+                                    debug!(
+                                        "Received request to set product {}'s selection in user {}'s cart to {}",
+                                        product_id, user_id, params.value
+                                    )
+                                })
+                                .and_then(move |params| {
+                                    (service_factory.cart_factory)()
+                                        .set_selection(user_id, product_id, params.value)
+                                        .map_err(ControllerError::InternalServerError)
+                                }),
+                        ),
+                        (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
+                            parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
+                                debug!("Received request to increment product {} quantity for user {}", product_id, user_id);
+                                (service_factory.cart_factory)()
+                                    .increment_item(user_id, product_id, data.store_id)
+                                    .map_err(ControllerError::InternalServerError)
+                            })
+                        }),
+                        (Post, Some(Route::CartMerge)) => serialize_future({
+                            parse_body::<CartMergePayload>(payload).and_then(move |data| {
+                                let user_to = user_id;
+                                debug!("Received request to merge cart from user {} to user {}", data.user_from, user_to);
+                                (service_factory.cart_factory)()
+                                    .merge(data.user_from, user_to)
+                                    .map_err(ControllerError::InternalServerError)
+                            })
+                        }),
+                        (Get, Some(Route::Orders)) => serialize_future({
+                            debug!("Received request to get orders for user {}", user_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .get_orders_for_user(user_id)
+                                    .map_err(ControllerError::InternalServerError),
+                            )
+                        }),
+                        (Post, Some(Route::OrderFromCart)) => serialize_future({
+                            debug!("Received request to convert cart into orders for user {}", user_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .convert_cart(user_id)
+                                    .map_err(ControllerError::InternalServerError),
+                            )
+                        }),
+                        (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
+                            debug!("Received request to set order status");
+                            parse_body::<OrderState>(payload).and_then(move |order_status| {
+                                Box::new(
+                                    (service_factory.order_factory)()
+                                        .set_order_state(order_id, order_status)
+                                        .map_err(ControllerError::InternalServerError),
+                                )
+                            })
+                        }),
+                        (Delete, Some(Route::Order { order_id })) => serialize_future({
+                            debug!("Received request to delete order {}", order_id);
+                            Box::new(
+                                (service_factory.order_factory)()
+                                    .delete_order(order_id)
+                                    .map_err(ControllerError::InternalServerError),
+                            )
+                        }),
+                        // Fallback
+                        _ => Box::new(future::err(ControllerError::NotFound)),
+                    }
+                })
+                .then(move |res| {
+                    let d = Local::now() - dt;
+                    info!(
+                        "Response error = {:?}, elapsed time = {}.{:03}",
+                        res.as_ref().err(),
+                        d.num_seconds(),
+                        d.num_milliseconds()
+                    );
+                    res
                 }),
-                (Post, Some(Route::CartMerge)) => serialize_future({
-                    parse_body::<CartMergePayload>(payload).and_then(move |data| {
-                        let user_to = user_id;
-                        debug!("Received request to merge cart from user {} to user {}", data.user_from, user_to);
-                        (service_factory.cart_factory)()
-                            .merge(data.user_from, user_to)
-                            .map_err(ControllerError::InternalServerError)
-                    })
-                }),
-                (Get, Some(Route::Orders)) => serialize_future({
-                    debug!("Received request to get orders for user {}", user_id);
-                    Box::new(
-                        (service_factory.order_factory)()
-                            .get_orders_for_user(user_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                (Post, Some(Route::OrderFromCart)) => serialize_future({
-                    debug!("Received request to convert cart into orders for user {}", user_id);
-                    Box::new(
-                        (service_factory.order_factory)()
-                            .convert_cart(user_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
-                    debug!("Received request to set order status");
-                    parse_body::<OrderState>(payload).and_then(move |order_status| {
-                        Box::new(
-                            (service_factory.order_factory)()
-                                .set_order_state(order_id, order_status)
-                                .map_err(ControllerError::InternalServerError),
-                        )
-                    })
-                }),
-                (Delete, Some(Route::Order { order_id })) => serialize_future({
-                    debug!("Received request to delete order {}", order_id);
-                    Box::new(
-                        (service_factory.order_factory)()
-                            .delete_order(order_id)
-                            .map_err(ControllerError::InternalServerError),
-                    )
-                }),
-                // Fallback
-                _ => Box::new(future::err(ControllerError::NotFound)),
-            }
-        }))
+        )
     }
 }
 
