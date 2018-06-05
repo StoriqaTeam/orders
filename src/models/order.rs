@@ -1,9 +1,12 @@
+use errors::Error;
+
+use failure;
+use failure::Fail;
 use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
 use stq_db::repo::*;
 use stq_db::statement::*;
-use stq_http::errors::ControllerError;
 use tokio_postgres::rows::Row;
 
 const ID_COLUMN: &'static str = "id";
@@ -50,7 +53,7 @@ impl From<OrderState> for (String, Value) {
 }
 
 impl OrderState {
-    fn from_tuple<'a>(v: (&'a str, Value)) -> Result<Self, ControllerError> {
+    fn from_tuple<'a>(v: (&'a str, Value)) -> Result<Self, failure::Error> {
         let (state_id, state_data) = v;
         match state_id {
             "new" => Ok(OrderState::New(serde_json::from_value(state_data)?)),
@@ -59,7 +62,7 @@ impl OrderState {
             "processing" => Ok(OrderState::Processing(serde_json::from_value(state_data)?)),
             "confirmed" => Ok(OrderState::Confirmed(serde_json::from_value(state_data)?)),
             "complete" => Ok(OrderState::Complete(serde_json::from_value(state_data)?)),
-            &_ => Err(ControllerError::UnprocessableEntity(format_err!("Could not parse state"))),
+            other => Err(Error::ParseError.context(format!("Unknown state_id {}", other)).into()),
         }
     }
 }
