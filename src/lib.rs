@@ -45,6 +45,7 @@ pub mod services;
 pub mod types;
 
 pub use config::*;
+use errors::*;
 
 pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
     let config = config::Config::new().unwrap();
@@ -78,7 +79,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
             let controller = controller::ControllerImpl::new(db_pool.clone(), config.clone());
 
             // Prepare application
-            let app = Application::new(controller);
+            let app = Application::<Error>::new(controller);
 
             Ok(app)
         })
