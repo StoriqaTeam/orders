@@ -3,6 +3,7 @@ CREATE TABLE cart_items (
     user_id    INTEGER NOT NULL,
     product_id INTEGER NOT NULL,
     quantity   INTEGER NOT NULL,
+    total      FLOAT   NOT NULL,
 
     CONSTRAINT item UNIQUE (user_id, product_id)
 );

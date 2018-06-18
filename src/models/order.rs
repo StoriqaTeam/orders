@@ -1,3 +1,4 @@
+use super::StoreId;
 use errors::Error;
 
 use failure;
@@ -28,6 +29,9 @@ pub struct ConfirmedData;
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CompleteData;
 
+pub struct SentData {
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "id", content = "data")]
 pub enum OrderState {
@@ -36,6 +40,7 @@ pub enum OrderState {
     NeedPayment(NeedPaymentData),
     Processing(ProcessingData),
     Confirmed(ConfirmedData),
+    Sent(SentData),
     Complete(CompleteData),
 }
 
@@ -79,7 +84,8 @@ pub type OrderId = i32;
 pub struct Order {
     pub id: OrderId,
     pub user_id: i32,
-    pub products: HashMap<i32, i32>,
+    pub store_id: StoreId,
+    pub product_id: i32,
     pub state: OrderState,
 }
 

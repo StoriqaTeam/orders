@@ -12,9 +12,11 @@ use repos::*;
 use types::*;
 
 pub trait OrderService {
-    fn convert_cart(&self, user_id: i32) -> ServiceFuture<HashMap<i32, Order>>;
+    fn convert_cart(&self, user_id: i32, address: AddressFull) -> ServiceFuture<HashMap<i32, Order>>;
+    fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, order_id: OrderId) -> ServiceFuture<Option<Order>>;
     fn get_orders_for_user(&self, user_id: i32) -> ServiceFuture<Vec<Order>>;
+    fn get_orders_for_store(&self, store_id: i32) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, order_id: OrderId) -> ServiceFuture<()>;
     fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order>;
 }
@@ -34,7 +36,7 @@ struct OrderItem {
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(&self, user_id: i32) -> ServiceFuture<HashMap<i32, Order>> {
+    fn convert_cart(&self, user_id: i32, address: AddressFull) -> ServiceFuture<HashMap<i32, Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
@@ -148,7 +150,7 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn get_orders_for_user(&self, user_id: i32) -> ServiceFuture<Vec<Order>> {
+    fn get_orders_for_store(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)()
@@ -156,6 +158,22 @@ impl OrderService for OrderServiceImpl {
                     Box::new(conn),
                     OrderMask {
                         user_id: Some(user_id),
+                        ..Default::default()
+                    },
+                )
+                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
+                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+        }))
+    }
+
+    fn get_orders_for_user(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
+        let order_repo_factory = self.order_repo_factory.clone();
+        Box::new(self.db_pool.run(move |conn| {
+            (order_repo_factory)()
+                .select(
+                    Box::new(conn),
+                    OrderMask {
+                        store_id: Some(store_id),
                         ..Default::default()
                     },
                 )

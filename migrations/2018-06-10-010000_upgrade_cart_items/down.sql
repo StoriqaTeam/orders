@@ -1,0 +1,4 @@
+ALTER TABLE cart_items
+    ALTER COLUMN user_id TYPE INTEGER,
+    ALTER COLUMN product_id TYPE INTEGER,
+    ALTER COLUMN quantity TYPE INTEGER;
