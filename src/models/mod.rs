@@ -12,3 +12,6 @@ pub use self::order::*;
 
 pub mod product_info;
 pub use self::product_info::*;
+
+pub mod order_diff;
+pub use self::order_diff::*;

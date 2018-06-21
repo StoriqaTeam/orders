@@ -11,14 +11,32 @@ use models::*;
 use repos::*;
 use types::*;
 
+pub struct OrderSearchTerms {
+    pub timestamp_from: Option<i64>,
+    pub timestamp_to: Option<i64>,
+    pub payment_status: Option<bool>,
+    pub user_id: Option<UserId>,
+}
+
+pub enum OrderIdentifier {
+    Id(OrderId),
+    Slug(String),
+}
+
+pub enum OrderSearchFilter {
+    Id(OrderIdentifier),
+    Terms(OrderSearchTerms),
+}
+
 pub trait OrderService {
-    fn convert_cart(&self, user_id: i32, address: AddressFull) -> ServiceFuture<HashMap<i32, Order>>;
-    fn create_order(&self) -> ServiceFuture<Order>;
-    fn get_order(&self, order_id: OrderId) -> ServiceFuture<Option<Order>>;
-    fn get_orders_for_user(&self, user_id: i32) -> ServiceFuture<Vec<Order>>;
-    fn get_orders_for_store(&self, store_id: i32) -> ServiceFuture<Vec<Order>>;
-    fn delete_order(&self, order_id: OrderId) -> ServiceFuture<()>;
-    fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order>;
+    fn convert_cart(&self, user_id: UserId, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<Vec<Order>>;
+    // fn create_order(&self) -> ServiceFuture<Order>;
+    fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
+    fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
+    fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
+    fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
+    // fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState) -> ServiceFuture<Order>;
+    fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>>;
 }
 
 pub type CartServiceFactory = Arc<Fn() -> Box<CartService> + Send + Sync>;
@@ -36,7 +54,7 @@ struct OrderItem {
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(&self, user_id: i32, address: AddressFull) -> ServiceFuture<HashMap<i32, Order>> {
+    fn convert_cart(&self, user_id: i32, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<HashMap<i32, Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
@@ -57,27 +75,13 @@ impl OrderService for OrderServiceImpl {
                         })
                     }).collect::<Result<Vec<_>, RepoError>>())
                 })
-                // Bin cart products into separate orders based on store ID
+                // Create orders from OrderItems
                 .map(move |cart: Vec<OrderItem>| {
-                            let mut orders_by_store = HashMap::<i32, NewOrder>::new();
-                            for OrderItem {product_id, store_id, quantity} in cart {
-                                match orders_by_store.entry(store_id) {
-                                    Occupied(mut entry) => {
-                                        entry.get_mut().products.insert(product_id, quantity);
-                                    }
-                                    Vacant(mut entry) => {
-                                        let mut v = NewOrder {
-                                            user_id,
-                                            state: OrderState::Processing(Default::default()),
-                                            products: Default::default(),
-                                        };
-                                        v.products.insert(product_id, quantity);
-
-                                        entry.insert(v);
-                                    }
-                                }
-                            }
-                            orders_by_store
+                    cart.map(|item| {
+                        NewOrder {
+                            id: OrderId::new(),
+                        }
+                    })
                         })
                         // Insert new orders into database
                         .and_then({

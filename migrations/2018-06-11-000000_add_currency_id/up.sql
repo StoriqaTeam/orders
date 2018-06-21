@@ -1,1 +1,0 @@
-ALTER TABLE cart_items ADD COLUMN currency_id INTEGER NOT NULL DEFAULT 1;

@@ -7,6 +7,7 @@ extern crate env_logger;
 extern crate failure;
 extern crate futures;
 extern crate futures_state_stream;
+extern crate geo;
 extern crate hyper;
 #[macro_use]
 extern crate log as log_crate;
@@ -22,6 +23,7 @@ extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
 extern crate tokio_postgres;
+extern crate uuid;
 
 use bb8_postgres::PostgresConnectionManager;
 use futures::future;

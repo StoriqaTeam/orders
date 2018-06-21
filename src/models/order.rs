@@ -1,8 +1,9 @@
-use super::StoreId;
+use super::common::*;
 use errors::Error;
 
 use failure;
 use failure::Fail;
+use geo::Point as GeoPoint;
 use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,114 +12,125 @@ use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 
 const ID_COLUMN: &'static str = "id";
-const USER_ID_COLUMN: &'static str = "user_id";
-const PRODUCTS_COLUMN: &'static str = "products";
+const SLUG_COLUMN: &'static str = "slug";
+const CUSTOMER_COLUMN: &'static str = "customer";
+const PRODUCT_COLUMN: &'static str = "product";
+const PRICE_COLUMN: &'static str = "price";
+const QUANTITY_COLUMN: &'static str = "quantity";
+const SUBTOTAL_COLUMN: &'static str = "subtotal";
+const RECEIVER_NAME: &'static str = "receiver_name";
+const LOCATION_COLUMN: &'static str = "location";
+const ADMINISTRATIVE_AREA_LEVEL_1_COLUMN: &'static str = "administrative_area_level_1";
+const ADMINISTRATIVE_AREA_LEVEL_2_COLUMN: &'static str = "administrative_area_level_2";
+const COUNTRY_COLUMN: &'static str = "country";
+const LOCALITY_COLUMN: &'static str = "locality";
+const POLITICAL_COLUMN: &'static str = "political";
+const POSTAL_CODE_COLUMN: &'static str = "postal_code";
+const ROUTE_COLUMN: &'static str = "route";
+const STREET_NUMBER_COLUMN: &'static str = "street_number";
+const ADDRESS_COLUMN: &'static str = "address";
+const PLACE_ID_COLUMN: &'static str = "place_id";
+const TRACK_ID_COLUMN: &'static str = "track_id";
+const CREATION_DATE_COLUMN: &'static str = "creation_date";
 const STATE_ID_COLUMN: &'static str = "state_id";
 const STATE_DATA_COLUMN: &'static str = "state_data";
+const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
+const DELIVERY_COMPANY_COLUMN: &'static str = "delivery_company";
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct NewData;
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct CancelledData;
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct NeedPaymentData;
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ProcessingData;
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ConfirmedData;
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct CompleteData;
+pub struct NewData {
+    pub comment: String,
+}
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PaidData {
+    pub comment: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct InProcessingData {
+    pub comment: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CancelledData {
+    pub comment: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SentData {
+    pub comment: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "id", content = "data")]
 pub enum OrderState {
-    New(NewData),
-    Cancelled(CancelledData),
-    NeedPayment(NeedPaymentData),
-    Processing(ProcessingData),
-    Confirmed(ConfirmedData),
-    Sent(SentData),
-    Complete(CompleteData),
-}
-
-impl From<OrderState> for (String, Value) {
-    fn from(v: OrderState) -> Self {
-        match v {
-            OrderState::New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::NeedPayment(data) => ("need_payment".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Processing(data) => ("processing".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Confirmed(data) => ("confirmed".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Complete(data) => ("complete".to_string(), serde_json::to_value(data).unwrap()),
-        }
-    }
+    New(NewData), // on creation
+    // Confirmed, // if required by store owner in product settings
+    Paid(PaidData), // set on request of billing service,
+    InProcessing(InProcessingData),
+    Cancelled(CancelledData), // Can be set by user or store manager before InDelivery.
+    Sent(SentData),           // on setting tracking id must be set.
+                              // Return,
+                              // Replacement,
+                              // Delivered,
+                              // Received,
+                              // Complete,
 }
 
 impl OrderState {
-    fn from_tuple<'a>(v: (&'a str, Value)) -> Result<Self, failure::Error> {
-        let (state_id, state_data) = v;
+    pub fn into_db(self) -> (String, Value) {
+        match v {
+            OrderState::New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::Paid(data) => ("paid".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::InProcessing(data) => ("in_processing".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
+            OrderState::Sent(data) => ("sent".to_string(), serde_json::to_value(data).unwrap()),
+        }
+    }
+
+    pub fn from_db<'a>(state_id: &'a str, state_data: Value) -> Result<Self, failure::Error> {
         match state_id {
             "new" => Ok(OrderState::New(serde_json::from_value(state_data)?)),
+            "paid" => Ok(OrderState::Paid(serde_json::from_value(state_data)?)),
+            "in_processing" => Ok(OrderState::InProcessing(serde_json::from_value(state_data)?)),
             "cancelled" => Ok(OrderState::Cancelled(serde_json::from_value(state_data)?)),
-            "need_payment" => Ok(OrderState::NeedPayment(serde_json::from_value(state_data)?)),
-            "processing" => Ok(OrderState::Processing(serde_json::from_value(state_data)?)),
-            "confirmed" => Ok(OrderState::Confirmed(serde_json::from_value(state_data)?)),
-            "complete" => Ok(OrderState::Complete(serde_json::from_value(state_data)?)),
+            "sent" => Ok(OrderState::Sent(serde_json::from_value(state_data)?)),
             other => Err(Error::ParseError.context(format!("Unknown state_id {}", other)).into()),
         }
     }
 }
 
-impl<'a> From<(&'a str, Value)> for OrderState {
-    fn from(v: (&str, Value)) -> Self {
-        OrderState::from_tuple(v).unwrap()
-    }
+#[derive(Clone, Debug)]
+pub struct AddressFull {
+    location: Option<GeoPoint<f64>>,
+    administrative_area_level_1: Option<String>,
+    administrative_area_level_2: Option<String>,
+    country: Option<String>,
+    locality: Option<String>,
+    political: Option<String>,
+    postal_code: Option<String>,
+    route: Option<String>,
+    street_number: Option<String>,
+    address: Option<String>,
+    place_id: Option<String>,
+    track_id: Option<String>,
 }
 
-pub type OrderId = i32;
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[postgres(name = "order_id")]
+pub struct OrderId(pub Uuid);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     pub id: OrderId,
-    pub user_id: i32,
+    pub slug: String,
+    pub user_id: UserId,
     pub store_id: StoreId,
-    pub product_id: i32,
+    pub product_id: ProductId,
+    pub address: AddressFull,
+    pub receiver_name: String,
     pub state: OrderState,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct NewOrder {
-    pub user_id: OrderId,
-    pub products: HashMap<i32, i32>,
-    pub state: OrderState,
-}
-
-impl From<(OrderId, NewOrder)> for Order {
-    fn from(v: (OrderId, NewOrder)) -> Self {
-        let (id, new_order) = v;
-        Order {
-            id,
-            user_id: new_order.user_id,
-            products: new_order.products,
-            state: new_order.state,
-        }
-    }
-}
-
-impl From<Order> for (OrderId, NewOrder) {
-    fn from(v: Order) -> Self {
-        (
-            v.id,
-            NewOrder {
-                user_id: v.user_id,
-                products: v.products,
-                state: v.state,
-            },
-        )
-    }
 }
 
 impl From<Row> for Order {
@@ -129,17 +141,21 @@ impl From<Row> for Order {
             id: row.get(ID_COLUMN),
             user_id: row.get(USER_ID_COLUMN),
             products: serde_json::from_value(row.get(PRODUCTS_COLUMN)).unwrap(),
-            state: OrderState::from((state_id.as_str(), state_data)),
+            state: OrderState::from_db(state_id.as_str(), state_data).unwrap(),
         }
     }
 }
 
-impl Inserter for NewOrder {
+impl Inserter for Order {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        let (state_id, state_data) = self.state.into();
+        let (state_id, state_data) = self.state.into_db();
         InsertBuilder::new(table)
+            .with_arg(ID_COLUMN, self.id)
+            .with_arg(SLUG_COLUMN, self.slug)
             .with_arg(USER_ID_COLUMN, self.user_id)
-            .with_arg(PRODUCTS_COLUMN, serde_json::to_value(self.products).unwrap())
+            .with_arg(STORE_ID_COLUMN, self.store_id)
+            .with_arg(PRODUCT_COLUMN, self.product_id)
+            .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(STATE_ID_COLUMN, state_id)
             .with_arg(STATE_DATA_COLUMN, state_data)
     }
@@ -148,24 +164,24 @@ impl Inserter for NewOrder {
 #[derive(Clone, Debug, Default)]
 pub struct OrderMask {
     pub id: Option<OrderId>,
-    pub user_id: Option<i32>,
+    pub user_id: Option<UserId>,
     pub state_id: Option<String>,
 }
 
 impl Filter for OrderMask {
-    fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
-        let mut b = FilteredOperationBuilder::new(op, table);
+    fn into_filtered_operation_builder(self, table: &'static str) -> FilteredOperationBuilder {
+        let mut b = FilteredOperationBuilder::new(table);
 
         if let Some(id) = self.id {
-            b = b.with_arg(ID_COLUMN, id);
+            b = b.with_filter(ID_COLUMN, id);
         }
 
         if let Some(user_id) = self.user_id {
-            b = b.with_arg(USER_ID_COLUMN, user_id);
+            b = b.with_filter(USER_ID_COLUMN, user_id);
         }
 
         if let Some(state_id) = self.state_id {
-            b = b.with_arg(STATE_ID_COLUMN, state_id);
+            b = b.with_filter(STATE_ID_COLUMN, state_id);
         }
 
         b
@@ -185,7 +201,7 @@ impl Updater for OrderUpdate {
     fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
         let OrderUpdate { mask, data } = self;
 
-        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(FilteredOperation::Select, table));
+        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
         if let Some(state) = data.state {
             let (state_id, state_data) = state.into();
