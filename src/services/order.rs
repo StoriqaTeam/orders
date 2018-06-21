@@ -82,20 +82,26 @@ impl OrderService for OrderServiceImpl {
                     }).collect::<Result<Vec<_>, RepoError>>())
                 })
                 // Create orders from OrderItems
-                .map(move |cart: Vec<OrderItem>| {
-                    cart.map(|item| {
-                        NewOrder {
-                            id: OrderId::new(),
-                        }
-                    })
+                .map({
+                    let db_pool = self.db_pool.clone();
+                    let order_repo_factory = order_repo_factory.clone();
+                    move |cart: Vec<OrderItem>| {
+                        cart.map(move |item| {
+                            Order {
+                                id: OrderId::new(),
+                                receiver_name: receiver_name.clone(),
+
+                            }
                         })
+                    }
+                })
                         // Insert new orders into database
                         .and_then({
                             let db_pool = self.db_pool.clone();
                             move |new_orders_by_store| {
                                 db_pool.run(move |conn| {
                                     let mut out: RepoConnectionFuture<HashMap<i32, Order>>;
-                                    out = Box::new(future::ok((Default::default(), Box::new(conn) as RepoConnection)));
+                                    out = Box::new(future::ok((Default::default(), conn)));
 
                                     for (store_id, new_order) in new_orders_by_store.into_iter() {
                                         out = Box::new(out.and_then({
@@ -112,8 +118,6 @@ impl OrderService for OrderServiceImpl {
                                     }
 
                                     out
-                                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                                 })
                             }
                         })
@@ -145,16 +149,13 @@ impl OrderService for OrderServiceImpl {
         Box::new(
             self.db_pool
                 .run(move |conn| {
-                    (order_repo_factory)()
-                        .select(
-                            Box::new(conn),
-                            OrderMask {
-                                id: Some(order_id),
-                                ..Default::default()
-                            },
-                        )
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+                    (order_repo_factory)().select(
+                        conn,
+                        OrderMask {
+                            id: Some(order_id),
+                            ..Default::default()
+                        },
+                    )
                 })
                 .map(|orders| orders.first().cloned()),
         )
@@ -163,32 +164,26 @@ impl OrderService for OrderServiceImpl {
     fn get_orders_for_store(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)()
-                .select(
-                    Box::new(conn),
-                    OrderMask {
-                        user_id: Some(user_id),
-                        ..Default::default()
-                    },
-                )
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+            (order_repo_factory)().select(
+                conn,
+                OrderMask {
+                    customer: Some(user_id),
+                    ..Default::default()
+                },
+            )
         }))
     }
 
     fn get_orders_for_user(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)()
-                .select(
-                    Box::new(conn),
-                    OrderMask {
-                        store_id: Some(store_id),
-                        ..Default::default()
-                    },
-                )
-                .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
+            (order_repo_factory)().select(
+                conn,
+                OrderMask {
+                    store_id: Some(store_id),
+                    ..Default::default()
+                },
+            )
         }))
     }
 

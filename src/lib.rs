@@ -53,6 +53,7 @@ pub mod types;
 
 pub use config::*;
 use errors::*;
+use types::*;
 
 pub fn prepare_db(remote: Remote) -> Box<Future<Item = bb8::Pool<PostgresConnectionManager>, Error = tokio_postgres::Error>> {
     let config = config::Config::new().unwrap();
@@ -66,15 +67,17 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
     let mut core = Core::new().expect("Unexpected error creating event loop core");
 
     let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
-    let db_pool = Arc::new({
+    let db_pool = {
         let remote = core.remote();
-        core.run(
-            bb8::Pool::builder()
-                .min_idle(Some(10))
-                .build(manager, remote)
-                .map_err(|e| format_err!("{}", e)),
-        ).expect("Failed to create connection pool")
-    });
+        DbPool::from(
+            core.run(
+                bb8::Pool::builder()
+                    .min_idle(Some(10))
+                    .build(manager, remote)
+                    .map_err(|e| format_err!("{}", e)),
+            ).expect("Failed to create connection pool"),
+        )
+    };
 
     let listen_address = {
         let port = port.unwrap_or(config.listen.port);

@@ -1,7 +1,8 @@
 CREATE SEQUENCE order_id_seq;
 CREATE TABLE orders (
     id                          order_id PRIMARY KEY,
-    slug                        VARCHAR UNIQUE NOT NULL,
+    slug                        VARCHAR UNIQUE NOT NULL DEFAULT nextval('order_id_seq')::text,
+    store                       store_id NOT NULL,
     customer                    user_id NOT NULL,
     product                     product_id NOT NULL,
     price                       NUMERIC NOT NULL,

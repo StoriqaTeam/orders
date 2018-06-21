@@ -15,11 +15,13 @@ use uuid::Uuid;
 const ID_COLUMN: &'static str = "id";
 const SLUG_COLUMN: &'static str = "slug";
 const CUSTOMER_COLUMN: &'static str = "customer";
+const STORE_COLUMN: &'static str = "column";
 const PRODUCT_COLUMN: &'static str = "product";
 const PRICE_COLUMN: &'static str = "price";
 const QUANTITY_COLUMN: &'static str = "quantity";
 const SUBTOTAL_COLUMN: &'static str = "subtotal";
-const RECEIVER_NAME: &'static str = "receiver_name";
+const RECEIVER_NAME_COLUMN: &'static str = "receiver_name";
+
 const LOCATION_COLUMN: &'static str = "location";
 const ADMINISTRATIVE_AREA_LEVEL_1_COLUMN: &'static str = "administrative_area_level_1";
 const ADMINISTRATIVE_AREA_LEVEL_2_COLUMN: &'static str = "administrative_area_level_2";
@@ -31,6 +33,7 @@ const ROUTE_COLUMN: &'static str = "route";
 const STREET_NUMBER_COLUMN: &'static str = "street_number";
 const ADDRESS_COLUMN: &'static str = "address";
 const PLACE_ID_COLUMN: &'static str = "place_id";
+
 const TRACK_ID_COLUMN: &'static str = "track_id";
 const CREATION_DATE_COLUMN: &'static str = "creation_date";
 const STATE_ID_COLUMN: &'static str = "state_id";
@@ -123,7 +126,50 @@ pub struct AddressFull {
     street_number: Option<String>,
     address: Option<String>,
     place_id: Option<String>,
-    track_id: Option<String>,
+}
+
+impl AddressFull {
+    pub fn write_into_inserter(self, mut b: InsertBuilder) -> InsertBuilder {
+        if let Some(v) = self.location {
+            b = b.with_value(LOCATION_COLUMN, v);
+        }
+        if let Some(v) = self.administrative_area_level_1 {
+            b = b.with_value(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN, v);
+        }
+        if let Some(v) = self.administrative_area_level_2 {
+            b = b.with_value(ADMINISTRATIVE_AREA_LEVEL_2_COLUMN, v);
+        }
+        if let Some(v) = self.country {
+            b = b.with_value(COUNTRY_COLUMN, v);
+        }
+        if let Some(v) = self.locality {
+            b = b.with_value(LOCALITY_COLUMN, v);
+        }
+        if let Some(v) = self.political {
+            b = b.with_value(POLITICAL_COLUMN, v);
+        }
+        if let Some(v) = self.postal_code {
+            b = b.with_value(POSTAL_CODE_COLUMN, v);
+        }
+        if let Some(v) = self.route {
+            b = b.with_value(ROUTE_COLUMN, v);
+        }
+        if let Some(v) = self.street_number {
+            b = b.with_value(STREET_NUMBER_COLUMN, v);
+        }
+        if let Some(v) = self.address {
+            b = b.with_value(ADDRESS_COLUMN, v);
+        }
+        if let Some(v) = self.place_id {
+            b = b.with_value(PLACE_ID_COLUMN, v);
+        }
+
+        b
+    }
+
+    pub fn from_row(row: Row) -> AddressFull {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
@@ -141,8 +187,8 @@ pub struct Order {
     pub id: OrderId,
     pub slug: String,
     pub customer: UserId,
-    pub store_id: StoreId,
-    pub product_id: ProductId,
+    pub store: StoreId,
+    pub product: ProductId,
     pub address: AddressFull,
     pub receiver_name: String,
     pub state: OrderState,
@@ -154,32 +200,55 @@ impl From<Row> for Order {
         let state_data: Value = row.get(STATE_DATA_COLUMN);
         Self {
             id: row.get(ID_COLUMN),
+            slug: row.get(SLUG_COLUMN),
             customer: row.get(CUSTOMER_COLUMN),
+            store: row.get(STORE_COLUMN),
             product: row.get(PRODUCT_COLUMN),
+            address: AddressFull::from_row(&row),
+            receiver_name: row.get(RECEIVER_NAME_COLUMN),
             state: OrderState::from_db(state_id.as_str(), state_data).unwrap(),
         }
     }
 }
 
-impl Inserter for Order {
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OrderInserter {
+    pub id: OrderId,
+    pub customer: UserId,
+    pub store_id: StoreId,
+    pub product_id: ProductId,
+    pub address: AddressFull,
+    pub receiver_name: String,
+    pub state: OrderState,
+    pub track_id: Option<String>,
+}
+
+impl Inserter for OrderInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         let (state_id, state_data) = self.state.into_db();
-        InsertBuilder::new(table)
+        let mut b = InsertBuilder::new(table)
             .with_arg(ID_COLUMN, self.id)
-            .with_arg(SLUG_COLUMN, self.slug)
             .with_arg(CUSTOMER_COLUMN, self.customer)
-            .with_arg(STORE_ID_COLUMN, self.store_id)
+            .with_arg(STORE_COLUMN, self.store_id)
             .with_arg(PRODUCT_COLUMN, self.product_id)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(STATE_ID_COLUMN, state_id)
-            .with_arg(STATE_DATA_COLUMN, state_data)
+            .with_arg(STATE_DATA_COLUMN, state_data);
+
+        b = self.address.write_into_inserter(b);
+
+        if let Some(v) = self.track_id {
+            b = b.with_value(TRACK_ID_COLUMN, v);
+        }
+
+        b
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct OrderMask {
     pub id: Option<OrderId>,
-    pub user_id: Option<UserId>,
+    pub customer: Option<UserId>,
     pub state_id: Option<String>,
 }
 
@@ -187,16 +256,16 @@ impl Filter for OrderMask {
     fn into_filtered_operation_builder(self, table: &'static str) -> FilteredOperationBuilder {
         let mut b = FilteredOperationBuilder::new(table);
 
-        if let Some(id) = self.id {
-            b = b.with_filter(ID_COLUMN, id);
+        if let Some(v) = self.id {
+            b = b.with_filter(ID_COLUMN, v);
         }
 
-        if let Some(user_id) = self.user_id {
-            b = b.with_filter(USER_ID_COLUMN, user_id);
+        if let Some(v) = self.customer {
+            b = b.with_filter(CUSTOMER_COLUMN, v);
         }
 
-        if let Some(state_id) = self.state_id {
-            b = b.with_filter(STATE_ID_COLUMN, state_id);
+        if let Some(v) = self.state_id {
+            b = b.with_filter(STATE_ID_COLUMN, v);
         }
 
         b
