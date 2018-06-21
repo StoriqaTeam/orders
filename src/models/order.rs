@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use stq_db::repo::*;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
+use uuid::Uuid;
 
 const ID_COLUMN: &'static str = "id";
 const SLUG_COLUMN: &'static str = "slug";
@@ -65,37 +66,45 @@ pub struct SentData {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "id", content = "data")]
 pub enum OrderState {
+    /// State set on order creation.
+    #[serde(rename = "new")]
     New(NewData), // on creation
-    // Confirmed, // if required by store owner in product settings
-    Paid(PaidData), // set on request of billing service,
+    /// Set after payment by request of billing
+    #[serde(rename = "paid")]
+    Paid(PaidData),
+    /// Order is being processed by store management
+    #[serde(rename = "in_processing")]
     InProcessing(InProcessingData),
-    Cancelled(CancelledData), // Can be set by user or store manager before InDelivery.
-    Sent(SentData),           // on setting tracking id must be set.
-                              // Return,
-                              // Replacement,
-                              // Delivered,
-                              // Received,
-                              // Complete,
+    /// Can be cancelled by any party before order being sent.
+    #[serde(rename = "cancelled")]
+    Cancelled(CancelledData),
+    /// Wares are on their way to the customer. Tracking ID must be set.
+    #[serde(rename = "sent")]
+    Sent(SentData),
 }
 
 impl OrderState {
     pub fn into_db(self) -> (String, Value) {
-        match v {
-            OrderState::New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Paid(data) => ("paid".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::InProcessing(data) => ("in_processing".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
-            OrderState::Sent(data) => ("sent".to_string(), serde_json::to_value(data).unwrap()),
+        use self::OrderState::*;
+
+        match self {
+            New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
+            Paid(data) => ("paid".to_string(), serde_json::to_value(data).unwrap()),
+            InProcessing(data) => ("in_processing".to_string(), serde_json::to_value(data).unwrap()),
+            Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
+            Sent(data) => ("sent".to_string(), serde_json::to_value(data).unwrap()),
         }
     }
 
     pub fn from_db<'a>(state_id: &'a str, state_data: Value) -> Result<Self, failure::Error> {
+        use self::OrderState::*;
+
         match state_id {
-            "new" => Ok(OrderState::New(serde_json::from_value(state_data)?)),
-            "paid" => Ok(OrderState::Paid(serde_json::from_value(state_data)?)),
-            "in_processing" => Ok(OrderState::InProcessing(serde_json::from_value(state_data)?)),
-            "cancelled" => Ok(OrderState::Cancelled(serde_json::from_value(state_data)?)),
-            "sent" => Ok(OrderState::Sent(serde_json::from_value(state_data)?)),
+            "new" => Ok(New(serde_json::from_value(state_data)?)),
+            "paid" => Ok(Paid(serde_json::from_value(state_data)?)),
+            "in_processing" => Ok(InProcessing(serde_json::from_value(state_data)?)),
+            "cancelled" => Ok(Cancelled(serde_json::from_value(state_data)?)),
+            "sent" => Ok(Sent(serde_json::from_value(state_data)?)),
             other => Err(Error::ParseError.context(format!("Unknown state_id {}", other)).into()),
         }
     }
@@ -121,11 +130,17 @@ pub struct AddressFull {
 #[postgres(name = "order_id")]
 pub struct OrderId(pub Uuid);
 
+impl OrderId {
+    pub fn new() -> Self {
+        OrderId(Uuid::new_v4())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     pub id: OrderId,
     pub slug: String,
-    pub user_id: UserId,
+    pub customer: UserId,
     pub store_id: StoreId,
     pub product_id: ProductId,
     pub address: AddressFull,
@@ -139,8 +154,8 @@ impl From<Row> for Order {
         let state_data: Value = row.get(STATE_DATA_COLUMN);
         Self {
             id: row.get(ID_COLUMN),
-            user_id: row.get(USER_ID_COLUMN),
-            products: serde_json::from_value(row.get(PRODUCTS_COLUMN)).unwrap(),
+            customer: row.get(CUSTOMER_COLUMN),
+            product: row.get(PRODUCT_COLUMN),
             state: OrderState::from_db(state_id.as_str(), state_data).unwrap(),
         }
     }
@@ -152,7 +167,7 @@ impl Inserter for Order {
         InsertBuilder::new(table)
             .with_arg(ID_COLUMN, self.id)
             .with_arg(SLUG_COLUMN, self.slug)
-            .with_arg(USER_ID_COLUMN, self.user_id)
+            .with_arg(CUSTOMER_COLUMN, self.customer)
             .with_arg(STORE_ID_COLUMN, self.store_id)
             .with_arg(PRODUCT_COLUMN, self.product_id)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)

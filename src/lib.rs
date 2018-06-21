@@ -13,6 +13,10 @@ extern crate hyper;
 extern crate log as log_crate;
 #[cfg_attr(test, macro_use)]
 extern crate maplit;
+#[macro_use]
+extern crate postgres;
+#[macro_use]
+extern crate postgres_derive;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -22,6 +26,7 @@ extern crate stq_db;
 extern crate stq_http;
 extern crate stq_router;
 extern crate tokio_core;
+#[macro_use]
 extern crate tokio_postgres;
 extern crate uuid;
 

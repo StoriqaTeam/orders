@@ -54,7 +54,13 @@ struct OrderItem {
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(&self, user_id: i32, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<HashMap<i32, Order>> {
+    fn convert_cart(
+        &self,
+        user_id: i32,
+        address: AddressFull,
+        receiver_name: String,
+        comment: String,
+    ) -> ServiceFuture<HashMap<i32, Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
@@ -206,6 +212,11 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
+    fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>> {
+        unimplemented!()
+    }
+
+    /*
     fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(
@@ -231,34 +242,5 @@ impl OrderService for OrderServiceImpl {
                 }),
         )
     }
-}
-
-pub type OrderServiceMemoryStorage = Arc<Mutex<HashMap<i32, Order>>>;
-
-/// In-memory implementation of cart service
-pub struct OrderServiceMemory {
-    pub inner: OrderServiceMemoryStorage,
-    pub cart_factory: Arc<Fn() -> Box<CartService> + Send + Sync>,
-}
-
-impl OrderService for OrderServiceMemory {
-    fn convert_cart(&self, _user_id: i32) -> ServiceFuture<HashMap<i32, Order>> {
-        unimplemented!()
-    }
-
-    fn get_order(&self, _order_id: OrderId) -> ServiceFuture<Option<Order>> {
-        unimplemented!()
-    }
-
-    fn get_orders_for_user(&self, _user_id: i32) -> ServiceFuture<Vec<Order>> {
-        unimplemented!()
-    }
-
-    fn delete_order(&self, _order_id: OrderId) -> ServiceFuture<()> {
-        unimplemented!()
-    }
-
-    fn set_order_state(&self, _order_id: OrderId, _state: OrderState) -> ServiceFuture<Order> {
-        unimplemented!()
-    }
+    */
 }
