@@ -13,7 +13,6 @@ extern crate hyper;
 extern crate log as log_crate;
 #[cfg_attr(test, macro_use)]
 extern crate maplit;
-#[macro_use]
 extern crate postgres;
 #[macro_use]
 extern crate postgres_derive;
@@ -36,7 +35,6 @@ use futures::prelude::*;
 use hyper::server::Http;
 use std::net::SocketAddr;
 use std::process::exit;
-use std::sync::Arc;
 use tokio_core::reactor::{Core, Remote};
 use tokio_postgres::TlsMode;
 

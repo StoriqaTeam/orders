@@ -2,9 +2,9 @@ use futures::future;
 use futures::prelude::*;
 use std::sync::Arc;
 use stq_db::repo::*;
+use stq_db::statement::*;
 
 use super::types::ServiceFuture;
-use log;
 use models::*;
 use repos::*;
 use types::*;
@@ -102,7 +102,7 @@ impl CartService for CartServiceImpl {
                         move |(products, conn)| {
                             let new_product = if let Some(mut product) = products.first().cloned() {
                                 product.quantity += 1;
-                                <(CartProductId, NewCartProduct)>::from(product).1
+                                product.decompose().1
                             } else {
                                 NewCartProduct {
                                     user_id,
@@ -112,7 +112,7 @@ impl CartService for CartServiceImpl {
                                     store_id,
                                 }
                             };
-                            (repo_factory)().insert_exactly_one(conn, UpsertCartProduct(new_product))
+                            (repo_factory)().insert_exactly_one(conn, CartProductInserter::Upserter(new_product))
                         }
                     })
                     .and_then({
@@ -236,14 +236,27 @@ impl CartService for CartServiceImpl {
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
-            (repo_factory)().list(conn, user_id, from, count).map(|(products, conn)| {
-                let mut cart = Cart::default();
-                for product in products.into_iter() {
-                    let (id, info) = product.into();
-                    cart.insert(id, info);
-                }
-                (cart, conn)
-            })
+            (repo_factory)()
+                .select_full(
+                    conn,
+                    CartProductMask {
+                        user_id: user_id,
+                        product_id: Some(Range::From(RangeLimit {
+                            value: from,
+                            inclusive: true,
+                        })),
+
+                        ..Default::default()
+                    },
+                )
+                .map(|(products, conn)| {
+                    let mut cart = Cart::default();
+                    for product in products.into_iter() {
+                        let (id, info) = product.into();
+                        cart.insert(id, info);
+                    }
+                    (cart, conn)
+                })
         }))
     }
 
@@ -275,7 +288,7 @@ impl CartService for CartServiceImpl {
                                 let mut new_cart_product = product.decompose().1;
                                 new_cart_product.user_id = to;
                                 (repo_factory)()
-                                    .insert(conn, CartProductNewInserter(new_cart_product))
+                                    .insert(conn, CartProductInserter::Upserter(new_cart_product))
                                     .map(|(_, conn)| ((), conn))
                             }));
                         }

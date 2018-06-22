@@ -6,8 +6,6 @@ use failure::Fail;
 use geo::Point as GeoPoint;
 use serde_json;
 use serde_json::Value;
-use std::collections::HashMap;
-use stq_db::repo::*;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
@@ -215,8 +213,8 @@ impl From<Row> for Order {
 pub struct OrderInserter {
     pub id: OrderId,
     pub customer: UserId,
-    pub store_id: StoreId,
-    pub product_id: ProductId,
+    pub store: StoreId,
+    pub product: ProductId,
     pub address: AddressFull,
     pub receiver_name: String,
     pub state: OrderState,
@@ -229,8 +227,8 @@ impl Inserter for OrderInserter {
         let mut b = InsertBuilder::new(table)
             .with_arg(ID_COLUMN, self.id)
             .with_arg(CUSTOMER_COLUMN, self.customer)
-            .with_arg(STORE_COLUMN, self.store_id)
-            .with_arg(PRODUCT_COLUMN, self.product_id)
+            .with_arg(STORE_COLUMN, self.store)
+            .with_arg(PRODUCT_COLUMN, self.product)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(STATE_ID_COLUMN, state_id)
             .with_arg(STATE_DATA_COLUMN, state_data);
@@ -245,11 +243,19 @@ impl Inserter for OrderInserter {
     }
 }
 
+pub type AddressMask = AddressFull;
+
 #[derive(Clone, Debug, Default)]
 pub struct OrderMask {
     pub id: Option<OrderId>,
+    pub slug: Option<String>,
     pub customer: Option<UserId>,
-    pub state_id: Option<String>,
+    pub store: Option<StoreId>,
+    pub product: Option<ProductId>,
+    pub address: AddressMask,
+    pub receiver_name: Option<String>,
+    pub state: Option<OrderState>,
+    pub track_id: Option<String>,
 }
 
 impl Filter for OrderMask {
@@ -260,11 +266,15 @@ impl Filter for OrderMask {
             b = b.with_filter(ID_COLUMN, v);
         }
 
+        if let Some(v) = self.slug {
+            b = b.with_filter(SLUG_COLUMN, v);
+        }
+
         if let Some(v) = self.customer {
             b = b.with_filter(CUSTOMER_COLUMN, v);
         }
 
-        if let Some(v) = self.state_id {
+        if let Some(v) = self.state {
             b = b.with_filter(STATE_ID_COLUMN, v);
         }
 

@@ -1,6 +1,5 @@
 use super::*;
 
-use stq_db::repo::*;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 
@@ -33,23 +32,22 @@ impl Inserter for NewCartProduct {
     }
 }
 
-pub struct UpsertCartProduct(pub NewCartProduct);
-
-impl Inserter for UpsertCartProduct {
-    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        self.0
-            .into_insert_builder(table)
-            .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2")
-    }
+#[derive(Clone, Copy, Debug)]
+pub enum CartProductInserter {
+    Upserter(NewCartProduct),
+    CollisionNoOp(NewCartProduct),
 }
 
-pub struct CartProductNewInserter(pub NewCartProduct);
-
-impl Inserter for CartProductNewInserter {
+impl Inserter for CartProductInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        self.0
-            .into_insert_builder(table)
-            .with_extra("ON CONFLICT (user_id, product_id) DO NOTHING")
+        use self::CartProductInserter::*;
+
+        match self {
+            Upserter(data) => data.into_insert_builder(table)
+                .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2"),
+            CollisionNoOp(data) => data.into_insert_builder(table)
+                .with_extra("ON CONFLICT (user_id, product_id) DO NOTHING"),
+        }
     }
 }
 
@@ -64,24 +62,18 @@ pub struct CartProduct {
     pub store_id: i32,
 }
 
-impl From<CartProduct> for (CartProductId, NewCartProduct) {
-    fn from(product: CartProduct) -> Self {
-        (
-            product.id,
-            NewCartProduct {
-                user_id: product.user_id,
-                product_id: product.product_id,
-                quantity: product.quantity,
-                selected: product.selected,
-                store_id: product.store_id,
-            },
-        )
-    }
-}
-
 impl CartProduct {
     pub fn decompose(self) -> (CartProductId, NewCartProduct) {
-        <(CartProductId, NewCartProduct)>::from(self)
+        (
+            self.id,
+            NewCartProduct {
+                user_id: self.user_id,
+                product_id: self.product_id,
+                quantity: self.quantity,
+                selected: self.selected,
+                store_id: self.store_id,
+            },
+        )
     }
 }
 
@@ -101,34 +93,35 @@ impl From<Row> for CartProduct {
 #[derive(Clone, Debug, Default)]
 pub struct CartProductMask {
     pub id: Option<CartProductId>,
-    pub product_id: Option<i32>,
-    pub user_id: Option<i32>,
+    pub user_id: Option<Range<i32>>,
+    pub product_id: Option<Range<i32>>,
+    pub quantity: Option<Range<i32>>,
     pub selected: Option<bool>,
-    pub store_id: Option<i32>,
+    pub store_id: Option<Range<i32>>,
 }
 
 impl Filter for CartProductMask {
-    fn into_filtered_operation_builder(self, op: FilteredOperation, table: &'static str) -> FilteredOperationBuilder {
-        let mut b = FilteredOperationBuilder::new(op, table);
+    fn into_filtered_operation_builder(self, table: &'static str) -> FilteredOperationBuilder {
+        let mut b = FilteredOperationBuilder::new(table);
 
-        if let Some(id) = self.id {
-            b = b.with_arg(ID_COLUMN, id);
+        if let Some(v) = self.id {
+            b = b.with_filter(ID_COLUMN, v);
         }
 
-        if let Some(product_id) = self.product_id {
-            b = b.with_arg(PRODUCT_ID_COLUMN, product_id);
+        if let Some(v) = self.product_id {
+            b = b.with_filter(PRODUCT_ID_COLUMN, v);
         }
 
-        if let Some(user_id) = self.user_id {
-            b = b.with_arg(USER_ID_COLUMN, user_id);
+        if let Some(v) = self.user_id {
+            b = b.with_filter(USER_ID_COLUMN, v);
         }
 
-        if let Some(selected) = self.selected {
-            b = b.with_arg(SELECTED_COLUMN, selected);
+        if let Some(v) = self.selected {
+            b = b.with_filter(SELECTED_COLUMN, v);
         }
 
-        if let Some(store_id) = self.store_id {
-            b = b.with_arg(STORE_ID_COLUMN, store_id);
+        if let Some(v) = self.store_id {
+            b = b.with_filter(STORE_ID_COLUMN, v);
         }
 
         b
@@ -151,7 +144,7 @@ impl Updater for CartProductUpdate {
     fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
         let Self { mask, data } = self;
 
-        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(FilteredOperation::Select, table));
+        let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
         if let Some(selected) = data.selected {
             b = b.with_value(SELECTED_COLUMN, selected);

@@ -1,15 +1,14 @@
-use futures::future;
-use futures::prelude::*;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use stq_db::repo::*;
-
 use super::types::ServiceFuture;
 use super::CartService;
 use models::*;
 use repos::*;
 use types::*;
+
+use futures::future;
+use futures::prelude::*;
+use std::collections::HashMap;
+use std::rc::Rc;
+use stq_db::repo::*;
 
 pub struct OrderSearchTerms {
     pub timestamp_from: Option<i64>,
@@ -39,11 +38,11 @@ pub trait OrderService {
     fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>>;
 }
 
-pub type CartServiceFactory = Arc<Fn() -> Box<CartService> + Send + Sync>;
+pub type CartServiceFactory = Rc<Fn() -> Box<CartService> + Send + Sync>;
 
 pub struct OrderServiceImpl {
     pub cart_service_factory: CartServiceFactory,
-    pub order_repo_factory: Arc<Fn() -> Box<OrderRepo + Send + Sync> + Send + Sync>,
+    pub order_repo_factory: Rc<Fn() -> Box<OrderRepo + Send + Sync> + Send + Sync>,
     pub db_pool: DbPool,
 }
 
@@ -161,26 +160,26 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn get_orders_for_store(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
+    fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)().select(
                 conn,
                 OrderMask {
-                    customer: Some(user_id),
+                    store: Some(store_id),
                     ..Default::default()
                 },
             )
         }))
     }
 
-    fn get_orders_for_user(&self, store_id: i32) -> ServiceFuture<Vec<Order>> {
+    fn get_orders_for_user(&self, customer: UserId) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)().select(
                 conn,
                 OrderMask {
-                    store_id: Some(store_id),
+                    customer: Some(customer),
                     ..Default::default()
                 },
             )
