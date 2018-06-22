@@ -6,17 +6,17 @@ use models::*;
 pub enum Route {
     Cart,
     CartProducts,
-    CartIncrementProduct { product_id: i32 },
-    CartProduct { product_id: i32 },
-    CartProductQuantity { product_id: i32 },
-    CartProductSelection { product_id: i32 },
+    CartIncrementProduct { product_id: ProductId },
+    CartProduct { product_id: ProductId },
+    CartProductQuantity { product_id: ProductId },
+    CartProductSelection { product_id: ProductId },
     CartClear,
     CartMerge,
     OrderFromCart,
     Orders,
     OrdersByStore { store_id: StoreId },
-    Order { order_id: OrderId },
-    OrderStatus { order_id: OrderId },
+    Order { order_id: OrderIdentifier },
+    OrderStatus { order_id: OrderIdentifier },
     OrdersAllowedStatuses,
 }
 
@@ -58,17 +58,17 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok().map(StoreId))
             .map(|store_id| Route::OrdersByStore { store_id })
     });
-    route_parser.add_route_with_params(r"^/orders/(\d+)$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-id(\S+)$", |params| {
         params
             .get(0)
-            .and_then(|string_id| string_id.parse().ok())
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
             .map(|order_id| Route::Order { order_id })
     });
-    route_parser.add_route_with_params(r"^/orders/(\d+)/status$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-slug(\d+)$", |params| {
         params
             .get(0)
-            .and_then(|string_id| string_id.parse().ok())
-            .map(|order_id| Route::OrderStatus { order_id })
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
+            .map(|order_id| Route::Order { order_id })
     });
 
     route_parser

@@ -10,23 +10,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use stq_db::repo::*;
 
-pub struct OrderSearchTerms {
-    pub timestamp_from: Option<i64>,
-    pub timestamp_to: Option<i64>,
-    pub payment_status: Option<bool>,
-    pub user_id: Option<UserId>,
-}
-
-pub enum OrderIdentifier {
-    Id(OrderId),
-    Slug(String),
-}
-
-pub enum OrderSearchFilter {
-    Id(OrderIdentifier),
-    Terms(OrderSearchTerms),
-}
-
 pub trait OrderService {
     fn convert_cart(&self, user_id: UserId, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<Vec<Order>>;
     // fn create_order(&self) -> ServiceFuture<Order>;
@@ -38,11 +21,11 @@ pub trait OrderService {
     fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>>;
 }
 
-pub type CartServiceFactory = Rc<Fn() -> Box<CartService> + Send + Sync>;
+pub type CartServiceFactory = Rc<Fn() -> Box<CartService>>;
 
 pub struct OrderServiceImpl {
     pub cart_service_factory: CartServiceFactory,
-    pub order_repo_factory: Rc<Fn() -> Box<OrderRepo + Send + Sync> + Send + Sync>,
+    pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub db_pool: DbPool,
 }
 
@@ -53,13 +36,7 @@ struct OrderItem {
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(
-        &self,
-        user_id: i32,
-        address: AddressFull,
-        receiver_name: String,
-        comment: String,
-    ) -> ServiceFuture<HashMap<i32, Order>> {
+    fn convert_cart(&self, user_id: UserId, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
@@ -143,19 +120,11 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn get_order(&self, order_id: OrderId) -> ServiceFuture<Option<Order>> {
+    fn get_order(&self, order_id: OrderIdentifier) -> ServiceFuture<Option<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(
             self.db_pool
-                .run(move |conn| {
-                    (order_repo_factory)().select(
-                        conn,
-                        OrderMask {
-                            id: Some(order_id),
-                            ..Default::default()
-                        },
-                    )
-                })
+                .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
                 .map(|orders| orders.first().cloned()),
         )
     }
@@ -165,7 +134,7 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)().select(
                 conn,
-                OrderMask {
+                OrderFilter {
                     store: Some(store_id),
                     ..Default::default()
                 },
@@ -178,7 +147,7 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             (order_repo_factory)().select(
                 conn,
-                OrderMask {
+                OrderFilter {
                     customer: Some(customer),
                     ..Default::default()
                 },
@@ -186,22 +155,11 @@ impl OrderService for OrderServiceImpl {
         }))
     }
 
-    fn delete_order(&self, order_id: OrderId) -> ServiceFuture<()> {
+    fn delete_order(&self, order_id: OrderIdentifier) -> ServiceFuture<()> {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(
             self.db_pool
-                .run(move |conn| {
-                    (order_repo_factory)()
-                        .delete(
-                            Box::new(conn),
-                            OrderMask {
-                                id: Some(order_id),
-                                ..Default::default()
-                            },
-                        )
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
-                })
+                .run(move |conn| (order_repo_factory)().delete(conn, OrderFilter::from(order_id)))
                 .map(|_| ()),
         )
     }

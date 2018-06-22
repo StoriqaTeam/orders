@@ -9,7 +9,7 @@ const TIMESTAMP_COLUMN: &'static str = "datetime";
 const CHANGE_COLUMN: &'static str = "change";
 const DIFF_COLUMN: &'static str = "diff";
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
 #[postgres(name = "order_id")]
 pub struct OrderDiffId(pub Uuid);
 

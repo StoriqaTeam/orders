@@ -14,11 +14,11 @@ const STORE_ID_COLUMN: &'static str = "store_id";
 
 #[derive(Clone, Debug)]
 pub struct NewCartProduct {
-    pub user_id: CartProductId,
-    pub product_id: i32,
-    pub quantity: i32,
+    pub user_id: UserId,
+    pub product_id: ProductId,
+    pub quantity: Quantity,
     pub selected: bool,
-    pub store_id: i32,
+    pub store_id: StoreId,
 }
 
 impl Inserter for NewCartProduct {
@@ -32,7 +32,7 @@ impl Inserter for NewCartProduct {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum CartProductInserter {
     Upserter(NewCartProduct),
     CollisionNoOp(NewCartProduct),
@@ -55,11 +55,11 @@ impl Inserter for CartProductInserter {
 #[derive(Clone, Debug)]
 pub struct CartProduct {
     pub id: CartProductId,
-    pub user_id: i32,
+    pub user_id: UserId,
     pub product_id: ProductId,
-    pub quantity: i32,
+    pub quantity: Quantity,
     pub selected: bool,
-    pub store_id: i32,
+    pub store_id: StoreId,
 }
 
 impl CartProduct {
@@ -93,11 +93,11 @@ impl From<Row> for CartProduct {
 #[derive(Clone, Debug, Default)]
 pub struct CartProductMask {
     pub id: Option<CartProductId>,
-    pub user_id: Option<Range<i32>>,
-    pub product_id: Option<Range<i32>>,
-    pub quantity: Option<Range<i32>>,
+    pub user_id: Option<Range<UserId>>,
+    pub product_id: Option<Range<ProductId>>,
+    pub quantity: Option<Range<Quantity>>,
     pub selected: Option<bool>,
-    pub store_id: Option<Range<i32>>,
+    pub store_id: Option<Range<StoreId>>,
 }
 
 impl Filter for CartProductMask {

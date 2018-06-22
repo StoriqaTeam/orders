@@ -1,6 +1,6 @@
 use futures::future;
 use futures::prelude::*;
-use std::sync::Arc;
+use std::rc::Rc;
 use stq_db::repo::*;
 use stq_db::statement::*;
 
@@ -12,24 +12,24 @@ use types::*;
 /// Service that provides operations for interacting with user carts
 pub trait CartService {
     /// Get user's cart contents
-    fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    fn get_cart(&self, user_id: UserId) -> ServiceFuture<Cart>;
     /// Increase item's quantity by 1
-    fn increment_item(&self, user_id: i32, product_id: i32, store_id: i32) -> ServiceFuture<Cart>;
+    fn increment_item(&self, user_id: UserId, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
-    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>>;
+    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Option<CartItem>>;
     /// Set selection of the item in user's cart
-    fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>>;
+    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Option<CartItem>>;
     /// Delete item from user's cart
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>>;
+    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Option<CartItem>>;
     /// Clear user's cart
-    fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart>;
+    fn clear_cart(&self, user_id: UserId) -> ServiceFuture<Cart>;
     /// Iterate over cart
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart>;
+    fn list(&self, user_id: UserId, from: ProductId, count: i64) -> ServiceFuture<Cart>;
     /// Merge carts
-    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart>;
+    fn merge(&self, from: UserId, to: UserId) -> ServiceFuture<Cart>;
 }
 
-pub type ProductRepoFactory = Arc<Fn() -> Box<ProductRepo> + Send + Sync>;
+pub type ProductRepoFactory = Rc<Fn() -> Box<ProductRepo>>;
 
 /// Default implementation of user cart service
 pub struct CartServiceImpl {
@@ -42,12 +42,12 @@ impl CartServiceImpl {
     pub fn new(db_pool: DbPool) -> Self {
         Self {
             db_pool,
-            repo_factory: Arc::new(|| Box::new(make_product_repo())),
+            repo_factory: Rc::new(|| Box::new(make_product_repo())),
         }
     }
 }
 
-fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: i32) -> RepoConnectionFuture<Cart> {
+fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, user_id: UserId) -> RepoConnectionFuture<Cart> {
     Box::new(
         (repo_factory)()
             .select(
@@ -69,7 +69,7 @@ fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, us
 }
 
 impl CartService for CartServiceImpl {
-    fn get_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
+    fn get_cart(&self, user_id: UserId) -> ServiceFuture<Cart> {
         debug!("Getting cart for user {}.", user_id);
         Box::new(self.db_pool.run({
             let repo_factory = self.repo_factory.clone();
@@ -77,7 +77,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn increment_item(&self, user_id: i32, product_id: i32, store_id: i32) -> ServiceFuture<Cart> {
+    fn increment_item(&self, user_id: UserId, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart> {
         debug!("Adding 1 item {} into cart for user {}", product_id, user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -142,7 +142,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn set_quantity(&self, user_id: i32, product_id: i32, quantity: i32) -> ServiceFuture<Option<CartItem>> {
+    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Option<CartItem>> {
         debug!("Setting quantity for item {} for user {} to {}", product_id, user_id, quantity);
 
         let repo_factory = self.repo_factory.clone();
@@ -168,7 +168,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn set_selection(&self, user_id: i32, product_id: i32, selected: bool) -> ServiceFuture<Option<CartItem>> {
+    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Option<CartItem>> {
         debug!("Setting selection for item {} for user {} to {}", product_id, user_id, selected);
 
         let repo_factory = self.repo_factory.clone();
@@ -194,7 +194,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn delete_item(&self, user_id: i32, product_id: i32) -> ServiceFuture<Option<CartItem>> {
+    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Option<CartItem>> {
         debug!("Deleting item {} for user {}", product_id, user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -214,7 +214,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn clear_cart(&self, user_id: i32) -> ServiceFuture<Cart> {
+    fn clear_cart(&self, user_id: UserId) -> ServiceFuture<Cart> {
         debug!("Clearing cart for user {}", user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -231,7 +231,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn list(&self, user_id: i32, from: i32, count: i64) -> ServiceFuture<Cart> {
+    fn list(&self, user_id: UserId, from: ProductId, count: i64) -> ServiceFuture<Cart> {
         debug!("Getting {} cart items starting from {} for user {}", count, from, user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -260,7 +260,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn merge(&self, from: i32, to: i32) -> ServiceFuture<Cart> {
+    fn merge(&self, from: UserId, to: UserId) -> ServiceFuture<Cart> {
         debug!("Merging cart contents from user {} to user {}", from, to);
 
         let repo_factory = self.repo_factory.clone();
@@ -272,7 +272,7 @@ impl CartService for CartServiceImpl {
                         (repo_factory)().delete(
                             conn,
                             CartProductMask {
-                                user_id: Some(from),
+                                user_id: Some(from.into()),
                                 ..Default::default()
                             },
                         )

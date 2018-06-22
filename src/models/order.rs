@@ -1,6 +1,7 @@
 use super::common::*;
 use errors::Error;
 
+use chrono::prelude::*;
 use failure;
 use failure::Fail;
 use geo::Point as GeoPoint;
@@ -33,7 +34,8 @@ const ADDRESS_COLUMN: &'static str = "address";
 const PLACE_ID_COLUMN: &'static str = "place_id";
 
 const TRACK_ID_COLUMN: &'static str = "track_id";
-const CREATION_DATE_COLUMN: &'static str = "creation_date";
+const CREATION_DATE_COLUMN: &'static str = "created_at";
+const UPDATE_DATE_COLUMN: &'static str = "updated_at";
 const STATE_ID_COLUMN: &'static str = "state_id";
 const STATE_DATA_COLUMN: &'static str = "state_data";
 const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
@@ -111,7 +113,7 @@ impl OrderState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AddressFull {
     location: Option<GeoPoint<f64>>,
     administrative_area_level_1: Option<String>,
@@ -129,48 +131,60 @@ pub struct AddressFull {
 impl AddressFull {
     pub fn write_into_inserter(self, mut b: InsertBuilder) -> InsertBuilder {
         if let Some(v) = self.location {
-            b = b.with_value(LOCATION_COLUMN, v);
+            b = b.with_arg(LOCATION_COLUMN, v);
         }
         if let Some(v) = self.administrative_area_level_1 {
-            b = b.with_value(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN, v);
+            b = b.with_arg(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN, v);
         }
         if let Some(v) = self.administrative_area_level_2 {
-            b = b.with_value(ADMINISTRATIVE_AREA_LEVEL_2_COLUMN, v);
+            b = b.with_arg(ADMINISTRATIVE_AREA_LEVEL_2_COLUMN, v);
         }
         if let Some(v) = self.country {
-            b = b.with_value(COUNTRY_COLUMN, v);
+            b = b.with_arg(COUNTRY_COLUMN, v);
         }
         if let Some(v) = self.locality {
-            b = b.with_value(LOCALITY_COLUMN, v);
+            b = b.with_arg(LOCALITY_COLUMN, v);
         }
         if let Some(v) = self.political {
-            b = b.with_value(POLITICAL_COLUMN, v);
+            b = b.with_arg(POLITICAL_COLUMN, v);
         }
         if let Some(v) = self.postal_code {
-            b = b.with_value(POSTAL_CODE_COLUMN, v);
+            b = b.with_arg(POSTAL_CODE_COLUMN, v);
         }
         if let Some(v) = self.route {
-            b = b.with_value(ROUTE_COLUMN, v);
+            b = b.with_arg(ROUTE_COLUMN, v);
         }
         if let Some(v) = self.street_number {
-            b = b.with_value(STREET_NUMBER_COLUMN, v);
+            b = b.with_arg(STREET_NUMBER_COLUMN, v);
         }
         if let Some(v) = self.address {
-            b = b.with_value(ADDRESS_COLUMN, v);
+            b = b.with_arg(ADDRESS_COLUMN, v);
         }
         if let Some(v) = self.place_id {
-            b = b.with_value(PLACE_ID_COLUMN, v);
+            b = b.with_arg(PLACE_ID_COLUMN, v);
         }
 
         b
     }
 
-    pub fn from_row(row: Row) -> AddressFull {
-        unimplemented!()
+    pub fn from_row(row: &Row) -> Self {
+        Self {
+            location: row.get(LOCATION_COLUMN),
+            administrative_area_level_1: row.get(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN),
+            administrative_area_level_2: row.get(ADMINISTRATIVE_AREA_LEVEL_2_COLUMN),
+            country: row.get(COUNTRY_COLUMN),
+            locality: row.get(LOCALITY_COLUMN),
+            political: row.get(POLITICAL_COLUMN),
+            postal_code: row.get(POSTAL_CODE_COLUMN),
+            route: row.get(ROUTE_COLUMN),
+            street_number: row.get(STREET_NUMBER_COLUMN),
+            address: row.get(ADDRESS_COLUMN),
+            place_id: row.get(PLACE_ID_COLUMN),
+        }
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
 #[postgres(name = "order_id")]
 pub struct OrderId(pub Uuid);
 
@@ -180,16 +194,22 @@ impl OrderId {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[postgres(name = "order_slug")]
+pub struct OrderSlug(pub i32);
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     pub id: OrderId,
-    pub slug: String,
+    pub slug: OrderSlug,
     pub customer: UserId,
     pub store: StoreId,
     pub product: ProductId,
     pub address: AddressFull,
     pub receiver_name: String,
     pub state: OrderState,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<Row> for Order {
@@ -236,7 +256,7 @@ impl Inserter for OrderInserter {
         b = self.address.write_into_inserter(b);
 
         if let Some(v) = self.track_id {
-            b = b.with_value(TRACK_ID_COLUMN, v);
+            b = b.with_arg(TRACK_ID_COLUMN, v);
         }
 
         b
@@ -245,10 +265,28 @@ impl Inserter for OrderInserter {
 
 pub type AddressMask = AddressFull;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum OrderIdentifier {
+    Id(OrderId),
+    Slug(OrderSlug),
+}
+
+pub struct OrderSearchTerms {
+    pub timestamp_from: Option<i64>,
+    pub timestamp_to: Option<i64>,
+    pub paid: Option<bool>,
+    pub user_id: Option<UserId>,
+}
+
+pub enum OrderSearchFilter {
+    Id(OrderIdentifier),
+    Terms(OrderSearchTerms),
+}
+
 #[derive(Clone, Debug, Default)]
-pub struct OrderMask {
+pub struct OrderFilter {
     pub id: Option<OrderId>,
-    pub slug: Option<String>,
+    pub slug: Option<OrderSlug>,
     pub customer: Option<UserId>,
     pub store: Option<StoreId>,
     pub product: Option<ProductId>,
@@ -258,7 +296,56 @@ pub struct OrderMask {
     pub track_id: Option<String>,
 }
 
-impl Filter for OrderMask {
+impl From<OrderIdentifier> for OrderFilter {
+    fn from(v: OrderIdentifier) -> Self {
+        use self::OrderIdentifier::*;
+
+        match v {
+            Id(id) => Self {
+                id: Some(id),
+                ..Default::default()
+            },
+            Slug(slug) => Self {
+                slug: Some(slug),
+                ..Default::default()
+            },
+        }
+    }
+}
+
+impl From<OrderSearchTerms> for OrderFilter {
+    fn from(v: OrderSearchTerms) -> Self {
+        let mut mask = Default::default();
+
+        if v.timestamp_from.is_some() && v.timestamp_to.is_some() {
+            mask.timestamp = Range::Between((
+                RangeLimit {
+                    value: v.timestamp_from.unwrap(),
+                    inclusive: true,
+                },
+                RangeLimit {
+                    value: v.timestamp_to.unwrap(),
+                    inclusive: true,
+                },
+            ));
+        }
+
+        mask
+    }
+}
+
+impl From<OrderSearchFilter> for OrderFilter {
+    fn from(v: OrderSearchFilter) -> Self {
+        use self::OrderSearchFilter::*;
+
+        match v {
+            Id(id) => id.into(),
+            Terms(terms) => terms.into(),
+        }
+    }
+}
+
+impl Filter for OrderFilter {
     fn into_filtered_operation_builder(self, table: &'static str) -> FilteredOperationBuilder {
         let mut b = FilteredOperationBuilder::new(table);
 
@@ -287,7 +374,7 @@ pub struct OrderUpdateData {
 }
 
 pub struct OrderUpdate {
-    pub mask: OrderMask,
+    pub mask: OrderFilter,
     pub data: OrderUpdateData,
 }
 

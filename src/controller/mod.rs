@@ -5,8 +5,8 @@ use futures::future;
 use futures::prelude::*;
 use hyper;
 use hyper::{Delete, Get, Headers, Post, Put, Request};
+use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use stq_http::controller::{Controller, ControllerFuture};
 use stq_http::request_util::{parse_body, serialize_future};
@@ -22,36 +22,36 @@ use self::routing::*;
 use types::*;
 
 pub struct ServiceFactory {
-    pub cart_factory: Arc<Fn() -> Box<CartService>>,
-    pub order_factory: Arc<Fn() -> Box<OrderService>>,
+    pub cart_factory: Rc<Fn() -> Box<CartService>>,
+    pub order_factory: Rc<Fn() -> Box<OrderService>>,
 }
 
 pub struct ControllerImpl {
-    route_parser: Arc<RouteParser<Route>>,
-    service_factory: Arc<ServiceFactory>,
+    route_parser: Rc<RouteParser<Route>>,
+    service_factory: Rc<ServiceFactory>,
 }
 
 impl ControllerImpl {
     pub fn new(db_pool: DbPool, _config: Config) -> Self {
-        let cart_factory = Arc::new({
+        let cart_factory = Rc::new({
             let db_pool = db_pool.clone();
             move || Box::new(CartServiceImpl::new(db_pool.clone())) as Box<CartService>
         });
         ControllerImpl {
-            service_factory: Arc::new(ServiceFactory {
-                order_factory: Arc::new({
+            service_factory: Rc::new(ServiceFactory {
+                order_factory: Rc::new({
                     let cart_factory = cart_factory.clone();
                     move || {
                         Box::new(OrderServiceImpl {
                             db_pool: db_pool.clone(),
                             cart_service_factory: cart_factory.clone(),
-                            order_repo_factory: Arc::new(|| Box::new(make_order_repo())),
+                            order_repo_factory: Rc::new(|| Box::new(make_order_repo())),
                         })
                     }
                 }),
                 cart_factory,
             }),
-            route_parser: Arc::new(routing::make_router()),
+            route_parser: Rc::new(routing::make_router()),
         }
     }
 }
@@ -71,13 +71,13 @@ pub fn extract_user_id(headers: Headers) -> Box<Future<Item = UserId, Error = fa
                         .into()
                 })
                 .and_then(|string_id| {
-                    UserId::from_str(&string_id).map_err(|e| {
-                        e.context(Error::UserIdParse)
-                            .context(format!("Failed to parse user ID: {}", string_id))
+                    i32::from_str(&string_id).map(UserId).map_err(|e| {
+                        e.context(format!("Failed to parse user ID: {}", string_id))
+                            .context(Error::UserIdParse)
                             .into()
                     })
                 }),
-        ).inspect(|user_id| debug!("Extracted user_id: {}", user_id)),
+        ).inspect(|user_id| debug!("Extracted user_id: {}", user_id.0)),
     )
 }
 
@@ -97,7 +97,7 @@ impl Controller for ControllerImpl {
                     match (method, route) {
                         (Get, Some(Route::Cart)) => {
                             if let (Some(from), Some(count)) =
-                                parse_query!(uri.query().unwrap_or_default(), "offset" => i32, "count" => i64)
+                                parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i64)
                             {
                                 debug!(
                                     "Received request for user {} to get {} products starting from {}",
@@ -106,7 +106,7 @@ impl Controller for ControllerImpl {
                                 serialize_future((service_factory.cart_factory)().list(user_id, from, count))
                             } else {
                                 serialize_future::<String, _, _>(future::err(
-                                    Error::ParseError.context("Error parsing request from gateway body"),
+                                    format_err!("Error parsing request from gateway body").context(Error::ParseError),
                                 ))
                             }
                         }
@@ -161,16 +161,17 @@ impl Controller for ControllerImpl {
                         }),
                         (Post, Some(Route::OrderFromCart)) => serialize_future({
                             debug!("Received request to convert cart into orders for user {}", user_id);
-                            Box::new((service_factory.order_factory)().convert_cart(user_id))
-                        }),
-                        (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
-                            debug!("Received request to set order status");
-                            parse_body::<OrderState>(payload).and_then(move |order_status| {
-                                Box::new((service_factory.order_factory)().set_order_state(order_id, order_status))
+                            parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {
+                                Box::new((service_factory.order_factory)().convert_cart(
+                                    user_id,
+                                    payload.address,
+                                    payload.receiver_name,
+                                    payload.comment,
+                                ))
                             })
                         }),
                         (Delete, Some(Route::Order { order_id })) => serialize_future({
-                            debug!("Received request to delete order {}", order_id);
+                            debug!("Received request to delete order {:?}", order_id);
                             Box::new((service_factory.order_factory)().delete_order(order_id))
                         }),
                         // Fallback

@@ -1,40 +1,51 @@
 use super::*;
 use std::collections::HashMap;
 
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[postgres(name = "quantity")]
+pub struct Quantity(pub i32);
+
 fn return_true() -> bool {
     true
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CartItemInfo {
-    pub quantity: i32,
+    pub quantity: Quantity,
     #[serde(default = "return_true")]
     pub selected: bool,
-    pub store_id: i32,
+    pub store_id: StoreId,
 }
 
 pub type Cart = HashMap<ProductId, CartItemInfo>;
 
-pub type CartProductQuantityPayload = SetterPayload<i32>;
+pub type CartProductQuantityPayload = SetterPayload<Quantity>;
 pub type CartProductSelectionPayload = SetterPayload<bool>;
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CartProductIncrementPayload {
-    pub store_id: i32,
+    pub store_id: StoreId,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CartMergePayload {
-    pub user_from: i32,
+    pub user_from: UserId,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConvertCartPayload {
+    pub comment: String,
+    pub receiver_name: String,
+    pub address: AddressFull,
 }
 
 /// Model for vectorized cart
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CartItem {
     pub product_id: ProductId,
-    pub quantity: i32,
+    pub quantity: Quantity,
     pub selected: bool,
-    pub store_id: i32,
+    pub store_id: StoreId,
 }
 
 impl From<(ProductId, CartItemInfo)> for CartItem {

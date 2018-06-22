@@ -1,11 +1,6 @@
-use super::UserId;
-
-use futures::prelude::*;
-use futures_state_stream::StateStream;
-use stq_db::repo::*;
-use tokio_postgres::types::ToSql;
-
 use models::*;
+
+use stq_db::repo::*;
 
 static TABLE: &'static str = "cart_items";
 

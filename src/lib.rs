@@ -2,6 +2,8 @@ extern crate bb8;
 extern crate bb8_postgres;
 extern crate chrono;
 extern crate config as config_crate;
+#[macro_use]
+extern crate derive_more;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
@@ -11,8 +13,6 @@ extern crate geo;
 extern crate hyper;
 #[macro_use]
 extern crate log as log_crate;
-#[cfg_attr(test, macro_use)]
-extern crate maplit;
 extern crate postgres;
 #[macro_use]
 extern crate postgres_derive;

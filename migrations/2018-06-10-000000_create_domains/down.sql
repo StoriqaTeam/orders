@@ -1,5 +1,9 @@
+DROP DOMAIN cart_item_id;
 DROP DOMAIN quantity;
 DROP DOMAIN user_id;
 DROP DOMAIN store_id;
 DROP DOMAIN product_id;
 DROP DOMAIN warehouse_id;
+DROP DOMAIN order_id;
+DROP DOMAIN order_slug;
+DROP DOMAIN order_diff_id;
