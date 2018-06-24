@@ -130,7 +130,7 @@ impl Filter for CartProductMask {
 
 #[derive(Clone, Debug, Default)]
 pub struct CartProductUpdateData {
-    pub quantity: Option<i32>,
+    pub quantity: Option<Quantity>,
     pub selected: Option<bool>,
 }
 
@@ -146,12 +146,12 @@ impl Updater for CartProductUpdate {
 
         let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
-        if let Some(selected) = data.selected {
-            b = b.with_value(SELECTED_COLUMN, selected);
+        if let Some(v) = data.selected {
+            b = b.with_value(SELECTED_COLUMN, v);
         }
 
-        if let Some(quantity) = data.quantity {
-            b = b.with_value(QUANTITY_COLUMN, quantity);
+        if let Some(v) = data.quantity {
+            b = b.with_value(QUANTITY_COLUMN, v);
         }
 
         b

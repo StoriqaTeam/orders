@@ -22,18 +22,18 @@ fn test_carts_service() {
         base_url,
     } = common::setup();
 
-    let user_id = 777;
-    let user_id_2 = 24361345;
+    let user_id = UserId(777);
+    let user_id_2 = UserId(24361345);
 
-    let store_id = 1337;
-    let product_id = 12345;
-    let quantity = 9000;
+    let store_id = StoreId(1337);
+    let product_id = ProductId(12345);
+    let quantity = Quantity(9000);
 
-    let product_id_2 = 67890;
-    let mut quantity_2 = 0;
+    let product_id_2 = ProductId(67890);
+    let mut quantity_2 = Quantity(0);
 
-    let product_id_3 = 88888;
-    let quantity_3 = 9002;
+    let product_id_3 = ProductId(88888);
+    let quantity_3 = Quantity(9002);
 
     for id in vec![user_id, user_id_2] {
         assert_eq!(
@@ -56,7 +56,7 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
                 store_id,
             },
@@ -72,7 +72,7 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
                 store_id,
             },
@@ -96,7 +96,7 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
                 store_id,
             },
@@ -122,7 +122,7 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
                 store_id,
             },
@@ -159,7 +159,7 @@ fn test_carts_service() {
         }
     );
 
-    quantity_2 += 1;
+    quantity_2.0 += 1;
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
@@ -182,7 +182,7 @@ fn test_carts_service() {
         },
     );
 
-    quantity_2 += 1;
+    quantity_2.0 += 1;
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(

@@ -97,7 +97,7 @@ impl Controller for ControllerImpl {
                     match (method, route) {
                         (Get, Some(Route::Cart)) => {
                             if let (Some(from), Some(count)) =
-                                parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i64)
+                                parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i32)
                             {
                                 debug!(
                                     "Received request for user {} to get {} products starting from {}",

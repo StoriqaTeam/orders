@@ -24,7 +24,7 @@ pub trait CartService {
     /// Clear user's cart
     fn clear_cart(&self, user_id: UserId) -> ServiceFuture<Cart>;
     /// Iterate over cart
-    fn list(&self, user_id: UserId, from: ProductId, count: i64) -> ServiceFuture<Cart>;
+    fn list(&self, user_id: UserId, from: ProductId, count: i32) -> ServiceFuture<Cart>;
     /// Merge carts
     fn merge(&self, from: UserId, to: UserId) -> ServiceFuture<Cart>;
 }
@@ -53,7 +53,7 @@ fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, us
             .select(
                 conn,
                 CartProductMask {
-                    user_id: Some(user_id),
+                    user_id: Some(user_id.into()),
                     ..Default::default()
                 },
             )
@@ -90,8 +90,8 @@ impl CartService for CartServiceImpl {
                             (repo_factory)().select(
                                 conn,
                                 CartProductMask {
-                                    user_id: Some(user_id),
-                                    product_id: Some(product_id),
+                                    user_id: Some(user_id.into()),
+                                    product_id: Some(product_id.into()),
                                     ..Default::default()
                                 },
                             )
@@ -101,13 +101,13 @@ impl CartService for CartServiceImpl {
                         let repo_factory = repo_factory.clone();
                         move |(products, conn)| {
                             let new_product = if let Some(mut product) = products.first().cloned() {
-                                product.quantity += 1;
+                                product.quantity.0 += 1;
                                 product.decompose().1
                             } else {
                                 NewCartProduct {
                                     user_id,
                                     product_id,
-                                    quantity: 1,
+                                    quantity: Quantity(1),
                                     selected: true,
                                     store_id,
                                 }
@@ -121,7 +121,7 @@ impl CartService for CartServiceImpl {
                             (repo_factory)().select(
                                 conn,
                                 CartProductMask {
-                                    user_id: Some(user_id),
+                                    user_id: Some(user_id.into()),
                                     ..Default::default()
                                 },
                             )
@@ -153,18 +153,18 @@ impl CartService for CartServiceImpl {
                         conn,
                         CartProductUpdate {
                             mask: CartProductMask {
-                                user_id: Some(user_id),
-                                product_id: Some(product_id),
+                                user_id: Some(user_id.into()),
+                                product_id: Some(product_id.into()),
                                 ..Default::default()
                             },
                             data: CartProductUpdateData {
-                                quantity: Some(quantity),
+                                quantity: Some(quantity.into()),
                                 ..Default::default()
                             },
                         },
                     )
                 })
-                .map(|mut v| v.pop()),
+                .map(|mut v| v.pop().map(CartItem::from)),
         )
     }
 
@@ -179,18 +179,18 @@ impl CartService for CartServiceImpl {
                         conn,
                         CartProductUpdate {
                             mask: CartProductMask {
-                                user_id: Some(user_id),
-                                product_id: Some(product_id),
+                                user_id: Some(user_id.into()),
+                                product_id: Some(product_id.into()),
                                 ..Default::default()
                             },
                             data: CartProductUpdateData {
-                                selected: Some(selected),
+                                selected: Some(selected.into()),
                                 ..Default::default()
                             },
                         },
                     )
                 })
-                .map(|mut v| v.pop()),
+                .map(|mut v| v.pop().map(CartItem::from)),
         )
     }
 
@@ -204,8 +204,8 @@ impl CartService for CartServiceImpl {
                     (repo_factory)().delete(
                         conn,
                         CartProductMask {
-                            user_id: Some(user_id),
-                            product_id: Some(product_id),
+                            user_id: Some(user_id.into()),
+                            product_id: Some(product_id.into()),
                             ..Default::default()
                         },
                     )
@@ -218,20 +218,22 @@ impl CartService for CartServiceImpl {
         debug!("Clearing cart for user {}", user_id);
 
         let repo_factory = self.repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (repo_factory)()
-                .delete(
-                    Box::new(conn),
-                    CartProductMask {
-                        user_id: Some(user_id),
-                        ..Default::default()
-                    },
-                )
-                .and_then(move |(_, conn)| get_cart_from_repo(repo_factory, conn, user_id))
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)().delete(
+                        conn,
+                        CartProductMask {
+                            user_id: Some(user_id.into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .map(|_| Default::default()),
+        )
     }
 
-    fn list(&self, user_id: UserId, from: ProductId, count: i64) -> ServiceFuture<Cart> {
+    fn list(&self, user_id: UserId, from: ProductId, count: i32) -> ServiceFuture<Cart> {
         debug!("Getting {} cart items starting from {} for user {}", count, from, user_id);
 
         let repo_factory = self.repo_factory.clone();
@@ -240,23 +242,17 @@ impl CartService for CartServiceImpl {
                 .select_full(
                     conn,
                     CartProductMask {
-                        user_id: user_id,
+                        user_id: Some(user_id.into()),
                         product_id: Some(Range::From(RangeLimit {
                             value: from,
                             inclusive: true,
                         })),
-
                         ..Default::default()
                     },
+                    Some(count),
+                    None,
                 )
-                .map(|(products, conn)| {
-                    let mut cart = Cart::default();
-                    for product in products.into_iter() {
-                        let (id, info) = product.into();
-                        cart.insert(id, info);
-                    }
-                    (cart, conn)
-                })
+                .map(|(products, conn)| (products.into_iter().map(<(ProductId, CartItemInfo)>::from).collect::<Cart>(), conn))
         }))
     }
 

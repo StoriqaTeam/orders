@@ -13,10 +13,12 @@ const DIFF_COLUMN: &'static str = "diff";
 #[postgres(name = "order_id")]
 pub struct OrderDiffId(pub Uuid);
 
+pub type ChangeType = String;
+
 pub struct OrderDiff {
     pub id: OrderDiffId,
     pub parent: OrderId,
     pub committer: UserId,
     pub timestamp: i64,
-    pub state: OrderState,
+    pub change: ChangeType,
 }

@@ -34,8 +34,8 @@ const ADDRESS_COLUMN: &'static str = "address";
 const PLACE_ID_COLUMN: &'static str = "place_id";
 
 const TRACK_ID_COLUMN: &'static str = "track_id";
-const CREATION_DATE_COLUMN: &'static str = "created_at";
-const UPDATE_DATE_COLUMN: &'static str = "updated_at";
+const CREATED_AT_COLUMN: &'static str = "created_at";
+const UPDATED_AT_COLUMN: &'static str = "updated_at";
 const STATE_ID_COLUMN: &'static str = "state_id";
 const STATE_DATA_COLUMN: &'static str = "state_data";
 const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
@@ -208,8 +208,8 @@ pub struct Order {
     pub address: AddressFull,
     pub receiver_name: String,
     pub state: OrderState,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 impl From<Row> for Order {
@@ -224,6 +224,8 @@ impl From<Row> for Order {
             product: row.get(PRODUCT_COLUMN),
             address: AddressFull::from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
+            created_at: row.get(CREATED_AT_COLUMN),
+            updated_at: row.get(UPDATED_AT_COLUMN),
             state: OrderState::from_db(state_id.as_str(), state_data).unwrap(),
         }
     }
@@ -265,6 +267,7 @@ impl Inserter for OrderInserter {
 
 pub type AddressMask = AddressFull;
 
+/// Anything that can uniquely identify an Order
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum OrderIdentifier {
     Id(OrderId),
@@ -272,8 +275,8 @@ pub enum OrderIdentifier {
 }
 
 pub struct OrderSearchTerms {
-    pub timestamp_from: Option<i64>,
-    pub timestamp_to: Option<i64>,
+    pub created_from: Option<i64>,
+    pub created_to: Option<i64>,
     pub paid: Option<bool>,
     pub user_id: Option<UserId>,
 }
@@ -292,6 +295,8 @@ pub struct OrderFilter {
     pub product: Option<ProductId>,
     pub address: AddressMask,
     pub receiver_name: Option<String>,
+    pub created_at: Option<Range<NaiveDateTime>>,
+    pub updated_at: Option<Range<NaiveDateTime>>,
     pub state: Option<OrderState>,
     pub track_id: Option<String>,
 }
@@ -313,34 +318,58 @@ impl From<OrderIdentifier> for OrderFilter {
     }
 }
 
-impl From<OrderSearchTerms> for OrderFilter {
-    fn from(v: OrderSearchTerms) -> Self {
-        let mut mask = Default::default();
+impl OrderSearchTerms {
+    fn make_filter(self) -> Result<OrderFilter, failure::Error> {
+        let mut mask = OrderFilter::default();
 
-        if v.timestamp_from.is_some() && v.timestamp_to.is_some() {
-            mask.timestamp = Range::Between((
-                RangeLimit {
-                    value: v.timestamp_from.unwrap(),
-                    inclusive: true,
+        mask.created_at = if self.created_from.is_some() && self.created_to.is_some() {
+            Some(Range::Between((
+                {
+                    let ts = self.created_from.unwrap();
+                    RangeLimit {
+                        value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                        inclusive: true,
+                    }
                 },
-                RangeLimit {
-                    value: v.timestamp_to.unwrap(),
-                    inclusive: true,
+                {
+                    let ts = self.created_to.unwrap();
+                    RangeLimit {
+                        value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                        inclusive: true,
+                    }
                 },
-            ));
-        }
+            )))
+        } else if self.created_from.is_some() {
+            Some(Range::From({
+                let ts = self.created_from.unwrap();
+                RangeLimit {
+                    value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                    inclusive: true,
+                }
+            }))
+        } else if self.created_to.is_some() {
+            Some(Range::To({
+                let ts = self.created_to.unwrap();
+                RangeLimit {
+                    value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                    inclusive: true,
+                }
+            }))
+        } else {
+            None
+        };
 
-        mask
+        Ok(mask)
     }
 }
 
-impl From<OrderSearchFilter> for OrderFilter {
-    fn from(v: OrderSearchFilter) -> Self {
+impl OrderSearchFilter {
+    fn make_filter(self) -> Result<OrderFilter, failure::Error> {
         use self::OrderSearchFilter::*;
 
-        match v {
-            Id(id) => id.into(),
-            Terms(terms) => terms.into(),
+        match self {
+            Id(id) => Ok(id.into()),
+            Terms(terms) => terms.make_filter(),
         }
     }
 }
@@ -362,7 +391,9 @@ impl Filter for OrderFilter {
         }
 
         if let Some(v) = self.state {
-            b = b.with_filter(STATE_ID_COLUMN, v);
+            // TODO: Should we filter by state_data too?
+            let (state_id, _state_data) = v.into_db();
+            b = b.with_filter(STATE_ID_COLUMN, state_id);
         }
 
         b
@@ -385,7 +416,7 @@ impl Updater for OrderUpdate {
         let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
         if let Some(state) = data.state {
-            let (state_id, state_data) = state.into();
+            let (state_id, state_data) = state.into_db();
             b = b.with_value(STATE_ID_COLUMN, state_id).with_value(STATE_DATA_COLUMN, state_data);
         }
 

@@ -6,7 +6,6 @@ use types::*;
 
 use futures::future;
 use futures::prelude::*;
-use std::collections::HashMap;
 use std::rc::Rc;
 use stq_db::repo::*;
 
@@ -21,71 +20,56 @@ pub trait OrderService {
     fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>>;
 }
 
-pub type CartServiceFactory = Rc<Fn() -> Box<CartService>>;
-
 pub struct OrderServiceImpl {
-    pub cart_service_factory: CartServiceFactory,
+    pub cart_service_factory: Rc<Fn() -> Box<CartService>>,
     pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub db_pool: DbPool,
 }
 
 struct OrderItem {
-    product_id: i32,
-    store_id: i32,
-    quantity: i32,
+    product_id: ProductId,
+    store_id: StoreId,
+    quantity: Quantity,
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(&self, user_id: UserId, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<Vec<Order>> {
+    fn convert_cart(&self, customer_id: UserId, address: AddressFull, receiver_name: String, comment: String) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let cart_service_factory = self.cart_service_factory.clone();
 
         Box::new(
             (cart_service_factory)()
-                .get_cart(user_id)
-                // Get store ID for each cart product
-                .and_then(|cart: Cart| {
-                    future::result(cart.into_iter().map(|(product_id, cart_item_info)| {
-                        if cart_item_info.store_id < 0 {
-                            return Err(format_err!("Invalid store ID for product {}: {}", product_id, cart_item_info.store_id)).into()
+                .get_cart(customer_id)
+                // Create orders from cart items
+                .map(move |cart: Cart| {
+                    cart.into_iter().filter(|(_, cart_item_info)| cart_item_info.selected).map(|(product_id, item)| {
+                        OrderInserter {
+                            id: OrderId::new(),
+                            customer: customer_id,
+                            store: item.store_id,
+                            product: product_id,
+                            address: address.clone(),
+                            receiver_name: receiver_name.clone(),
+                            state: OrderState::New(NewData {comment: comment.clone()}),
+                            track_id: None,
                         }
-
-                        Ok(OrderItem {
-                            product_id,
-                            store_id: cart_item_info.store_id,
-                            quantity: cart_item_info.quantity,
-                        })
-                    }).collect::<Result<Vec<_>, RepoError>>())
-                })
-                // Create orders from OrderItems
-                .map({
-                    let db_pool = self.db_pool.clone();
-                    let order_repo_factory = order_repo_factory.clone();
-                    move |cart: Vec<OrderItem>| {
-                        cart.map(move |item| {
-                            Order {
-                                id: OrderId::new(),
-                                receiver_name: receiver_name.clone(),
-
-                            }
-                        })
-                    }
+                    }).collect::<Vec<_>>()
                 })
                         // Insert new orders into database
                         .and_then({
                             let db_pool = self.db_pool.clone();
-                            move |new_orders_by_store| {
+                            move |new_orders| {
                                 db_pool.run(move |conn| {
-                                    let mut out: RepoConnectionFuture<HashMap<i32, Order>>;
+                                    let mut out: RepoConnectionFuture<Vec<Order>>;
                                     out = Box::new(future::ok((Default::default(), conn)));
 
-                                    for (store_id, new_order) in new_orders_by_store.into_iter() {
+                                    for new_order in new_orders.into_iter() {
                                         out = Box::new(out.and_then({
                                             let order_repo_factory = order_repo_factory.clone();
                                             move |(mut out_data, conn)| {
                                                 (order_repo_factory)().insert_exactly_one(conn, new_order).map({
                                                     move |(order, conn)| {
-                                                        out_data.insert(store_id, order);
+                                                        out_data.push(order);
                                                         (out_data, conn)
                                                     }
                                                 })
@@ -102,17 +86,15 @@ impl OrderService for OrderServiceImpl {
                             let cart_service_factory = cart_service_factory.clone();
                             move |out_data| {
                                 let mut out: ServiceFuture<()> = Box::new(future::ok(()));
-                                for (_store_id, order) in &out_data {
-                                    for (product_id, _) in &order.products {
+                                for order in &out_data {
                                         out = Box::new(out.and_then({
-                                            let user_id = user_id.clone();
-                                            let product_id = product_id.clone();
+                                            let user_id = order.customer;
+                                            let product_id = order.product;
                                             let cart_service_factory = cart_service_factory.clone();
                                             move |_| {
                                                 (cart_service_factory)().delete_item(user_id, product_id).map(|_| ())
                                             }
                                         }));
-                                    }
                                 }
                                 out.map(move |_| out_data)
                             }

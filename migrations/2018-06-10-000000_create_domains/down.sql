@@ -1,3 +1,4 @@
+DROP EXTENSION IF EXISTS "uuid-ossp";
 DROP DOMAIN cart_item_id;
 DROP DOMAIN quantity;
 DROP DOMAIN user_id;
