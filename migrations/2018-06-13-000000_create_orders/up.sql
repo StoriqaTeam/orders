@@ -1,11 +1,12 @@
+DROP TABLE IF EXISTS orders;
 CREATE SEQUENCE order_id_seq;
 CREATE TABLE orders (
-    id                          order_id PRIMARY KEY,
-    slug                        VARCHAR UNIQUE NOT NULL DEFAULT nextval('order_id_seq')::text,
+    id                          order_id PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slug                        order_slug UNIQUE NOT NULL DEFAULT nextval('order_id_seq'),
     store                       store_id NOT NULL,
     customer                    user_id NOT NULL,
     product                     product_id NOT NULL,
-    price                       NUMERIC NOT NULL,
+    price                       DOUBLE PRECISION NOT NULL,
     quantity                    quantity NOT NULL,
     subtotal                    NUMERIC NOT NULL,
     receiver_name               VARCHAR,
@@ -24,7 +25,6 @@ CREATE TABLE orders (
     created_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     updated_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     state                       VARCHAR,
-    state_data                  VARCHAR,
     payment_status              BOOLEAN,
     delivery_company            VARCHAR NOT NULL
 );

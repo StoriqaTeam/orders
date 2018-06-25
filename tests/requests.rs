@@ -114,7 +114,7 @@ fn test_carts_service() {
                 h.set(Authorization(user_id.to_string()));
 
                 let mut c = Cookie::new();
-                c.set("SESSION_ID", (user_id + 1000).to_string());
+                c.set("SESSION_ID", UserId(user_id.0 + 1000).to_string());
 
                 h.set(c);
                 h
@@ -262,7 +262,7 @@ fn test_carts_service() {
         let user_from = user_id_2;
         let to_user = user_id;
         let from_existing_product_id = product_id_2;
-        let from_existing_product_quantity = 912673;
+        let from_existing_product_quantity = Quantity(912673);
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
@@ -272,15 +272,15 @@ fn test_carts_service() {
             )).unwrap(),
             hashmap! {
                 from_existing_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
                     store_id,
                 },
             },
         );
 
-        let from_new_product_id = 2351143;
-        let from_new_product_quantity = 2324;
+        let from_new_product_id = ProductId(2351143);
+        let from_new_product_quantity = Quantity(2324);
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
@@ -290,12 +290,12 @@ fn test_carts_service() {
             )).unwrap(),
             hashmap! {
                 from_existing_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
                     store_id,
                 },
                 from_new_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
                     store_id,
                 },

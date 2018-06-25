@@ -1,10 +1,6 @@
 use super::*;
 use std::collections::HashMap;
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
-#[postgres(name = "quantity")]
-pub struct Quantity(pub i32);
-
 fn return_true() -> bool {
     true
 }
@@ -34,9 +30,12 @@ pub struct CartMergePayload {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConvertCartPayload {
-    pub comment: String,
+    pub customer_id: UserId,
+    pub comments: Option<String>,
     pub receiver_name: String,
+    #[serde(flatten)]
     pub address: AddressFull,
+    pub prices: HashMap<ProductId, ProductPrice>,
 }
 
 /// Model for vectorized cart

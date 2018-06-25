@@ -4,9 +4,9 @@ use stq_db::repo::*;
 
 static TABLE: &'static str = "cart_items";
 
-pub trait ProductRepo: DbRepo<CartProduct, CartProductInserter, CartProductMask, CartProductUpdate, RepoError> {}
+pub trait ProductRepo: DbRepo<CartProduct, CartProductInserter, CartProductMask, CartProductUpdater, RepoError> {}
 
-pub type ProductRepoImpl = DbRepoImpl<CartProduct, CartProductInserter, CartProductMask, CartProductUpdate>;
+pub type ProductRepoImpl = DbRepoImpl<CartProduct, CartProductInserter, CartProductMask, CartProductUpdater>;
 
 impl ProductRepo for ProductRepoImpl {}
 

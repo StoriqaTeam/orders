@@ -135,12 +135,12 @@ pub struct CartProductUpdateData {
 }
 
 #[derive(Clone, Debug)]
-pub struct CartProductUpdate {
+pub struct CartProductUpdater {
     pub mask: CartProductMask,
     pub data: CartProductUpdateData,
 }
 
-impl Updater for CartProductUpdate {
+impl Updater for CartProductUpdater {
     fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
         let Self { mask, data } = self;
 

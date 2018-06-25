@@ -151,7 +151,7 @@ impl CartService for CartServiceImpl {
                 .run(move |conn| {
                     (repo_factory)().update(
                         conn,
-                        CartProductUpdate {
+                        CartProductUpdater {
                             mask: CartProductMask {
                                 user_id: Some(user_id.into()),
                                 product_id: Some(product_id.into()),
@@ -177,7 +177,7 @@ impl CartService for CartServiceImpl {
                 .run(move |conn| {
                     (repo_factory)().update(
                         conn,
-                        CartProductUpdate {
+                        CartProductUpdater {
                             mask: CartProductMask {
                                 user_id: Some(user_id.into()),
                                 product_id: Some(product_id.into()),

@@ -1,12 +1,12 @@
 use super::common::*;
-use errors::Error;
+use errors::*;
 
 use chrono::prelude::*;
 use failure;
-use failure::Fail;
 use geo::Point as GeoPoint;
-use serde_json;
-use serde_json::Value;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
@@ -18,7 +18,6 @@ const STORE_COLUMN: &'static str = "column";
 const PRODUCT_COLUMN: &'static str = "product";
 const PRICE_COLUMN: &'static str = "price";
 const QUANTITY_COLUMN: &'static str = "quantity";
-const SUBTOTAL_COLUMN: &'static str = "subtotal";
 const RECEIVER_NAME_COLUMN: &'static str = "receiver_name";
 
 const LOCATION_COLUMN: &'static str = "location";
@@ -36,80 +35,66 @@ const PLACE_ID_COLUMN: &'static str = "place_id";
 const TRACK_ID_COLUMN: &'static str = "track_id";
 const CREATED_AT_COLUMN: &'static str = "created_at";
 const UPDATED_AT_COLUMN: &'static str = "updated_at";
-const STATE_ID_COLUMN: &'static str = "state_id";
-const STATE_DATA_COLUMN: &'static str = "state_data";
+const STATE_COLUMN: &'static str = "state";
 const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
 const DELIVERY_COMPANY_COLUMN: &'static str = "delivery_company";
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct NewData {
-    pub comment: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct PaidData {
-    pub comment: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct InProcessingData {
-    pub comment: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct CancelledData {
-    pub comment: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct SentData {
-    pub comment: String,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "id", content = "data")]
 pub enum OrderState {
     /// State set on order creation.
     #[serde(rename = "new")]
-    New(NewData), // on creation
+    New,
     /// Set after payment by request of billing
     #[serde(rename = "paid")]
-    Paid(PaidData),
+    Paid,
     /// Order is being processed by store management
     #[serde(rename = "in_processing")]
-    InProcessing(InProcessingData),
+    InProcessing,
     /// Can be cancelled by any party before order being sent.
     #[serde(rename = "cancelled")]
-    Cancelled(CancelledData),
+    Cancelled,
     /// Wares are on their way to the customer. Tracking ID must be set.
     #[serde(rename = "sent")]
-    Sent(SentData),
+    Sent,
+    /// Order is complete.
+    #[serde(rename = "complete")]
+    Complete,
 }
 
-impl OrderState {
-    pub fn into_db(self) -> (String, Value) {
-        use self::OrderState::*;
+impl FromStr for OrderState {
+    type Err = failure::Error;
 
-        match self {
-            New(data) => ("new".to_string(), serde_json::to_value(data).unwrap()),
-            Paid(data) => ("paid".to_string(), serde_json::to_value(data).unwrap()),
-            InProcessing(data) => ("in_processing".to_string(), serde_json::to_value(data).unwrap()),
-            Cancelled(data) => ("cancelled".to_string(), serde_json::to_value(data).unwrap()),
-            Sent(data) => ("sent".to_string(), serde_json::to_value(data).unwrap()),
-        }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "new" => OrderState::New,
+            "paid" => OrderState::Paid,
+            "in_processing" => OrderState::InProcessing,
+            "cancelled" => OrderState::Cancelled,
+            "sent" => OrderState::Sent,
+            "complete" => OrderState::Complete,
+            other => {
+                return Err(format_err!("Invalid order state: {}", other).context(Error::ParseError).into());
+            }
+        })
     }
+}
 
-    pub fn from_db<'a>(state_id: &'a str, state_data: Value) -> Result<Self, failure::Error> {
+impl Display for OrderState {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use self::OrderState::*;
 
-        match state_id {
-            "new" => Ok(New(serde_json::from_value(state_data)?)),
-            "paid" => Ok(Paid(serde_json::from_value(state_data)?)),
-            "in_processing" => Ok(InProcessing(serde_json::from_value(state_data)?)),
-            "cancelled" => Ok(Cancelled(serde_json::from_value(state_data)?)),
-            "sent" => Ok(Sent(serde_json::from_value(state_data)?)),
-            other => Err(Error::ParseError.context(format!("Unknown state_id {}", other)).into()),
-        }
+        write!(
+            f,
+            "{}",
+            match self {
+                New => "new",
+                Paid => "paid",
+                InProcessing => "in_processing",
+                Cancelled => "cancelled",
+                Sent => "sent",
+                Complete => "complete",
+            }
+        )
     }
 }
 
@@ -205,28 +190,38 @@ pub struct Order {
     pub customer: UserId,
     pub store: StoreId,
     pub product: ProductId,
+    pub price: ProductPrice,
+    pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
     pub state: OrderState,
+    pub payment_status: bool,
+    pub delivery_company: Option<String>,
+    pub track_id: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
 
 impl From<Row> for Order {
     fn from(row: Row) -> Self {
-        let state_id: String = row.get(STATE_ID_COLUMN);
-        let state_data: Value = row.get(STATE_DATA_COLUMN);
+        let id = row.get(ID_COLUMN);
+        let state_id: String = row.get(STATE_COLUMN);
         Self {
-            id: row.get(ID_COLUMN),
+            id,
             slug: row.get(SLUG_COLUMN),
             customer: row.get(CUSTOMER_COLUMN),
             store: row.get(STORE_COLUMN),
             product: row.get(PRODUCT_COLUMN),
+            price: row.get(PRICE_COLUMN),
+            quantity: row.get(QUANTITY_COLUMN),
             address: AddressFull::from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
+            payment_status: row.get(PAYMENT_STATUS_COLUMN),
+            delivery_company: row.get(DELIVERY_COMPANY_COLUMN),
             created_at: row.get(CREATED_AT_COLUMN),
             updated_at: row.get(UPDATED_AT_COLUMN),
-            state: OrderState::from_db(state_id.as_str(), state_data).unwrap(),
+            track_id: row.get(TRACK_ID_COLUMN),
+            state: OrderState::from_str(&state_id).expect(&format!("Invalid order state ({}) in DB record {}", state_id, id)),
         }
     }
 }
@@ -237,23 +232,26 @@ pub struct OrderInserter {
     pub customer: UserId,
     pub store: StoreId,
     pub product: ProductId,
+    pub price: ProductPrice,
+    pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
+    pub delivery_company: Option<String>,
     pub state: OrderState,
     pub track_id: Option<String>,
 }
 
 impl Inserter for OrderInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        let (state_id, state_data) = self.state.into_db();
         let mut b = InsertBuilder::new(table)
             .with_arg(ID_COLUMN, self.id)
             .with_arg(CUSTOMER_COLUMN, self.customer)
             .with_arg(STORE_COLUMN, self.store)
             .with_arg(PRODUCT_COLUMN, self.product)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
-            .with_arg(STATE_ID_COLUMN, state_id)
-            .with_arg(STATE_DATA_COLUMN, state_data);
+            .with_arg(PRICE_COLUMN, self.price)
+            .with_arg(QUANTITY_COLUMN, self.quantity)
+            .with_arg(STATE_COLUMN, self.state.to_string());
 
         b = self.address.write_into_inserter(b);
 
@@ -288,17 +286,18 @@ pub enum OrderSearchFilter {
 
 #[derive(Clone, Debug, Default)]
 pub struct OrderFilter {
-    pub id: Option<OrderId>,
-    pub slug: Option<OrderSlug>,
-    pub customer: Option<UserId>,
-    pub store: Option<StoreId>,
-    pub product: Option<ProductId>,
+    pub id: Option<ValueContainer<OrderId>>,
+    pub slug: Option<ValueContainer<OrderSlug>>,
+    pub customer: Option<ValueContainer<UserId>>,
+    pub store: Option<ValueContainer<StoreId>>,
+    pub product: Option<ValueContainer<ProductId>>,
     pub address: AddressMask,
-    pub receiver_name: Option<String>,
-    pub created_at: Option<Range<NaiveDateTime>>,
-    pub updated_at: Option<Range<NaiveDateTime>>,
-    pub state: Option<OrderState>,
-    pub track_id: Option<String>,
+    pub receiver_name: Option<ValueContainer<String>>,
+    pub created_at: Option<ValueContainer<Range<NaiveDateTime>>>,
+    pub updated_at: Option<ValueContainer<Range<NaiveDateTime>>>,
+    pub state: Option<ValueContainer<OrderState>>,
+    pub delivery_company: Option<ValueContainer<Option<String>>>,
+    pub track_id: Option<ValueContainer<Option<String>>>,
 }
 
 impl From<OrderIdentifier> for OrderFilter {
@@ -307,11 +306,11 @@ impl From<OrderIdentifier> for OrderFilter {
 
         match v {
             Id(id) => Self {
-                id: Some(id),
+                id: Some(id.into()),
                 ..Default::default()
             },
             Slug(slug) => Self {
-                slug: Some(slug),
+                slug: Some(slug.into()),
                 ..Default::default()
             },
         }
@@ -323,38 +322,44 @@ impl OrderSearchTerms {
         let mut mask = OrderFilter::default();
 
         mask.created_at = if self.created_from.is_some() && self.created_to.is_some() {
-            Some(Range::Between((
-                {
+            Some(
+                Range::Between((
+                    {
+                        let ts = self.created_from.unwrap();
+                        RangeLimit {
+                            value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                            inclusive: true,
+                        }
+                    },
+                    {
+                        let ts = self.created_to.unwrap();
+                        RangeLimit {
+                            value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                            inclusive: true,
+                        }
+                    },
+                )).into(),
+            )
+        } else if self.created_from.is_some() {
+            Some(
+                Range::From({
                     let ts = self.created_from.unwrap();
                     RangeLimit {
                         value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
                         inclusive: true,
                     }
-                },
-                {
+                }).into(),
+            )
+        } else if self.created_to.is_some() {
+            Some(
+                Range::To({
                     let ts = self.created_to.unwrap();
                     RangeLimit {
                         value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
                         inclusive: true,
                     }
-                },
-            )))
-        } else if self.created_from.is_some() {
-            Some(Range::From({
-                let ts = self.created_from.unwrap();
-                RangeLimit {
-                    value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
-                    inclusive: true,
-                }
-            }))
-        } else if self.created_to.is_some() {
-            Some(Range::To({
-                let ts = self.created_to.unwrap();
-                RangeLimit {
-                    value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
-                    inclusive: true,
-                }
-            }))
+                }).into(),
+            )
         } else {
             None
         };
@@ -379,21 +384,19 @@ impl Filter for OrderFilter {
         let mut b = FilteredOperationBuilder::new(table);
 
         if let Some(v) = self.id {
-            b = b.with_filter(ID_COLUMN, v);
+            b = b.with_filter(ID_COLUMN, v.value);
         }
 
         if let Some(v) = self.slug {
-            b = b.with_filter(SLUG_COLUMN, v);
+            b = b.with_filter(SLUG_COLUMN, v.value);
         }
 
         if let Some(v) = self.customer {
-            b = b.with_filter(CUSTOMER_COLUMN, v);
+            b = b.with_filter(CUSTOMER_COLUMN, v.value);
         }
 
         if let Some(v) = self.state {
-            // TODO: Should we filter by state_data too?
-            let (state_id, _state_data) = v.into_db();
-            b = b.with_filter(STATE_ID_COLUMN, state_id);
+            b = b.with_filter(STATE_COLUMN, v.value.to_string());
         }
 
         b
@@ -404,20 +407,19 @@ pub struct OrderUpdateData {
     pub state: Option<OrderState>,
 }
 
-pub struct OrderUpdate {
+pub struct OrderUpdater {
     pub mask: OrderFilter,
     pub data: OrderUpdateData,
 }
 
-impl Updater for OrderUpdate {
+impl Updater for OrderUpdater {
     fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
-        let OrderUpdate { mask, data } = self;
+        let OrderUpdater { mask, data } = self;
 
         let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
         if let Some(state) = data.state {
-            let (state_id, state_data) = state.into_db();
-            b = b.with_value(STATE_ID_COLUMN, state_id).with_value(STATE_DATA_COLUMN, state_data);
+            b = b.with_value(STATE_COLUMN, state.to_string());
         }
 
         b
