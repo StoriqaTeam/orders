@@ -8,3 +8,4 @@ CREATE DOMAIN warehouse_id  AS UUID;
 CREATE DOMAIN order_id      AS UUID;
 CREATE DOMAIN order_slug    AS INTEGER CHECK (VALUE > 0);
 CREATE DOMAIN order_diff_id AS UUID;
+CREATE DOMAIN role_id       AS UUID;
