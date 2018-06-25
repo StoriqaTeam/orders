@@ -286,7 +286,7 @@ impl CartService for CartServiceImpl {
                                 let mut new_cart_product = product.decompose().1;
                                 new_cart_product.user_id = to;
                                 (repo_factory)()
-                                    .insert(conn, CartProductInserter::Upserter(new_cart_product))
+                                    .insert(conn, CartProductInserter::CollisionNoOp(new_cart_product))
                                     .map(|(_, conn)| ((), conn))
                             }));
                         }
