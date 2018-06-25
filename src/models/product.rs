@@ -3,7 +3,9 @@ use super::*;
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 
-pub type CartProductId = i32;
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[postgres(name = "cart_item_id")]
+pub struct CartItemId(pub i32);
 
 const ID_COLUMN: &'static str = "id";
 const USER_ID_COLUMN: &'static str = "user_id";
@@ -54,7 +56,7 @@ impl Inserter for CartProductInserter {
 /// Base unit of user's product selection
 #[derive(Clone, Debug)]
 pub struct CartProduct {
-    pub id: CartProductId,
+    pub id: CartItemId,
     pub user_id: UserId,
     pub product_id: ProductId,
     pub quantity: Quantity,
@@ -63,7 +65,7 @@ pub struct CartProduct {
 }
 
 impl CartProduct {
-    pub fn decompose(self) -> (CartProductId, NewCartProduct) {
+    pub fn decompose(self) -> (CartItemId, NewCartProduct) {
         (
             self.id,
             NewCartProduct {
@@ -92,7 +94,7 @@ impl From<Row> for CartProduct {
 
 #[derive(Clone, Debug, Default)]
 pub struct CartProductMask {
-    pub id: Option<CartProductId>,
+    pub id: Option<CartItemId>,
     pub user_id: Option<Range<UserId>>,
     pub product_id: Option<Range<ProductId>>,
     pub quantity: Option<Range<Quantity>>,

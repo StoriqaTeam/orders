@@ -15,7 +15,7 @@ pub struct StoreId(pub i32);
 pub struct Quantity(pub i32);
 
 #[derive(Clone, Copy, Debug, Default, Display, FromStr, PartialEq, Serialize, Deserialize, FromSql, ToSql)]
-#[postgres(name = "price")]
+#[postgres(name = "product_price")]
 pub struct ProductPrice(pub f64);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
