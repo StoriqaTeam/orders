@@ -2,8 +2,9 @@ use super::*;
 
 use stq_db::statement::*;
 use tokio_postgres::rows::Row;
+use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "cart_item_id")]
 pub struct CartItemId(pub i32);
 
@@ -26,11 +27,11 @@ pub struct NewCartProduct {
 impl Inserter for NewCartProduct {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         InsertBuilder::new(table)
-            .with_arg(USER_ID_COLUMN, self.user_id)
-            .with_arg(PRODUCT_ID_COLUMN, self.product_id)
-            .with_arg(QUANTITY_COLUMN, self.quantity)
+            .with_arg(USER_ID_COLUMN, self.user_id.0)
+            .with_arg(PRODUCT_ID_COLUMN, self.product_id.0)
+            .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(SELECTED_COLUMN, self.selected)
-            .with_arg(STORE_ID_COLUMN, self.store_id)
+            .with_arg(STORE_ID_COLUMN, self.store_id.0)
     }
 }
 
@@ -94,12 +95,12 @@ impl From<Row> for CartProduct {
 
 #[derive(Clone, Debug, Default)]
 pub struct CartProductMask {
-    pub id: Option<CartItemId>,
-    pub user_id: Option<Range<UserId>>,
-    pub product_id: Option<Range<ProductId>>,
-    pub quantity: Option<Range<Quantity>>,
+    pub id: Option<Uuid>,
+    pub user_id: Option<Range<i32>>,
+    pub product_id: Option<Range<i32>>,
+    pub quantity: Option<Range<i32>>,
     pub selected: Option<bool>,
-    pub store_id: Option<Range<StoreId>>,
+    pub store_id: Option<Range<i32>>,
 }
 
 impl Filter for CartProductMask {
@@ -153,7 +154,7 @@ impl Updater for CartProductUpdater {
         }
 
         if let Some(v) = data.quantity {
-            b = b.with_value(QUANTITY_COLUMN, v);
+            b = b.with_value(QUANTITY_COLUMN, v.0);
         }
 
         b

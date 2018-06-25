@@ -13,7 +13,7 @@ const TIMESTAMP_COLUMN: &'static str = "datetime";
 const STATE_COLUMN: &'static str = "state";
 const COMMENT_COLUMN: &'static str = "comment";
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "order_id")]
 pub struct OrderDiffId(pub Uuid);
 
@@ -50,8 +50,8 @@ pub struct OrderDiffInserter {
 impl Inserter for OrderDiffInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         InsertBuilder::new(table)
-            .with_arg(PARENT_COLUMN, self.parent)
-            .with_arg(COMMITTER_COLUMN, self.committer)
+            .with_arg(PARENT_COLUMN, self.parent.0)
+            .with_arg(COMMITTER_COLUMN, self.committer.0)
             .with_arg(TIMESTAMP_COLUMN, self.timestamp)
             .with_arg(STATE_COLUMN, self.state.to_string())
             .with_arg(COMMENT_COLUMN, self.comment)

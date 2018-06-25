@@ -169,7 +169,7 @@ impl AddressFull {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "order_id")]
 pub struct OrderId(pub Uuid);
 
@@ -179,7 +179,7 @@ impl OrderId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "order_slug")]
 pub struct OrderSlug(pub i32);
 
@@ -244,13 +244,13 @@ pub struct OrderInserter {
 impl Inserter for OrderInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         let mut b = InsertBuilder::new(table)
-            .with_arg(ID_COLUMN, self.id)
-            .with_arg(CUSTOMER_COLUMN, self.customer)
-            .with_arg(STORE_COLUMN, self.store)
-            .with_arg(PRODUCT_COLUMN, self.product)
+            .with_arg(ID_COLUMN, self.id.0)
+            .with_arg(CUSTOMER_COLUMN, self.customer.0)
+            .with_arg(STORE_COLUMN, self.store.0)
+            .with_arg(PRODUCT_COLUMN, self.product.0)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
-            .with_arg(PRICE_COLUMN, self.price)
-            .with_arg(QUANTITY_COLUMN, self.quantity)
+            .with_arg(PRICE_COLUMN, self.price.0)
+            .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(STATE_COLUMN, self.state.to_string());
 
         b = self.address.write_into_inserter(b);
@@ -384,15 +384,15 @@ impl Filter for OrderFilter {
         let mut b = FilteredOperationBuilder::new(table);
 
         if let Some(v) = self.id {
-            b = b.with_filter(ID_COLUMN, v.value);
+            b = b.with_filter(ID_COLUMN, v.value.0);
         }
 
         if let Some(v) = self.slug {
-            b = b.with_filter(SLUG_COLUMN, v.value);
+            b = b.with_filter(SLUG_COLUMN, v.value.0);
         }
 
         if let Some(v) = self.customer {
-            b = b.with_filter(CUSTOMER_COLUMN, v.value);
+            b = b.with_filter(CUSTOMER_COLUMN, v.value.0);
         }
 
         if let Some(v) = self.state {

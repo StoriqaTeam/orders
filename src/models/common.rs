@@ -1,20 +1,20 @@
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "user_id")]
 pub struct UserId(pub i32);
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "product_id")]
 pub struct ProductId(pub i32);
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "store_id")]
 pub struct StoreId(pub i32);
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
 #[postgres(name = "quantity")]
 pub struct Quantity(pub i32);
 
-#[derive(Clone, Copy, Debug, Default, Display, FromStr, PartialEq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Clone, Copy, Debug, Default, Display, FromStr, PartialEq, Serialize, Deserialize, FromSql)]
 #[postgres(name = "product_price")]
 pub struct ProductPrice(pub f64);
 
