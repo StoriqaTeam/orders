@@ -111,11 +111,11 @@ impl Filter for CartProductMask {
         }
 
         if let Some(v) = self.product_id {
-            b = b.with_filter(PRODUCT_ID_COLUMN, v.convert::<i32>());
+            b = b.with_filter::<i32, _>(PRODUCT_ID_COLUMN, v.convert());
         }
 
         if let Some(v) = self.user_id {
-            b = b.with_filter(USER_ID_COLUMN, v.convert::<i32>());
+            b = b.with_filter::<i32, _>(USER_ID_COLUMN, v.convert());
         }
 
         if let Some(v) = self.selected {
@@ -123,7 +123,7 @@ impl Filter for CartProductMask {
         }
 
         if let Some(v) = self.store_id {
-            b = b.with_filter(STORE_ID_COLUMN, v.convert::<i32>());
+            b = b.with_filter::<i32, _>(STORE_ID_COLUMN, v.convert());
         }
 
         b

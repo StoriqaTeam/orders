@@ -1,13 +1,13 @@
 DROP TABLE IF EXISTS orders;
 CREATE SEQUENCE order_id_seq;
 CREATE TABLE orders (
-    id                          order_id PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slug                        order_slug UNIQUE NOT NULL DEFAULT nextval('order_id_seq'),
-    store                       store_id NOT NULL,
-    customer                    user_id NOT NULL,
-    product                     product_id NOT NULL,
-    price                       product_price NOT NULL,
-    quantity                    quantity NOT NULL,
+    id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slug                        INTEGER UNIQUE NOT NULL DEFAULT nextval('order_id_seq'),
+    store                       INTEGER NOT NULL,
+    customer                    INTEGER NOT NULL,
+    product                     INTEGER NOT NULL,
+    price                       DOUBLE PRECISION NOT NULL,
+    quantity                    INTEGER NOT NULL,
     receiver_name               VARCHAR,
     location                    POINT,
     administrative_area_level_1 VARCHAR,
