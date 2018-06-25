@@ -55,7 +55,7 @@ fn get_cart_from_repo(repo_factory: ProductRepoFactory, conn: RepoConnection, us
             .select(
                 conn,
                 CartProductMask {
-                    user_id: Some(user_id.0.into()),
+                    user_id: Some(user_id.into()),
                     ..Default::default()
                 },
             )
@@ -92,8 +92,8 @@ impl CartService for CartServiceImpl {
                             (repo_factory)().select(
                                 conn,
                                 CartProductMask {
-                                    user_id: Some(user_id.0.into()),
-                                    product_id: Some(product_id.0.into()),
+                                    user_id: Some(user_id.into()),
+                                    product_id: Some(product_id.into()),
                                     ..Default::default()
                                 },
                             )
@@ -123,7 +123,7 @@ impl CartService for CartServiceImpl {
                             (repo_factory)().select(
                                 conn,
                                 CartProductMask {
-                                    user_id: Some(user_id.0.into()),
+                                    user_id: Some(user_id.into()),
                                     ..Default::default()
                                 },
                             )
@@ -155,8 +155,8 @@ impl CartService for CartServiceImpl {
                         conn,
                         CartProductUpdater {
                             mask: CartProductMask {
-                                user_id: Some(user_id.0.into()),
-                                product_id: Some(product_id.0.into()),
+                                user_id: Some(user_id.into()),
+                                product_id: Some(product_id.into()),
                                 ..Default::default()
                             },
                             data: CartProductUpdateData {
@@ -181,8 +181,8 @@ impl CartService for CartServiceImpl {
                         conn,
                         CartProductUpdater {
                             mask: CartProductMask {
-                                user_id: Some(user_id.0.into()),
-                                product_id: Some(product_id.0.into()),
+                                user_id: Some(user_id.into()),
+                                product_id: Some(product_id.into()),
                                 ..Default::default()
                             },
                             data: CartProductUpdateData {
@@ -206,8 +206,8 @@ impl CartService for CartServiceImpl {
                     (repo_factory)().delete(
                         conn,
                         CartProductMask {
-                            user_id: Some(user_id.0.into()),
-                            product_id: Some(product_id.0.into()),
+                            user_id: Some(user_id.into()),
+                            product_id: Some(product_id.into()),
                             ..Default::default()
                         },
                     )
@@ -226,7 +226,7 @@ impl CartService for CartServiceImpl {
                     (repo_factory)().delete(
                         conn,
                         CartProductMask {
-                            user_id: Some(user_id.0.into()),
+                            user_id: Some(user_id.into()),
                             ..Default::default()
                         },
                     )
@@ -244,9 +244,9 @@ impl CartService for CartServiceImpl {
                 .select_full(
                     conn,
                     CartProductMask {
-                        user_id: Some(user_id.0.into()),
+                        user_id: Some(user_id.into()),
                         product_id: Some(Range::From(RangeLimit {
-                            value: from.0,
+                            value: from,
                             inclusive: true,
                         })),
                         ..Default::default()
@@ -270,7 +270,7 @@ impl CartService for CartServiceImpl {
                         (repo_factory)().delete(
                             conn,
                             CartProductMask {
-                                user_id: Some(from.0.into()),
+                                user_id: Some(from.into()),
                                 ..Default::default()
                             },
                         )

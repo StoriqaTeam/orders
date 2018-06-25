@@ -4,8 +4,7 @@ use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
-#[postgres(name = "cart_item_id")]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CartItemId(pub i32);
 
 const ID_COLUMN: &'static str = "id";
@@ -83,12 +82,12 @@ impl CartProduct {
 impl From<Row> for CartProduct {
     fn from(row: Row) -> Self {
         Self {
-            id: row.get(ID_COLUMN),
-            user_id: row.get(USER_ID_COLUMN),
-            product_id: row.get(PRODUCT_ID_COLUMN),
-            quantity: row.get(QUANTITY_COLUMN),
+            id: CartItemId(row.get(ID_COLUMN)),
+            user_id: UserId(row.get(USER_ID_COLUMN)),
+            product_id: ProductId(row.get(PRODUCT_ID_COLUMN)),
+            quantity: Quantity(row.get(QUANTITY_COLUMN)),
             selected: row.get(SELECTED_COLUMN),
-            store_id: row.get(STORE_ID_COLUMN),
+            store_id: StoreId(row.get(STORE_ID_COLUMN)),
         }
     }
 }
@@ -96,11 +95,11 @@ impl From<Row> for CartProduct {
 #[derive(Clone, Debug, Default)]
 pub struct CartProductMask {
     pub id: Option<Uuid>,
-    pub user_id: Option<Range<i32>>,
-    pub product_id: Option<Range<i32>>,
-    pub quantity: Option<Range<i32>>,
+    pub user_id: Option<Range<UserId>>,
+    pub product_id: Option<Range<ProductId>>,
+    pub quantity: Option<Range<Quantity>>,
     pub selected: Option<bool>,
-    pub store_id: Option<Range<i32>>,
+    pub store_id: Option<Range<StoreId>>,
 }
 
 impl Filter for CartProductMask {
@@ -112,11 +111,11 @@ impl Filter for CartProductMask {
         }
 
         if let Some(v) = self.product_id {
-            b = b.with_filter(PRODUCT_ID_COLUMN, v);
+            b = b.with_filter(PRODUCT_ID_COLUMN, v.convert::<i32>());
         }
 
         if let Some(v) = self.user_id {
-            b = b.with_filter(USER_ID_COLUMN, v);
+            b = b.with_filter(USER_ID_COLUMN, v.convert::<i32>());
         }
 
         if let Some(v) = self.selected {
@@ -124,7 +123,7 @@ impl Filter for CartProductMask {
         }
 
         if let Some(v) = self.store_id {
-            b = b.with_filter(STORE_ID_COLUMN, v);
+            b = b.with_filter(STORE_ID_COLUMN, v.convert::<i32>());
         }
 
         b

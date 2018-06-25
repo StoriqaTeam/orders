@@ -169,8 +169,7 @@ impl AddressFull {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
-#[postgres(name = "order_id")]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OrderId(pub Uuid);
 
 impl OrderId {
@@ -179,8 +178,7 @@ impl OrderId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
-#[postgres(name = "order_slug")]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OrderSlug(pub i32);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -204,16 +202,16 @@ pub struct Order {
 
 impl From<Row> for Order {
     fn from(row: Row) -> Self {
-        let id = row.get(ID_COLUMN);
+        let id = OrderId(row.get(ID_COLUMN));
         let state_id: String = row.get(STATE_COLUMN);
         Self {
             id,
-            slug: row.get(SLUG_COLUMN),
-            customer: row.get(CUSTOMER_COLUMN),
-            store: row.get(STORE_COLUMN),
-            product: row.get(PRODUCT_COLUMN),
-            price: row.get(PRICE_COLUMN),
-            quantity: row.get(QUANTITY_COLUMN),
+            slug: OrderSlug(row.get(SLUG_COLUMN)),
+            customer: UserId(row.get(CUSTOMER_COLUMN)),
+            store: StoreId(row.get(STORE_COLUMN)),
+            product: ProductId(row.get(PRODUCT_COLUMN)),
+            price: ProductPrice(row.get(PRICE_COLUMN)),
+            quantity: Quantity(row.get(QUANTITY_COLUMN)),
             address: AddressFull::from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
             payment_status: row.get(PAYMENT_STATUS_COLUMN),

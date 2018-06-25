@@ -14,8 +14,6 @@ extern crate hyper;
 #[macro_use]
 extern crate log as log_crate;
 extern crate postgres;
-#[macro_use]
-extern crate postgres_derive;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

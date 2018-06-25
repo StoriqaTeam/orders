@@ -13,8 +13,7 @@ const TIMESTAMP_COLUMN: &'static str = "datetime";
 const STATE_COLUMN: &'static str = "state";
 const COMMENT_COLUMN: &'static str = "comment";
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize, FromSql)]
-#[postgres(name = "order_id")]
+#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OrderDiffId(pub Uuid);
 
 pub struct OrderDiff {
@@ -29,9 +28,9 @@ pub struct OrderDiff {
 impl From<Row> for OrderDiff {
     fn from(row: Row) -> Self {
         Self {
-            id: row.get(ID_COLUMN),
-            parent: row.get(PARENT_COLUMN),
-            committer: row.get(COMMITTER_COLUMN),
+            id: OrderDiffId(row.get(ID_COLUMN)),
+            parent: OrderId(row.get(PARENT_COLUMN)),
+            committer: UserId(row.get(COMMITTER_COLUMN)),
             timestamp: row.get(TIMESTAMP_COLUMN),
             state: OrderState::from_str(&row.get::<String, _>(STATE_COLUMN)).unwrap(),
             comment: row.get(COMMENT_COLUMN),
