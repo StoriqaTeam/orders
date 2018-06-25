@@ -369,7 +369,7 @@ impl OrderSearchTerms {
 }
 
 impl OrderSearchFilter {
-    fn make_filter(self) -> Result<OrderFilter, failure::Error> {
+    pub fn make_filter(self) -> Result<OrderFilter, failure::Error> {
         use self::OrderSearchFilter::*;
 
         match self {

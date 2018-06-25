@@ -39,12 +39,6 @@ pub struct OrderServiceImpl {
     pub calling_user: UserId,
 }
 
-struct OrderItem {
-    product_id: ProductId,
-    store_id: StoreId,
-    quantity: Quantity,
-}
-
 impl OrderService for OrderServiceImpl {
     fn convert_cart(
         &self,

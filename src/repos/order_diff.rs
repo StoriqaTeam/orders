@@ -7,7 +7,7 @@ const TABLE: &'static str = "order_diffs";
 
 pub struct DummyOrderDiffUpdater {}
 impl Updater for DummyOrderDiffUpdater {
-    fn into_update_builder(self, table: &'static str) -> UpdateBuilder {
+    fn into_update_builder(self, _table: &'static str) -> UpdateBuilder {
         unreachable!()
     }
 }

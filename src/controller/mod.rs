@@ -35,7 +35,7 @@ impl ControllerImpl {
     pub fn new(db_pool: DbPool, _config: Config) -> Self {
         let cart_factory = Rc::new({
             let db_pool = db_pool.clone();
-            move |calling_user| Box::new(CartServiceImpl::new(db_pool.clone())) as Box<CartService>
+            move |calling_user| Box::new(CartServiceImpl::new(calling_user,db_pool.clone())) as Box<CartService>
         });
         ControllerImpl {
             service_factory: Rc::new(ServiceFactory {
@@ -73,7 +73,7 @@ pub fn extract_user_id(headers: Headers) -> Box<Future<Item = UserId, Error = fa
                         .into()
                 })
                 .and_then(|string_id| {
-                    i32::from_str(&string_id).map(UserId).map_err(|e| {
+                    FromStr::from_str(&string_id).map(UserId).map_err(|e| {
                         e.context(format!("Failed to parse user ID: {}", string_id))
                             .context(Error::UserIdParse)
                             .into()

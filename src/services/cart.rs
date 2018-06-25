@@ -33,14 +33,16 @@ pub type ProductRepoFactory = Rc<Fn() -> Box<ProductRepo>>;
 
 /// Default implementation of user cart service
 pub struct CartServiceImpl {
+    calling_user: UserId,
     db_pool: DbPool,
     repo_factory: ProductRepoFactory,
 }
 
 impl CartServiceImpl {
     /// Create new cart service with provided DB connection pool
-    pub fn new(db_pool: DbPool) -> Self {
+    pub fn new(calling_user: UserId, db_pool: DbPool) -> Self {
         Self {
+            calling_user,
             db_pool,
             repo_factory: Rc::new(|| Box::new(make_product_repo())),
         }
