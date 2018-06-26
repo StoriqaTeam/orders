@@ -10,6 +10,7 @@ pub enum Route {
     CartProduct { product_id: ProductId },
     CartProductQuantity { product_id: ProductId },
     CartProductSelection { product_id: ProductId },
+    CartProductComment { product_id: ProductId },
     CartClear,
     CartMerge,
     OrderFromCart,
@@ -47,6 +48,12 @@ pub fn make_router() -> RouteParser<Route> {
             .get(0)
             .and_then(|string_id| string_id.parse().ok())
             .map(|product_id| Route::CartProductSelection { product_id })
+    });
+    route_parser.add_route_with_params(r"^/cart/products/(\d+)/comment$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok())
+            .map(|product_id| Route::CartProductComment { product_id })
     });
     route_parser.add_route(r"^/cart/products$", || Route::CartProducts);
     route_parser.add_route(r"^/cart/clear$", || Route::CartClear);

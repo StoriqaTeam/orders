@@ -58,6 +58,7 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -74,6 +75,7 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -98,6 +100,7 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -124,6 +127,7 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -140,6 +144,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: true,
+            comment: String::new(),
             store_id,
         },
     );
@@ -155,6 +160,23 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            comment: String::new(),
+            store_id,
+        }
+    );
+
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<CartItem>(
+            Method::Put,
+            format!("{}/cart/products/{}/comment", base_url, product_id),
+            Some(serde_json::to_string(&CartProductCommentPayload { value: "MyComment".into() }).unwrap()),
+            Some(user_id.to_string()),
+        )).unwrap(),
+        CartItem {
+            product_id,
+            quantity,
+            selected: false,
+            comment: "MyComment".into(),
             store_id,
         }
     );
@@ -172,11 +194,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -195,11 +219,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -226,11 +252,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -247,11 +275,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -274,6 +304,7 @@ fn test_carts_service() {
                 from_existing_product_id => CartItemInfo {
                     quantity: Quantity(1),
                     selected: true,
+                comment: String::new(),
                     store_id,
                 },
             },
@@ -292,11 +323,13 @@ fn test_carts_service() {
                 from_existing_product_id => CartItemInfo {
                     quantity: Quantity(1),
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
                 from_new_product_id => CartItemInfo {
                     quantity: Quantity(1),
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
             },
@@ -319,6 +352,7 @@ fn test_carts_service() {
                 product_id: from_existing_product_id,
                 quantity: from_existing_product_quantity,
                 selected: true,
+                comment: String::new(),
                 store_id,
             }),
         );
@@ -340,6 +374,7 @@ fn test_carts_service() {
                 product_id: from_new_product_id,
                 quantity: from_new_product_quantity,
                 selected: true,
+                comment: String::new(),
                 store_id,
             }),
         );
@@ -355,16 +390,19 @@ fn test_carts_service() {
                 product_id => CartItemInfo {
                     quantity,
                     selected: false,
+                    comment: "MyComment".into(),
                     store_id,
                 },
                 product_id_2 => CartItemInfo {
                     quantity: quantity_2,
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
                 from_new_product_id => CartItemInfo {
                     quantity: from_new_product_quantity,
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 }
             },
@@ -383,6 +421,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            comment: "MyComment".into(),
             store_id,
         },
     );

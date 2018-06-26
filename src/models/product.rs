@@ -12,6 +12,7 @@ const USER_ID_COLUMN: &'static str = "user_id";
 const PRODUCT_ID_COLUMN: &'static str = "product_id";
 const QUANTITY_COLUMN: &'static str = "quantity";
 const SELECTED_COLUMN: &'static str = "selected";
+const COMMENT_COLUMN: &'static str = "comment";
 const STORE_ID_COLUMN: &'static str = "store_id";
 
 #[derive(Clone, Debug)]
@@ -20,6 +21,7 @@ pub struct NewCartProduct {
     pub product_id: ProductId,
     pub quantity: Quantity,
     pub selected: bool,
+    pub comment: String,
     pub store_id: StoreId,
 }
 
@@ -32,6 +34,7 @@ impl NewCartProduct {
 
             quantity: Quantity(1),
             selected: true,
+            comment: String::new(),
         }
     }
 }
@@ -43,6 +46,7 @@ impl Inserter for NewCartProduct {
             .with_arg(PRODUCT_ID_COLUMN, self.product_id.0)
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(SELECTED_COLUMN, self.selected)
+            .with_arg(COMMENT_COLUMN, self.comment)
             .with_arg(STORE_ID_COLUMN, self.store_id.0)
     }
 }
@@ -74,6 +78,7 @@ pub struct CartProduct {
     pub product_id: ProductId,
     pub quantity: Quantity,
     pub selected: bool,
+    pub comment: String,
     pub store_id: StoreId,
 }
 
@@ -86,6 +91,7 @@ impl CartProduct {
                 product_id: self.product_id,
                 quantity: self.quantity,
                 selected: self.selected,
+                comment: self.comment,
                 store_id: self.store_id,
             },
         )
@@ -100,6 +106,7 @@ impl From<Row> for CartProduct {
             product_id: ProductId(row.get(PRODUCT_ID_COLUMN)),
             quantity: Quantity(row.get(QUANTITY_COLUMN)),
             selected: row.get(SELECTED_COLUMN),
+            comment: row.get(COMMENT_COLUMN),
             store_id: StoreId(row.get(STORE_ID_COLUMN)),
         }
     }
@@ -112,6 +119,7 @@ pub struct CartProductMask {
     pub product_id: Option<Range<ProductId>>,
     pub quantity: Option<Range<Quantity>>,
     pub selected: Option<bool>,
+    pub comment: Option<String>,
     pub store_id: Option<Range<StoreId>>,
 }
 
@@ -135,6 +143,10 @@ impl Filter for CartProductMask {
             b = b.with_filter(SELECTED_COLUMN, v);
         }
 
+        if let Some(v) = self.comment {
+            b = b.with_filter(COMMENT_COLUMN, v);
+        }
+
         if let Some(v) = self.store_id {
             b = b.with_filter::<i32, _>(STORE_ID_COLUMN, v.convert());
         }
@@ -147,6 +159,7 @@ impl Filter for CartProductMask {
 pub struct CartProductUpdateData {
     pub quantity: Option<Quantity>,
     pub selected: Option<bool>,
+    pub comment: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -167,6 +180,10 @@ impl Updater for CartProductUpdater {
 
         if let Some(v) = data.quantity {
             b = b.with_value(QUANTITY_COLUMN, v.0);
+        }
+
+        if let Some(v) = data.comment {
+            b = b.with_value(COMMENT_COLUMN, v);
         }
 
         b

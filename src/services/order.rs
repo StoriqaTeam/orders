@@ -20,7 +20,6 @@ pub trait OrderService {
         prices: HashMap<ProductId, ProductPrice>,
         address: AddressFull,
         receiver_name: String,
-        comment: Option<String>,
     ) -> ServiceFuture<Vec<Order>>;
     // fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
@@ -47,7 +46,6 @@ impl OrderService for OrderServiceImpl {
         prices: HashMap<ProductId, ProductPrice>,
         address: AddressFull,
         receiver_name: String,
-        comment: Option<String>,
     ) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
@@ -64,7 +62,7 @@ impl OrderService for OrderServiceImpl {
                         if item.selected {
                             let price = prices.get(&product_id).cloned().ok_or(failure::Error::from(Error::MissingPrice))?;
 
-                            order_items.push(OrderInserter {
+                            order_items.push((OrderInserter {
                                 id: OrderId::new(),
                                 customer: customer_id,
                                 store: item.store_id,
@@ -76,7 +74,7 @@ impl OrderService for OrderServiceImpl {
                                 state: OrderState::New,
                                 delivery_company: None,
                                 track_id: None,
-                            })
+                            }, item.comment))
                         }
                     }
                     Ok(order_items)
@@ -89,7 +87,7 @@ impl OrderService for OrderServiceImpl {
                                     let mut out: RepoConnectionFuture<Vec<Order>>;
                                     out = Box::new(future::ok((Default::default(), conn)));
 
-                                    for new_order in new_orders.into_iter() {
+                                    for (new_order, comment) in new_orders.into_iter() {
                                         out = Box::new(out.and_then({
                                             let comment = comment.clone();
                                             let order_repo_factory = order_repo_factory.clone();
@@ -102,7 +100,7 @@ impl OrderService for OrderServiceImpl {
                                                         committer: calling_user,
                                                         timestamp: Utc::now().naive_utc(),
                                                         state: OrderState::New,
-                                                        comment: comment.clone(),
+                                                        comment: Some(comment),
                                                     }).map(|(_, conn)| (inserted_order, conn))
                                                 }).map({
                                                     move |(order, conn): (Order, RepoConnection)| {

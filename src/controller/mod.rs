@@ -151,6 +151,22 @@ impl Controller for ControllerImpl {
                                     (service_factory.cart_factory)(calling_user).set_selection(calling_user, product_id, params.value)
                                 }),
                         ),
+                        (Put, Some(Route::CartProductComment { product_id })) => serialize_future(
+                            parse_body::<CartProductCommentPayload>(payload)
+                                .inspect(move |comment_payload| {
+                                    debug!(
+                                        "Received request to set product {}'s comment in user {}'s cart to {}",
+                                        product_id, calling_user, comment_payload.value
+                                    )
+                                })
+                                .and_then(move |comment_payload| {
+                                    (service_factory.cart_factory)(calling_user).set_comment(
+                                        calling_user,
+                                        product_id,
+                                        comment_payload.value,
+                                    )
+                                }),
+                        ),
                         (Post, Some(Route::CartIncrementProduct { product_id })) => serialize_future({
                             parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
                                 debug!(
@@ -172,9 +188,8 @@ impl Controller for ControllerImpl {
                             Box::new((service_factory.order_factory)(calling_user).get_orders_for_user(calling_user))
                         }),
                         (Post, Some(Route::OrderSearch)) => serialize_future({
-                            parse_body::<OrderSearchTerms>(payload).and_then(move |terms| {
-                                Box::new((service_factory.order_factory)(calling_user).search(terms))
-                            })
+                            parse_body::<OrderSearchTerms>(payload)
+                                .and_then(move |terms| Box::new((service_factory.order_factory)(calling_user).search(terms)))
                         }),
                         (Post, Some(Route::OrderFromCart)) => serialize_future({
                             debug!("Received request to convert cart into orders for user {}", calling_user);
@@ -184,7 +199,6 @@ impl Controller for ControllerImpl {
                                     payload.prices,
                                     payload.address,
                                     payload.receiver_name,
-                                    payload.comments,
                                 ))
                             })
                         }),

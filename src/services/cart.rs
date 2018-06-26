@@ -19,6 +19,8 @@ pub trait CartService {
     fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Option<CartItem>>;
     /// Set selection of the item in user's cart
     fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Option<CartItem>>;
+    /// Set comment for item in user's cart
+    fn set_comment(&self, user_id: UserId, product_id: ProductId, comment: String) -> ServiceFuture<Option<CartItem>>;
     /// Delete item from user's cart
     fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Option<CartItem>>;
     /// Clear user's cart
@@ -165,6 +167,32 @@ impl CartService for CartServiceImpl {
                             },
                             data: CartProductUpdateData {
                                 selected: Some(selected.into()),
+                                ..Default::default()
+                            },
+                        },
+                    )
+                })
+                .map(|mut v| v.pop().map(CartItem::from)),
+        )
+    }
+
+    fn set_comment(&self, user_id: UserId, product_id: ProductId, comment: String) -> ServiceFuture<Option<CartItem>> {
+        debug!("Setting comment for item {} for user {} to {}", product_id, user_id, comment);
+
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)().update(
+                        conn,
+                        CartProductUpdater {
+                            mask: CartProductMask {
+                                user_id: Some(user_id.into()),
+                                product_id: Some(product_id.into()),
+                                ..Default::default()
+                            },
+                            data: CartProductUpdateData {
+                                comment: Some(comment.into()),
                                 ..Default::default()
                             },
                         },
