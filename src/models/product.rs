@@ -23,6 +23,19 @@ pub struct NewCartProduct {
     pub store_id: StoreId,
 }
 
+impl NewCartProduct {
+    pub fn new(user_id: UserId, product_id: ProductId, store_id: StoreId) -> Self {
+        NewCartProduct {
+            user_id,
+            product_id,
+            store_id,
+
+            quantity: Quantity(1),
+            selected: true,
+        }
+    }
+}
+
 impl Inserter for NewCartProduct {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         InsertBuilder::new(table)

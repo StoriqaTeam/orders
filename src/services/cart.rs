@@ -106,13 +106,7 @@ impl CartService for CartServiceImpl {
                                 product.quantity.0 += 1;
                                 product.decompose().1
                             } else {
-                                NewCartProduct {
-                                    user_id,
-                                    product_id,
-                                    quantity: Quantity(1),
-                                    selected: true,
-                                    store_id,
-                                }
+                                NewCartProduct::new(user_id, product_id, store_id)
                             };
                             (repo_factory)().insert_exactly_one(conn, CartProductInserter::Upserter(new_product))
                         }
