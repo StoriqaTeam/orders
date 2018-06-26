@@ -28,7 +28,8 @@ pub trait OrderService {
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
     // fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState) -> ServiceFuture<Order>;
-    fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>>;
+    /// Search using the terms provided.
+    fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
 }
 
 pub struct OrderServiceImpl {
@@ -182,8 +183,13 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn search(&self, filter: OrderSearchFilter) -> ServiceFuture<Vec<Order>> {
-        unimplemented!()
+    fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>> {
+        let db_pool = self.db_pool.clone();
+        let order_repo_factory = self.order_repo_factory.clone();
+        Box::new(
+            future::result(terms.make_filter())
+                .and_then(move |filter| db_pool.run(move |conn| (order_repo_factory)().select(conn, filter))),
+        )
     }
 
     /*

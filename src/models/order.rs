@@ -273,13 +273,8 @@ pub enum OrderIdentifier {
 pub struct OrderSearchTerms {
     pub created_from: Option<i64>,
     pub created_to: Option<i64>,
-    pub paid: Option<bool>,
-    pub user_id: Option<UserId>,
-}
-
-pub enum OrderSearchFilter {
-    Id(OrderIdentifier),
-    Terms(OrderSearchTerms),
+    pub payment_status: Option<bool>,
+    pub customer: Option<UserId>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -294,6 +289,7 @@ pub struct OrderFilter {
     pub created_at: Option<ValueContainer<Range<NaiveDateTime>>>,
     pub updated_at: Option<ValueContainer<Range<NaiveDateTime>>>,
     pub state: Option<ValueContainer<OrderState>>,
+    pub payment_status: Option<ValueContainer<bool>>,
     pub delivery_company: Option<ValueContainer<Option<String>>>,
     pub track_id: Option<ValueContainer<Option<String>>>,
 }
@@ -316,7 +312,7 @@ impl From<OrderIdentifier> for OrderFilter {
 }
 
 impl OrderSearchTerms {
-    fn make_filter(self) -> Result<OrderFilter, failure::Error> {
+    pub fn make_filter(self) -> Result<OrderFilter, failure::Error> {
         let mut mask = OrderFilter::default();
 
         mask.created_at = if self.created_from.is_some() && self.created_to.is_some() {
@@ -362,18 +358,10 @@ impl OrderSearchTerms {
             None
         };
 
+        mask.payment_status = self.payment_status.map(From::from);
+        mask.customer = self.customer.map(From::from);
+
         Ok(mask)
-    }
-}
-
-impl OrderSearchFilter {
-    pub fn make_filter(self) -> Result<OrderFilter, failure::Error> {
-        use self::OrderSearchFilter::*;
-
-        match self {
-            Id(id) => Ok(id.into()),
-            Terms(terms) => terms.make_filter(),
-        }
     }
 }
 
@@ -395,6 +383,14 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.state {
             b = b.with_filter(STATE_COLUMN, v.value.to_string());
+        }
+
+        if let Some(v) = self.payment_status {
+            b = b.with_filter(PAYMENT_STATUS_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.track_id {
+            b = b.with_filter(TRACK_ID_COLUMN, v.value);
         }
 
         b
