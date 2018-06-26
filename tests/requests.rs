@@ -22,18 +22,18 @@ fn test_carts_service() {
         base_url,
     } = common::setup();
 
-    let user_id = 777;
-    let user_id_2 = 24361345;
+    let user_id = UserId(777);
+    let user_id_2 = UserId(24361345);
 
-    let store_id = 1337;
-    let product_id = 12345;
-    let quantity = 9000;
+    let store_id = StoreId(1337);
+    let product_id = ProductId(12345);
+    let quantity = Quantity(9000);
 
-    let product_id_2 = 67890;
-    let mut quantity_2 = 0;
+    let product_id_2 = ProductId(67890);
+    let mut quantity_2 = Quantity(0);
 
-    let product_id_3 = 88888;
-    let quantity_3 = 9002;
+    let product_id_3 = ProductId(88888);
+    let quantity_3 = Quantity(9002);
 
     for id in vec![user_id, user_id_2] {
         assert_eq!(
@@ -56,8 +56,9 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -72,8 +73,9 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -96,8 +98,9 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -114,7 +117,7 @@ fn test_carts_service() {
                 h.set(Authorization(user_id.to_string()));
 
                 let mut c = Cookie::new();
-                c.set("SESSION_ID", (user_id + 1000).to_string());
+                c.set("SESSION_ID", UserId(user_id.0 + 1000).to_string());
 
                 h.set(c);
                 h
@@ -122,8 +125,9 @@ fn test_carts_service() {
         )).unwrap(),
         hashmap! {
             product_id => CartItemInfo {
-                quantity: 1,
+                quantity: Quantity(1),
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -140,6 +144,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: true,
+            comment: String::new(),
             store_id,
         },
     );
@@ -155,11 +160,28 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            comment: String::new(),
             store_id,
         }
     );
 
-    quantity_2 += 1;
+    assert_eq!(
+        core.run(http_client.request_with_auth_header::<CartItem>(
+            Method::Put,
+            format!("{}/cart/products/{}/comment", base_url, product_id),
+            Some(serde_json::to_string(&CartProductCommentPayload { value: "MyComment".into() }).unwrap()),
+            Some(user_id.to_string()),
+        )).unwrap(),
+        CartItem {
+            product_id,
+            quantity,
+            selected: false,
+            comment: "MyComment".into(),
+            store_id,
+        }
+    );
+
+    quantity_2.0 += 1;
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
@@ -172,17 +194,19 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
     );
 
-    quantity_2 += 1;
+    quantity_2.0 += 1;
 
     assert_eq!(
         core.run(http_client.request_with_auth_header::<Cart>(
@@ -195,11 +219,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -226,11 +252,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -247,11 +275,13 @@ fn test_carts_service() {
             product_id => CartItemInfo {
                 quantity,
                 selected: false,
+                comment: "MyComment".into(),
                 store_id,
             },
             product_id_2 => CartItemInfo {
                 quantity: quantity_2,
                 selected: true,
+                comment: String::new(),
                 store_id,
             },
         },
@@ -262,7 +292,7 @@ fn test_carts_service() {
         let user_from = user_id_2;
         let to_user = user_id;
         let from_existing_product_id = product_id_2;
-        let from_existing_product_quantity = 912673;
+        let from_existing_product_quantity = Quantity(912673);
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
@@ -272,15 +302,16 @@ fn test_carts_service() {
             )).unwrap(),
             hashmap! {
                 from_existing_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
+                comment: String::new(),
                     store_id,
                 },
             },
         );
 
-        let from_new_product_id = 2351143;
-        let from_new_product_quantity = 2324;
+        let from_new_product_id = ProductId(2351143);
+        let from_new_product_quantity = Quantity(2324);
         assert_eq!(
             core.run(http_client.request_with_auth_header::<Cart>(
                 Method::Post,
@@ -290,13 +321,15 @@ fn test_carts_service() {
             )).unwrap(),
             hashmap! {
                 from_existing_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
                 from_new_product_id => CartItemInfo {
-                    quantity: 1,
+                    quantity: Quantity(1),
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
             },
@@ -319,6 +352,7 @@ fn test_carts_service() {
                 product_id: from_existing_product_id,
                 quantity: from_existing_product_quantity,
                 selected: true,
+                comment: String::new(),
                 store_id,
             }),
         );
@@ -340,6 +374,7 @@ fn test_carts_service() {
                 product_id: from_new_product_id,
                 quantity: from_new_product_quantity,
                 selected: true,
+                comment: String::new(),
                 store_id,
             }),
         );
@@ -355,16 +390,19 @@ fn test_carts_service() {
                 product_id => CartItemInfo {
                     quantity,
                     selected: false,
+                    comment: "MyComment".into(),
                     store_id,
                 },
                 product_id_2 => CartItemInfo {
                     quantity: quantity_2,
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 },
                 from_new_product_id => CartItemInfo {
                     quantity: from_new_product_quantity,
                     selected: true,
+                    comment: String::new(),
                     store_id,
                 }
             },
@@ -383,6 +421,7 @@ fn test_carts_service() {
             product_id,
             quantity,
             selected: false,
+            comment: "MyComment".into(),
             store_id,
         },
     );

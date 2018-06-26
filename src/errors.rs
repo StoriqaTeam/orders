@@ -10,6 +10,8 @@ pub enum Error {
     UserIdParse,
     #[fail(display = "Parse failure")]
     ParseError,
+    #[fail(display = "Missing price during order conversion")]
+    MissingPrice,
     #[fail(display = "Invalid route")]
     InvalidRoute,
 }
@@ -19,7 +21,7 @@ impl Codeable for Error {
         use self::Error::*;
 
         match self {
-            MissingUserId | UserIdParse { .. } => StatusCode::BadRequest,
+            MissingUserId | UserIdParse | MissingPrice => StatusCode::BadRequest,
             ParseError => StatusCode::UnprocessableEntity,
             InvalidRoute => StatusCode::NotFound,
         }
