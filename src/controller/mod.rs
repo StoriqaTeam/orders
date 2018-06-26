@@ -6,7 +6,6 @@ use futures::prelude::*;
 use hyper;
 use hyper::{Delete, Get, Headers, Post, Put, Request};
 use std::rc::Rc;
-use std::str::FromStr;
 
 use stq_http::controller::{Controller, ControllerFuture};
 use stq_http::request_util::{parse_body, serialize_future};
@@ -58,29 +57,27 @@ impl ControllerImpl {
     }
 }
 
-pub fn extract_user_id(headers: Headers) -> Box<Future<Item = UserId, Error = failure::Error>> {
-    Box::new(
-        future::result(
-            headers
-                .get::<hyper::header::Authorization<String>>()
-                .map(|auth| auth.0.clone())
-                .or(headers
-                    .get::<hyper::header::Cookie>()
-                    .and_then(|c| c.get("SESSION_ID").map(|v| v.to_string())))
-                .ok_or_else(|| {
-                    Error::MissingUserId
-                        .context("User ID not found in Authorization or Cookie headers")
-                        .into()
-                })
-                .and_then(|string_id| {
-                    FromStr::from_str(&string_id).map(UserId).map_err(|e| {
-                        e.context(format!("Failed to parse user ID: {}", string_id))
-                            .context(Error::UserIdParse)
-                            .into()
-                    })
-                }),
-        ).inspect(|user_id| debug!("Extracted user_id: {}", user_id.0)),
-    )
+pub fn extract_user_id(headers: Headers) -> Result<UserId, failure::Error> {
+    let string_id: String = if let Some(auth) = headers.get::<hyper::header::Authorization<String>>() {
+        auth.0.clone()
+    } else if let Some(s) = headers.get::<hyper::header::Cookie>().and_then(|c| c.get("SESSION_ID")) {
+        s.to_string()
+    } else {
+        return Err(format_err!("User ID not found in Authorization or Cookie headers")
+            .context(Error::MissingUserId)
+            .into());
+    };
+
+    let user_id = string_id.parse().map_err(|e| -> failure::Error {
+        failure::Error::from(e)
+            .context(format!("Failed to parse user ID: {}", string_id))
+            .context(Error::UserIdParse)
+            .into()
+    })?;
+
+    debug!("Extracted user_id: {}", user_id);
+
+    Ok(user_id)
 }
 
 impl Controller for ControllerImpl {
@@ -93,7 +90,7 @@ impl Controller for ControllerImpl {
 
         let route = route_parser.test(uri.path());
         Box::new(
-            extract_user_id(headers)
+            future::result(extract_user_id(headers))
                 .map_err(|e| e.context("Failed to extract user ID").into())
                 .and_then(move |calling_user| {
                     match (method, route) {
