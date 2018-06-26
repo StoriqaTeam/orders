@@ -89,26 +89,10 @@ impl CartService for CartServiceImpl {
                     .and_then({
                         let repo_factory = repo_factory.clone();
                         move |conn| {
-                            (repo_factory)().select(
+                            (repo_factory)().insert_exactly_one(
                                 conn,
-                                CartProductMask {
-                                    user_id: Some(user_id.into()),
-                                    product_id: Some(product_id.into()),
-                                    ..Default::default()
-                                },
+                                CartProductInserter::Incrementer(NewCartProduct::new(user_id, product_id, store_id)),
                             )
-                        }
-                    })
-                    .and_then({
-                        let repo_factory = repo_factory.clone();
-                        move |(products, conn)| {
-                            let new_product = if let Some(mut product) = products.first().cloned() {
-                                product.quantity.0 += 1;
-                                product.decompose().1
-                            } else {
-                                NewCartProduct::new(user_id, product_id, store_id)
-                            };
-                            (repo_factory)().insert_exactly_one(conn, CartProductInserter::Upserter(new_product))
                         }
                     })
                     .and_then({

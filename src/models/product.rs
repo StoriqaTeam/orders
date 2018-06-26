@@ -49,7 +49,7 @@ impl Inserter for NewCartProduct {
 
 #[derive(Clone, Debug)]
 pub enum CartProductInserter {
-    Upserter(NewCartProduct),
+    Incrementer(NewCartProduct),
     CollisionNoOp(NewCartProduct),
 }
 
@@ -58,8 +58,8 @@ impl Inserter for CartProductInserter {
         use self::CartProductInserter::*;
 
         match self {
-            Upserter(data) => data.into_insert_builder(table)
-                .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = $2"),
+            Incrementer(data) => data.into_insert_builder(table)
+                .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items.quantity + 1"),
             CollisionNoOp(data) => data.into_insert_builder(table)
                 .with_extra("ON CONFLICT (user_id, product_id) DO NOTHING"),
         }
