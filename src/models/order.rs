@@ -270,11 +270,15 @@ pub enum OrderIdentifier {
     Slug(OrderSlug),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OrderSearchTerms {
+    pub slug: Option<OrderSlug>,
     pub created_from: Option<i64>,
     pub created_to: Option<i64>,
     pub payment_status: Option<bool>,
     pub customer: Option<UserId>,
+    pub store: Option<StoreId>,
+    pub state: Option<OrderState>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -314,6 +318,8 @@ impl From<OrderIdentifier> for OrderFilter {
 impl OrderSearchTerms {
     pub fn make_filter(self) -> Result<OrderFilter, failure::Error> {
         let mut mask = OrderFilter::default();
+
+        mask.slug = self.slug.map(From::from);
 
         mask.created_at = if self.created_from.is_some() && self.created_to.is_some() {
             Some(
@@ -360,6 +366,8 @@ impl OrderSearchTerms {
 
         mask.payment_status = self.payment_status.map(From::from);
         mask.customer = self.customer.map(From::from);
+        mask.store = self.store.map(From::from);
+        mask.state = self.state.map(From::from);
 
         Ok(mask)
     }

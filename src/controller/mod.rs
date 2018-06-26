@@ -171,6 +171,11 @@ impl Controller for ControllerImpl {
                             debug!("Received request to get orders for user {}", calling_user);
                             Box::new((service_factory.order_factory)(calling_user).get_orders_for_user(calling_user))
                         }),
+                        (Post, Some(Route::OrderSearch)) => serialize_future({
+                            parse_body::<OrderSearchTerms>(payload).and_then(move |terms| {
+                                Box::new((service_factory.order_factory)(calling_user).search(terms))
+                            })
+                        }),
                         (Post, Some(Route::OrderFromCart)) => serialize_future({
                             debug!("Received request to convert cart into orders for user {}", calling_user);
                             parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {

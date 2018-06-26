@@ -13,6 +13,7 @@ pub enum Route {
     CartClear,
     CartMerge,
     OrderFromCart,
+    OrderSearch,
     Orders,
     OrdersByStore { store_id: StoreId },
     Order { order_id: OrderIdentifier },
@@ -52,6 +53,7 @@ pub fn make_router() -> RouteParser<Route> {
     route_parser.add_route(r"^/cart/merge$", || Route::CartMerge);
     route_parser.add_route(r"^/orders$", || Route::Orders);
     route_parser.add_route(r"^/orders/create_from_cart$", || Route::OrderFromCart);
+    route_parser.add_route(r"^/orders/search", || Route::OrderSearch);
     route_parser.add_route_with_params(r"^/orders/by-store/(\d+)$", |params| {
         params
             .get(0)
