@@ -24,7 +24,7 @@ CREATE TABLE orders (
     created_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     updated_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     state                       VARCHAR,
-    payment_status              BOOLEAN,
+    payment_status              BOOLEAN NOT NULL DEFAULT FALSE,
     delivery_company            VARCHAR
 );
 
