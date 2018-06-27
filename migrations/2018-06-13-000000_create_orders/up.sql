@@ -8,7 +8,7 @@ CREATE TABLE orders (
     product                     INTEGER NOT NULL,
     price                       DOUBLE PRECISION NOT NULL,
     quantity                    INTEGER NOT NULL,
-    receiver_name               VARCHAR,
+    receiver_name               VARCHAR NOT NULL,
     location                    POINT,
     administrative_area_level_1 VARCHAR,
     administrative_area_level_2 VARCHAR,
