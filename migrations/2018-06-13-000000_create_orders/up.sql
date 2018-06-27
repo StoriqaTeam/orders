@@ -23,7 +23,7 @@ CREATE TABLE orders (
     track_id                    VARCHAR,
     created_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     updated_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
-    state                       VARCHAR,
+    state                       VARCHAR NOT NULL,
     payment_status              BOOLEAN NOT NULL DEFAULT FALSE,
     delivery_company            VARCHAR
 );
