@@ -25,7 +25,7 @@ CREATE TABLE orders (
     updated_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
     state                       VARCHAR,
     payment_status              BOOLEAN,
-    delivery_company            VARCHAR NOT NULL
+    delivery_company            VARCHAR
 );
 
 CREATE INDEX order_user on orders (customer);
