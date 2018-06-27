@@ -23,7 +23,6 @@ hyper-tls="0.1"
 log = "*"
 maplit = "*"
 postgres = { git = "https://github.com/StoriqaTeam/rust-postgres" }
-postgres-derive = { git = "https://github.com/StoriqaTeam/rust-postgres-derive", branch = "fromsql-lifetime" }
 rand = "*"
 serde = "*"
 serde_derive = "*"
