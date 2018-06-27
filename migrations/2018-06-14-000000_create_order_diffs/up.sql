@@ -3,6 +3,6 @@ CREATE TABLE order_diffs (
     parent    UUID    NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
     committer INTEGER NOT NULL,
     datetime  DATE    NOT NULL,
-    status    VARCHAR NOT NULL,
+    state     VARCHAR NOT NULL,
     comment   VARCHAR
 );
