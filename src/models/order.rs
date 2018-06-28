@@ -196,8 +196,8 @@ pub struct Order {
     pub payment_status: bool,
     pub delivery_company: Option<String>,
     pub track_id: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<Row> for Order {
@@ -273,8 +273,8 @@ pub enum OrderIdentifier {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OrderSearchTerms {
     pub slug: Option<OrderSlug>,
-    pub created_from: Option<i64>,
-    pub created_to: Option<i64>,
+    pub created_from: Option<DateTime<Utc>>,
+    pub created_to: Option<DateTime<Utc>>,
     pub payment_status: Option<bool>,
     pub customer: Option<UserId>,
     pub store: Option<StoreId>,
@@ -290,8 +290,8 @@ pub struct OrderFilter {
     pub product: Option<ValueContainer<ProductId>>,
     pub address: AddressMask,
     pub receiver_name: Option<ValueContainer<String>>,
-    pub created_at: Option<ValueContainer<Range<NaiveDateTime>>>,
-    pub updated_at: Option<ValueContainer<Range<NaiveDateTime>>>,
+    pub created_at: Option<ValueContainer<Range<DateTime<Utc>>>>,
+    pub updated_at: Option<ValueContainer<Range<DateTime<Utc>>>>,
     pub state: Option<ValueContainer<OrderState>>,
     pub payment_status: Option<ValueContainer<bool>>,
     pub delivery_company: Option<ValueContainer<Option<String>>>,
@@ -321,45 +321,27 @@ impl OrderSearchTerms {
 
         mask.slug = self.slug.map(From::from);
 
-        mask.created_at = if self.created_from.is_some() && self.created_to.is_some() {
+        mask.created_at = if let (Some(from), Some(to)) = (self.created_from, self.created_to).clone() {
             Some(
                 Range::Between((
                     {
-                        let ts = self.created_from.unwrap();
                         RangeLimit {
-                            value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                            value: from,
                             inclusive: true,
                         }
                     },
                     {
-                        let ts = self.created_to.unwrap();
                         RangeLimit {
-                            value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
+                            value: to,
                             inclusive: true,
                         }
                     },
                 )).into(),
             )
-        } else if self.created_from.is_some() {
-            Some(
-                Range::From({
-                    let ts = self.created_from.unwrap();
-                    RangeLimit {
-                        value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
-                        inclusive: true,
-                    }
-                }).into(),
-            )
-        } else if self.created_to.is_some() {
-            Some(
-                Range::To({
-                    let ts = self.created_to.unwrap();
-                    RangeLimit {
-                        value: NaiveDateTime::from_timestamp_opt(ts, 0).ok_or(format_err!("Could not parse {} as timestamp", ts))?,
-                        inclusive: true,
-                    }
-                }).into(),
-            )
+        } else if let Some(value) = self.created_from {
+            Some(Range::From({ RangeLimit { value, inclusive: true } }).into())
+        } else if let Some(value) = self.created_to {
+            Some(Range::To({ RangeLimit { value, inclusive: true } }).into())
         } else {
             None
         };

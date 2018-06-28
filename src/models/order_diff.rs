@@ -20,7 +20,7 @@ pub struct OrderDiff {
     pub id: OrderDiffId,
     pub parent: OrderId,
     pub committer: UserId,
-    pub committed_at: NaiveDateTime,
+    pub committed_at: DateTime<Utc>,
     pub state: OrderState,
     pub comment: Option<String>,
 }
@@ -41,7 +41,7 @@ impl From<Row> for OrderDiff {
 pub struct OrderDiffInserter {
     pub parent: OrderId,
     pub committer: UserId,
-    pub committed_at: NaiveDateTime,
+    pub committed_at: DateTime<Utc>,
     pub state: OrderState,
     pub comment: Option<String>,
 }
