@@ -21,8 +21,8 @@ CREATE TABLE orders (
     address                     VARCHAR,
     place_id                    VARCHAR,
     track_id                    VARCHAR,
-    created_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
-    updated_at                  TIMESTAMP NOT NULL DEFAULT now()::timestamp,
+    created_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     state                       VARCHAR NOT NULL,
     payment_status              BOOLEAN NOT NULL DEFAULT FALSE,
     delivery_company            VARCHAR

@@ -98,7 +98,7 @@ impl OrderService for OrderServiceImpl {
                                                     (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
                                                         parent: inserted_order.id,
                                                         committer: calling_user,
-                                                        committed_at: Utc::now().naive_utc(),
+                                                        committed_at: Utc::now(),
                                                         state: OrderState::New,
                                                         comment: Some(comment),
                                                     }).map(|(_, conn)| (inserted_order, conn))
