@@ -13,6 +13,7 @@ services:
       - stq_cargo_cache:/usr/local/cargo
     environment:
       - DATABASE_URL=postgresql://orders:orders@orders-pg/orders
+      - "RUST_LOG=orders=debug"
     expose:
       - 8002
     stdin_open: true
@@ -29,7 +30,7 @@ services:
       - POSTGRES_DB=orders
       - POSTGRES_PASSWORD=orders
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
 volumes:
   stq_cargo_cache:

@@ -188,6 +188,10 @@ impl Controller for ControllerImpl {
                             debug!("Received request to get order {:?}", order_id);
                             Box::new((service_factory.order_factory)(calling_user).get_order(order_id))
                         }),
+                        (Get, Some(Route::OrderDiff { order_id })) => serialize_future({
+                            debug!("Received request to get order diff {:?}", order_id);
+                            Box::new((service_factory.order_factory)(calling_user).get_order_diff(order_id))
+                        }),
                         (Post, Some(Route::OrderSearch)) => serialize_future({
                             parse_body::<OrderSearchTerms>(payload)
                                 .and_then(move |terms| Box::new((service_factory.order_factory)(calling_user).search(terms)))

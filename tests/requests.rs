@@ -9,9 +9,9 @@ extern crate tokio_core;
 
 pub mod common;
 
-use hyper::{header::{Authorization, Cookie},
-            Headers,
-            Method};
+use hyper::{
+    header::{Authorization, Cookie}, Headers, Method,
+};
 use lib::models::*;
 
 #[test]

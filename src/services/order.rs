@@ -23,6 +23,7 @@ pub trait OrderService {
     ) -> ServiceFuture<Vec<Order>>;
     // fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
+    fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
@@ -143,6 +144,25 @@ impl OrderService for OrderServiceImpl {
             self.db_pool
                 .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
                 .map(|orders| orders.first().cloned()),
+        )
+    }
+
+    fn get_order_diff(&self, order_id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>> {
+        let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+        Box::new(
+            match order_id {
+                OrderIdentifier::Id(id) => Box::new(future::ok(Some(id))) as ServiceFuture<Option<OrderId>>,
+                OrderIdentifier::Slug(_slug) => Box::new(
+                    db_pool
+                        .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
+                        .map(|orders| orders.first().map(|order| order.id)),
+                ),
+            }.and_then(move |id| match id {
+                None => Box::new(future::ok(vec![])) as ServiceFuture<Vec<OrderDiff>>,
+                Some(id) => Box::new(db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id)))),
+            }),
         )
     }
 
