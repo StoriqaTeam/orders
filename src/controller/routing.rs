@@ -67,13 +67,13 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok())
             .map(|store_id| Route::OrdersByStore { store_id })
     });
-    route_parser.add_route_with_params(r"^/orders/by-id(\S+)$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-id/(\S+)$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
             .map(|order_id| Route::Order { order_id })
     });
-    route_parser.add_route_with_params(r"^/orders/by-slug(\d+)$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-slug/(\d+)$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
