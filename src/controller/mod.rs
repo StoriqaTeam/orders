@@ -192,6 +192,16 @@ impl Controller for ControllerImpl {
                             debug!("Received request to get order diff {:?}", order_id);
                             Box::new((service_factory.order_factory)(calling_user).get_order_diff(order_id))
                         }),
+                        (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
+                            parse_body::<UpdateStatePayload>(payload).and_then(move |data| {
+                                let user_to = calling_user;
+                                debug!(
+                                    "Received request to set order {:?} status {:?} for user {} ",
+                                    order_id, data.state, user_to
+                                );
+                                (service_factory.order_factory)(calling_user).set_order_state(order_id, data.state, data.comment)
+                            })
+                        }),
                         (Post, Some(Route::OrderSearch)) => serialize_future({
                             parse_body::<OrderSearchTerms>(payload)
                                 .and_then(move |terms| Box::new((service_factory.order_factory)(calling_user).search(terms)))

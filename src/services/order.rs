@@ -27,7 +27,7 @@ pub trait OrderService {
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
-    // fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState) -> ServiceFuture<Order>;
+    fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState, comment: Option<String>) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
 }
@@ -210,31 +210,42 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    /*
-    fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order> {
+    fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState, comment: Option<String>) -> ServiceFuture<Option<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+        let calling_user = self.calling_user;
         Box::new(
-            self.db_pool
+            db_pool
                 .run(move |conn| {
                     (order_repo_factory)()
                         .update(
-                            Box::new(conn),
-                            OrderUpdate {
-                                mask: OrderMask {
-                                    id: Some(order_id),
-                                    ..Default::default()
-                                },
+                            conn,
+                            OrderUpdater {
+                                mask: order_id.into(),
                                 data: OrderUpdateData { state: Some(state) },
                             },
                         )
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
-                .and_then(|mut v| match v.pop() {
-                    Some(order) => Ok(order),
-                    None => Err(format_err!("Order not found")),
+                .map(|mut out_data| out_data.pop() )
+                // Insert new order diff into database
+                .and_then(move |updated_order| {
+                    db_pool.run(move |conn| {
+                        if let Some(order) = updated_order {
+                            Box::new(
+                                (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
+                                parent: order.id,
+                                committer: calling_user,
+                                committed_at: Utc::now(),
+                                state: order.state.clone(),
+                                comment: comment,
+                            }).map(move |(_, c)| (Some(order), c))
+                            )
+                        } else {
+                            Box::new(future::ok((None,conn))) as RepoConnectionFuture<Option<Order>>
+                        }
+                    })
                 }),
         )
     }
-    */
 }

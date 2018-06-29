@@ -13,6 +13,12 @@ const COMMITTED_AT_COLUMN: &'static str = "committed_at";
 const STATE_COLUMN: &'static str = "state";
 const COMMENT_COLUMN: &'static str = "comment";
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct UpdateStatePayload {
+    pub state: OrderState,
+    pub comment: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OrderDiffId(pub Uuid);
 
