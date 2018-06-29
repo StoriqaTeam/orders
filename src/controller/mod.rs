@@ -184,6 +184,10 @@ impl Controller for ControllerImpl {
                             debug!("Received request to get orders for user {}", calling_user);
                             Box::new((service_factory.order_factory)(calling_user).get_orders_for_user(calling_user))
                         }),
+                        (Get, Some(Route::Order { order_id })) => serialize_future({
+                            debug!("Received request to get order {:?}", order_id);
+                            Box::new((service_factory.order_factory)(calling_user).get_order(order_id))
+                        }),
                         (Post, Some(Route::OrderSearch)) => serialize_future({
                             parse_body::<OrderSearchTerms>(payload)
                                 .and_then(move |terms| Box::new((service_factory.order_factory)(calling_user).search(terms)))
