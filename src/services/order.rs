@@ -23,10 +23,17 @@ pub trait OrderService {
     ) -> ServiceFuture<Vec<Order>>;
     // fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
+    fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
-    // fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState) -> ServiceFuture<Order>;
+    fn set_order_state(
+        &self,
+        order_id: OrderIdentifier,
+        state: OrderState,
+        comment: Option<String>,
+        track_id: Option<String>,
+    ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
 }
@@ -71,7 +78,7 @@ impl OrderService for OrderServiceImpl {
                                 price,
                                 address: address.clone(),
                                 receiver_name: receiver_name.clone(),
-                                state: OrderState::New,
+                                state: OrderState::PaimentAwaited,
                                 delivery_company: None,
                                 track_id: None,
                             }, item.comment))
@@ -99,7 +106,7 @@ impl OrderService for OrderServiceImpl {
                                                         parent: inserted_order.id,
                                                         committer: calling_user,
                                                         committed_at: Utc::now(),
-                                                        state: OrderState::New,
+                                                        state: OrderState::PaimentAwaited,
                                                         comment: Some(comment),
                                                     }).map(|(_, conn)| (inserted_order, conn))
                                                 }).map({
@@ -143,6 +150,25 @@ impl OrderService for OrderServiceImpl {
             self.db_pool
                 .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
                 .map(|orders| orders.first().cloned()),
+        )
+    }
+
+    fn get_order_diff(&self, order_id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>> {
+        let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+        Box::new(
+            match order_id {
+                OrderIdentifier::Id(id) => Box::new(future::ok(Some(id))) as ServiceFuture<Option<OrderId>>,
+                OrderIdentifier::Slug(_slug) => Box::new(
+                    db_pool
+                        .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
+                        .map(|orders| orders.first().map(|order| order.id)),
+                ),
+            }.and_then(move |id| match id {
+                None => Box::new(future::ok(vec![])) as ServiceFuture<Vec<OrderDiff>>,
+                Some(id) => Box::new(db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id)))),
+            }),
         )
     }
 
@@ -190,31 +216,48 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    /*
-    fn set_order_state(&self, order_id: OrderId, state: OrderState) -> ServiceFuture<Order> {
+    fn set_order_state(
+        &self,
+        order_id: OrderIdentifier,
+        state: OrderState,
+        comment: Option<String>,
+        track_id: Option<String>,
+    ) -> ServiceFuture<Option<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+        let calling_user = self.calling_user;
         Box::new(
-            self.db_pool
+            db_pool
                 .run(move |conn| {
                     (order_repo_factory)()
                         .update(
-                            Box::new(conn),
-                            OrderUpdate {
-                                mask: OrderMask {
-                                    id: Some(order_id),
-                                    ..Default::default()
-                                },
-                                data: OrderUpdateData { state: Some(state) },
+                            conn,
+                            OrderUpdater {
+                                mask: order_id.into(),
+                                data: OrderUpdateData { state: Some(state), track_id },
                             },
                         )
-                        .map(|(v, conn)| (v, conn.unwrap_tokio_postgres()))
-                        .map_err(|(e, conn)| (e, conn.unwrap_tokio_postgres()))
                 })
-                .and_then(|mut v| match v.pop() {
-                    Some(order) => Ok(order),
-                    None => Err(format_err!("Order not found")),
+                .map(|mut out_data| out_data.pop() )
+                // Insert new order diff into database
+                .and_then(move |updated_order| {
+                    db_pool.run(move |conn| {
+                        if let Some(order) = updated_order {
+                            Box::new(
+                                (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
+                                parent: order.id,
+                                committer: calling_user,
+                                committed_at: Utc::now(),
+                                state: order.state.clone(),
+                                comment: comment,
+                            }).map(move |(_, c)| (Some(order), c))
+                            )
+                        } else {
+                            Box::new(future::ok((None,conn))) as RepoConnectionFuture<Option<Order>>
+                        }
+                    })
                 }),
         )
     }
-    */
 }

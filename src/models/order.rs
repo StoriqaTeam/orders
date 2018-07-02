@@ -42,8 +42,8 @@ const DELIVERY_COMPANY_COLUMN: &'static str = "delivery_company";
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrderState {
     /// State set on order creation.
-    #[serde(rename = "new")]
-    New,
+    #[serde(rename = "payment_awaited")]
+    PaimentAwaited,
     /// Set after payment by request of billing
     #[serde(rename = "paid")]
     Paid,
@@ -56,6 +56,12 @@ pub enum OrderState {
     /// Wares are on their way to the customer. Tracking ID must be set.
     #[serde(rename = "sent")]
     Sent,
+    /// Wares are delivered to the customer.
+    #[serde(rename = "delivered")]
+    Delivered,
+    /// Wares are received by the customer.
+    #[serde(rename = "received")]
+    Received,
     /// Order is complete.
     #[serde(rename = "complete")]
     Complete,
@@ -66,11 +72,13 @@ impl FromStr for OrderState {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "new" => OrderState::New,
+            "payment_awaited" => OrderState::PaimentAwaited,
             "paid" => OrderState::Paid,
             "in_processing" => OrderState::InProcessing,
             "cancelled" => OrderState::Cancelled,
             "sent" => OrderState::Sent,
+            "delivered" => OrderState::Delivered,
+            "received" => OrderState::Received,
             "complete" => OrderState::Complete,
             other => {
                 return Err(format_err!("Invalid order state: {}", other).context(Error::ParseError).into());
@@ -87,11 +95,13 @@ impl Display for OrderState {
             f,
             "{}",
             match self {
-                New => "new",
+                PaimentAwaited => "payment_awaited",
                 Paid => "paid",
                 InProcessing => "in_processing",
                 Cancelled => "cancelled",
                 Sent => "sent",
+                Delivered => "delivered",
+                Received => "received",
                 Complete => "complete",
             }
         )
@@ -389,6 +399,7 @@ impl Filter for OrderFilter {
 
 pub struct OrderUpdateData {
     pub state: Option<OrderState>,
+    pub track_id: Option<String>,
 }
 
 pub struct OrderUpdater {
@@ -404,6 +415,10 @@ impl Updater for OrderUpdater {
 
         if let Some(state) = data.state {
             b = b.with_value(STATE_COLUMN, state.to_string());
+        }
+
+        if let Some(track_id) = data.track_id {
+            b = b.with_value(TRACK_ID_COLUMN, track_id);
         }
 
         b

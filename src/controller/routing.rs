@@ -18,6 +18,7 @@ pub enum Route {
     Orders,
     OrdersByStore { store_id: StoreId },
     Order { order_id: OrderIdentifier },
+    OrderDiff { order_id: OrderIdentifier },
     OrderStatus { order_id: OrderIdentifier },
     OrdersAllowedStatuses,
 }
@@ -78,6 +79,30 @@ pub fn make_router() -> RouteParser<Route> {
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
             .map(|order_id| Route::Order { order_id })
+    });
+    route_parser.add_route_with_params(r"^/orders/by-id/(\S+)/status$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
+            .map(|order_id| Route::OrderStatus { order_id })
+    });
+    route_parser.add_route_with_params(r"^/orders/by-slug/(\d+)/status$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
+            .map(|order_id| Route::OrderStatus { order_id })
+    });
+    route_parser.add_route_with_params(r"^/order_diff/by-id/(\S+)$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
+            .map(|order_id| Route::OrderDiff { order_id })
+    });
+    route_parser.add_route_with_params(r"^/order_diff/by-slug/(\d+)$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
+            .map(|order_id| Route::OrderDiff { order_id })
     });
 
     route_parser
