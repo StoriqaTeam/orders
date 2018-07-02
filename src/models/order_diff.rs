@@ -16,6 +16,7 @@ const COMMENT_COLUMN: &'static str = "comment";
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UpdateStatePayload {
     pub state: OrderState,
+    pub track_id: Option<String>,
     pub comment: Option<String>,
 }
 

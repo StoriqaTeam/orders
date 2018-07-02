@@ -199,7 +199,12 @@ impl Controller for ControllerImpl {
                                     "Received request to set order {:?} status {:?} for user {} ",
                                     order_id, data.state, user_to
                                 );
-                                (service_factory.order_factory)(calling_user).set_order_state(order_id, data.state, data.comment)
+                                (service_factory.order_factory)(calling_user).set_order_state(
+                                    order_id,
+                                    data.state,
+                                    data.comment,
+                                    data.track_id,
+                                )
                             })
                         }),
                         (Post, Some(Route::OrderSearch)) => serialize_future({

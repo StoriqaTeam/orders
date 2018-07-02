@@ -27,7 +27,13 @@ pub trait OrderService {
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
-    fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState, comment: Option<String>) -> ServiceFuture<Option<Order>>;
+    fn set_order_state(
+        &self,
+        order_id: OrderIdentifier,
+        state: OrderState,
+        comment: Option<String>,
+        track_id: Option<String>,
+    ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
 }
@@ -72,7 +78,7 @@ impl OrderService for OrderServiceImpl {
                                 price,
                                 address: address.clone(),
                                 receiver_name: receiver_name.clone(),
-                                state: OrderState::New,
+                                state: OrderState::PaimentAwaited,
                                 delivery_company: None,
                                 track_id: None,
                             }, item.comment))
@@ -100,7 +106,7 @@ impl OrderService for OrderServiceImpl {
                                                         parent: inserted_order.id,
                                                         committer: calling_user,
                                                         committed_at: Utc::now(),
-                                                        state: OrderState::New,
+                                                        state: OrderState::PaimentAwaited,
                                                         comment: Some(comment),
                                                     }).map(|(_, conn)| (inserted_order, conn))
                                                 }).map({
@@ -210,7 +216,13 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn set_order_state(&self, order_id: OrderIdentifier, state: OrderState, comment: Option<String>) -> ServiceFuture<Option<Order>> {
+    fn set_order_state(
+        &self,
+        order_id: OrderIdentifier,
+        state: OrderState,
+        comment: Option<String>,
+        track_id: Option<String>,
+    ) -> ServiceFuture<Option<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diff_repo_factory = self.order_diff_repo_factory.clone();
         let db_pool = self.db_pool.clone();
@@ -223,7 +235,7 @@ impl OrderService for OrderServiceImpl {
                             conn,
                             OrderUpdater {
                                 mask: order_id.into(),
-                                data: OrderUpdateData { state: Some(state) },
+                                data: OrderUpdateData { state: Some(state), track_id },
                             },
                         )
                 })
