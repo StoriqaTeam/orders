@@ -13,6 +13,12 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use stq_db::repo::*;
 
+#[derive(Clone, Debug)]
+pub enum RoleRemoveFilter {
+    Id(RoleId),
+    Meta((UserId, Option<UserRole>)),
+}
+
 pub trait OrderService {
     fn convert_cart(
         &self,
@@ -36,12 +42,18 @@ pub trait OrderService {
     ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
+
+    fn get_roles_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Role>>;
+    fn create_role(&self, item: Role) -> ServiceFuture<Role>;
+    fn remove_role(&self, filter: RoleRemoveFilter) -> ServiceFuture<Option<Role>>;
+    fn remove_all_roles(&self, user_id: UserId) -> ServiceFuture<Vec<Role>>;
 }
 
 pub struct OrderServiceImpl {
     pub cart_service_factory: Rc<Fn(UserId) -> Box<CartService>>,
     pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
+    pub roles_repo_factory: Rc<Fn() -> Box<RolesRepo>>,
     pub db_pool: DbPool,
     pub calling_user: UserId,
 }
@@ -258,6 +270,77 @@ impl OrderService for OrderServiceImpl {
                         }
                     })
                 }),
+        )
+    }
+
+    fn get_roles_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Role>> {
+        let roles_repo_factory = self.roles_repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (roles_repo_factory)().select(
+                        conn,
+                        RoleFilter {
+                            user_id: Some(user_id.into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .map_err(move |e| e.context(format!("Failed to get roles for user {}", user_id.0)).into()),
+        )
+    }
+    fn create_role(&self, item: Role) -> ServiceFuture<Role> {
+        let roles_repo_factory = self.roles_repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run({
+                    let item = item.clone();
+                    move |conn| (roles_repo_factory)().insert_exactly_one(conn, item)
+                })
+                .map_err(move |e| e.context(format!("Failed to create role: {:?}", item)).into()),
+        )
+    }
+    fn remove_role(&self, filter: RoleRemoveFilter) -> ServiceFuture<Option<Role>> {
+        let roles_repo_factory = self.roles_repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run({
+                    let filter = filter.clone();
+                    move |conn| {
+                        (roles_repo_factory)().delete(
+                            conn,
+                            match filter {
+                                RoleRemoveFilter::Id(id) => RoleFilter {
+                                    id: Some(id).map(From::from),
+                                    ..Default::default()
+                                },
+                                RoleRemoveFilter::Meta((user_id, role)) => RoleFilter {
+                                    user_id: Some(user_id).map(From::from),
+                                    role: role.map(From::from),
+                                    ..Default::default()
+                                },
+                            },
+                        )
+                    }
+                })
+                .map(|mut v| v.pop())
+                .map_err(move |e| e.context(format!("Failed to remove role: {:?}", filter)).into()),
+        )
+    }
+    fn remove_all_roles(&self, user_id: UserId) -> ServiceFuture<Vec<Role>> {
+        let roles_repo_factory = self.roles_repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (roles_repo_factory)().delete(
+                        conn,
+                        RoleFilter {
+                            user_id: Some(user_id.into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .map_err(move |e| e.context(format!("Failed to remove all roles for user {}", user_id.0)).into()),
         )
     }
 }
