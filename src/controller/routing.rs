@@ -21,6 +21,9 @@ pub enum Route {
     OrderDiff { order_id: OrderIdentifier },
     OrderStatus { order_id: OrderIdentifier },
     OrdersAllowedStatuses,
+    Roles,
+    RoleById { role_id: RoleId },
+    RolesByUserId { user_id: UserId },
 }
 
 pub fn make_router() -> RouteParser<Route> {
@@ -103,6 +106,20 @@ pub fn make_router() -> RouteParser<Route> {
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
             .map(|order_id| Route::OrderDiff { order_id })
+    });
+
+    route_parser.add_route(r"^/roles$", || Route::Roles);
+    route_parser.add_route_with_params(r"^/roles/by-user-id/(\d+)$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok())
+            .map(|user_id| Route::RolesByUserId { user_id })
+    });
+    route_parser.add_route_with_params(r"^/roles/by-id/(\S+)$", |params| {
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok())
+            .map(|role_id| Route::RoleById { role_id })
     });
 
     route_parser

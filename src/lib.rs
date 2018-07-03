@@ -18,6 +18,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate stq_acl;
 extern crate stq_db;
 #[macro_use]
 extern crate stq_http;

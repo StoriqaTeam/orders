@@ -47,6 +47,7 @@ impl ControllerImpl {
                             cart_service_factory: cart_factory.clone(),
                             order_diff_repo_factory: Rc::new(|| Box::new(make_order_diffs_repo())),
                             order_repo_factory: Rc::new(|| Box::new(make_order_repo())),
+                            roles_repo_factory: Rc::new(|| Box::new(make_su_repo())),
                         })
                     }
                 }),
@@ -226,6 +227,26 @@ impl Controller for ControllerImpl {
                             debug!("Received request to delete order {:?}", order_id);
                             Box::new((service_factory.order_factory)(calling_user).delete_order(order_id))
                         }),
+                        (Get, Some(Route::RolesByUserId { user_id })) => {
+                            debug!("Received request to get roles by user id {}", user_id);
+                            serialize_future({ (service_factory.order_factory)(calling_user).get_roles_for_user(user_id) })
+                        }
+                        (Post, Some(Route::Roles)) => serialize_future({
+                            parse_body::<Role>(payload).and_then(move |data| {
+                                debug!("Received request to create role {:?}", data);
+                                (service_factory.order_factory)(calling_user).create_role(data)
+                            })
+                        }),
+                        (Delete, Some(Route::RolesByUserId { user_id })) => serialize_future({
+                            parse_body::<Option<UserRole>>(payload).and_then(move |role| {
+                                debug!("Received request to delete role {:?}", role);
+                                (service_factory.order_factory)(calling_user).remove_role(RoleRemoveFilter::Meta((user_id, role)))
+                            })
+                        }),
+                        (Delete, Some(Route::RoleById { role_id })) => {
+                            debug!("Received request to delete role by id {}", role_id);
+                            serialize_future({ (service_factory.order_factory)(calling_user).remove_role(RoleRemoveFilter::Id(role_id)) })
+                        }
                         // Fallback
                         _ => Box::new(future::err(Error::InvalidRoute.into())),
                     }
