@@ -16,9 +16,9 @@ pub trait CartService {
     /// Increase item's quantity by 1
     fn increment_item(&self, user_id: UserId, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
-    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Option<CartItem>>;
+    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Cart> ;
     /// Set selection of the item in user's cart
-    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Option<CartItem>>;
+    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Cart> ;
     /// Set comment for item in user's cart
     fn set_comment(&self, user_id: UserId, product_id: ProductId, comment: String) -> ServiceFuture<Option<CartItem>>;
     /// Delete item from user's cart
@@ -124,7 +124,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Option<CartItem>> {
+    fn set_quantity(&self, user_id: UserId, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Cart> {
         debug!("Setting quantity for item {} for user {} to {}", product_id, user_id, quantity);
 
         let repo_factory = self.repo_factory.clone();
@@ -145,12 +145,34 @@ impl CartService for CartServiceImpl {
                             },
                         },
                     )
+                .and_then({
+                        let repo_factory = repo_factory.clone();
+                        move |(_, conn)| {
+                            (repo_factory)().select(
+                                conn,
+                                CartProductMask {
+                                    user_id: Some(user_id.into()),
+                                    ..Default::default()
+                                },
+                            )
+                        }
+                    })
+                    .map({
+                        move |(rows, conn)| {
+                            (
+                                rows.into_iter()
+                                    .map(CartProduct::from)
+                                    .map(<(ProductId, CartItemInfo)>::from)
+                                    .collect::<Cart>(),
+                                conn,
+                            )
+                        }
+                    })
                 })
-                .map(|mut v| v.pop().map(CartItem::from)),
         )
     }
 
-    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Option<CartItem>> {
+    fn set_selection(&self, user_id: UserId, product_id: ProductId, selected: bool) -> ServiceFuture<Cart> {
         debug!("Setting selection for item {} for user {} to {}", product_id, user_id, selected);
 
         let repo_factory = self.repo_factory.clone();
@@ -171,8 +193,30 @@ impl CartService for CartServiceImpl {
                             },
                         },
                     )
+                    .and_then({
+                        let repo_factory = repo_factory.clone();
+                        move |(_, conn)| {
+                            (repo_factory)().select(
+                                conn,
+                                CartProductMask {
+                                    user_id: Some(user_id.into()),
+                                    ..Default::default()
+                                },
+                            )
+                        }
+                    })
+                    .map({
+                        move |(rows, conn)| {
+                            (
+                                rows.into_iter()
+                                    .map(CartProduct::from)
+                                    .map(<(ProductId, CartItemInfo)>::from)
+                                    .collect::<Cart>(),
+                                conn,
+                            )
+                        }
+                    })
                 })
-                .map(|mut v| v.pop().map(CartItem::from)),
         )
     }
 
