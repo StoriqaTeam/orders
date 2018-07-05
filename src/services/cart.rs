@@ -22,7 +22,7 @@ pub trait CartService {
     /// Set comment for item in user's cart
     fn set_comment(&self, user_id: UserId, product_id: ProductId, comment: String) -> ServiceFuture<Cart>;
     /// Delete item from user's cart
-    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Option<CartItem>>;
+    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Cart>;
     /// Clear user's cart
     fn clear_cart(&self, user_id: UserId) -> ServiceFuture<Cart>;
     /// Iterate over cart
@@ -262,24 +262,44 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Option<CartItem>> {
+    fn delete_item(&self, user_id: UserId, product_id: ProductId) -> ServiceFuture<Cart> {
         debug!("Deleting item {} for user {}", product_id, user_id);
 
         let repo_factory = self.repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    (repo_factory)().delete(
-                        conn,
-                        CartProductMask {
-                            user_id: Some(user_id.into()),
-                            product_id: Some(product_id.into()),
-                            ..Default::default()
-                        },
-                    )
+        Box::new(self.db_pool.run(move |conn| {
+            (repo_factory)()
+                .delete(
+                    conn,
+                    CartProductMask {
+                        user_id: Some(user_id.into()),
+                        product_id: Some(product_id.into()),
+                        ..Default::default()
+                    },
+                )
+                .and_then({
+                    let repo_factory = repo_factory.clone();
+                    move |(_, conn)| {
+                        (repo_factory)().select(
+                            conn,
+                            CartProductMask {
+                                user_id: Some(user_id.into()),
+                                ..Default::default()
+                            },
+                        )
+                    }
                 })
-                .map(|mut rows| rows.pop().map(CartItem::from)),
-        )
+                .map({
+                    move |(rows, conn)| {
+                        (
+                            rows.into_iter()
+                                .map(CartProduct::from)
+                                .map(<(ProductId, CartItemInfo)>::from)
+                                .collect::<Cart>(),
+                            conn,
+                        )
+                    }
+                })
+        }))
     }
 
     fn clear_cart(&self, user_id: UserId) -> ServiceFuture<Cart> {
