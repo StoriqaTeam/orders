@@ -392,7 +392,11 @@ impl Filter for OrderFilter {
         if let Some(v) = self.track_id {
             b = b.with_filter(TRACK_ID_COLUMN, v.value);
         }
-
+        
+        if let Some(v) = self.created_at {
+            b = b.with_filter::<DateTime<Utc>, _>(CREATED_AT_COLUMN, v.value);
+        }
+        
         b
     }
 }
