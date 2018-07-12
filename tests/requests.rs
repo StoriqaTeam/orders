@@ -6,6 +6,7 @@ extern crate orders_lib as lib;
 extern crate serde_json;
 extern crate stq_http;
 extern crate tokio_core;
+extern crate stq_types;
 
 pub mod common;
 
@@ -13,6 +14,7 @@ use hyper::{
     header::{Authorization, Cookie}, Headers, Method,
 };
 use lib::models::*;
+use stq_types::*;
 
 #[test]
 fn test_carts_service() {

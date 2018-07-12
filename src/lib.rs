@@ -23,6 +23,8 @@ extern crate stq_db;
 #[macro_use]
 extern crate stq_http;
 extern crate stq_router;
+extern crate stq_types;
+extern crate stq_static_resources;
 extern crate tokio_core;
 extern crate tokio_postgres;
 extern crate uuid;

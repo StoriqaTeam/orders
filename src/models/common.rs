@@ -1,15 +1,3 @@
-#[derive(Clone, Copy, Debug, Default, Display, Eq, From, FromStr, Into, PartialEq, Hash, Serialize, Deserialize)]
-pub struct UserId(pub i32);
-
-#[derive(Clone, Copy, Debug, Default, Display, Eq, From, FromStr, Into, PartialEq, Hash, Serialize, Deserialize)]
-pub struct ProductId(pub i32);
-
-#[derive(Clone, Copy, Debug, Default, Display, Eq, From, FromStr, Into, PartialEq, Hash, Serialize, Deserialize)]
-pub struct StoreId(pub i32);
-
-#[derive(Clone, Copy, Debug, Default, Display, Eq, From, FromStr, Into, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Quantity(pub i32);
-
 #[derive(Clone, Copy, Debug, Default, Display, From, FromStr, Into, PartialEq, Serialize, Deserialize)]
 pub struct ProductPrice(pub f64);
 

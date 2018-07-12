@@ -10,6 +10,7 @@ use std::rc::Rc;
 use stq_http::controller::{Controller, ControllerFuture};
 use stq_http::request_util::{parse_body, serialize_future};
 use stq_router::RouteParser;
+use stq_types::*;
 
 use config::*;
 use errors::*;

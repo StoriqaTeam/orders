@@ -1,3 +1,11 @@
+use std::rc::Rc;
+use std::collections::HashMap;
+
+use chrono::prelude::*;
+use failure;
+use futures::future;
+use futures::prelude::*;
+
 use super::types::ServiceFuture;
 use super::CartService;
 use errors::*;
@@ -5,13 +13,9 @@ use models::*;
 use repos::*;
 use types::*;
 
-use chrono::prelude::*;
-use failure;
-use futures::future;
-use futures::prelude::*;
-use std::collections::HashMap;
-use std::rc::Rc;
 use stq_db::repo::*;
+use stq_static_resources::OrderState;
+use stq_types::*;
 
 #[derive(Clone, Debug)]
 pub enum RoleRemoveFilter {
@@ -90,7 +94,7 @@ impl OrderService for OrderServiceImpl {
                                 price,
                                 address: address.clone(),
                                 receiver_name: receiver_name.clone(),
-                                state: OrderState::PaimentAwaited,
+                                state: OrderState::PaymentAwaited,
                                 delivery_company: None,
                                 track_id: None,
                             }, item.comment))
@@ -118,7 +122,7 @@ impl OrderService for OrderServiceImpl {
                                                         parent: inserted_order.id,
                                                         committer: calling_user,
                                                         committed_at: Utc::now(),
-                                                        state: OrderState::PaimentAwaited,
+                                                        state: OrderState::PaymentAwaited,
                                                         comment: Some(comment),
                                                     }).map(|(_, conn)| (inserted_order, conn))
                                                 }).map({

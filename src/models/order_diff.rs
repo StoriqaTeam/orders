@@ -1,10 +1,14 @@
-use super::*;
+use std::str::FromStr;
 
 use chrono::prelude::*;
-use std::str::FromStr;
-use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
+
+use stq_db::statement::*;
+use stq_static_resources::OrderState;
+use stq_types::*;
+
+use super::*;
 
 const ID_COLUMN: &'static str = "id";
 const PARENT_COLUMN: &'static str = "parent";

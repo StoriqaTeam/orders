@@ -1,25 +1,19 @@
-use super::{StoreId, UserId, ValueContainer};
-use errors::*;
-
 use failure;
 use serde_json::{from_value, to_value, Value};
-use stq_db::statement::*;
 use tokio_postgres::rows::Row;
-use uuid::Uuid;
+
+use stq_db::statement::*;
+use stq_types::*;
+
+use super::ValueContainer;
+use errors::*;
+
 
 const ID_COLUMN: &'static str = "id";
 const USER_ID_COLUMN: &'static str = "user_id";
 const ROLE_NAME_COLUMN: &'static str = "name";
 const ROLE_DATA_COLUMN: &'static str = "data";
 
-#[derive(Clone, Copy, Debug, Display, PartialEq, FromStr, Hash, Serialize, Deserialize)]
-pub struct RoleId(pub Uuid);
-
-impl RoleId {
-    pub fn new() -> Self {
-        RoleId(Uuid::new_v4())
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UserRoleName {

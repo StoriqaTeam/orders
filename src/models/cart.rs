@@ -1,5 +1,8 @@
-use super::*;
 use std::collections::HashMap;
+
+use stq_types::*;
+
+use super::*;
 
 fn return_true() -> bool {
     true
