@@ -1,8 +1,9 @@
-use super::*;
-
-use stq_db::statement::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
+
+use stq_db::statement::*;
+use stq_types::*;
+
 
 #[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CartItemId(pub i32);

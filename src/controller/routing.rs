@@ -1,4 +1,5 @@
 use stq_router::*;
+use stq_types::*;
 
 use models::*;
 

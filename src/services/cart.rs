@@ -1,8 +1,11 @@
+use std::rc::Rc;
+
 use futures::future;
 use futures::prelude::*;
-use std::rc::Rc;
+
 use stq_db::repo::*;
 use stq_db::statement::*;
+use stq_types::*;
 
 use super::types::ServiceFuture;
 use models::*;

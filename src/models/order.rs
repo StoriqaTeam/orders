@@ -1,15 +1,15 @@
-use super::common::*;
-use errors::*;
+use std::str::FromStr;
 
 use chrono::prelude::*;
 use failure;
 use geo::Point as GeoPoint;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use stq_db::statement::*;
 use tokio_postgres::rows::Row;
-use uuid::Uuid;
+
+use stq_db::statement::*;
+use stq_static_resources::OrderState;
+use stq_types::*;
+
+use super::common::*;
 
 const ID_COLUMN: &'static str = "id";
 const SLUG_COLUMN: &'static str = "slug";
@@ -39,74 +39,6 @@ const STATE_COLUMN: &'static str = "state";
 const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
 const DELIVERY_COMPANY_COLUMN: &'static str = "delivery_company";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum OrderState {
-    /// State set on order creation.
-    #[serde(rename = "payment_awaited")]
-    PaimentAwaited,
-    /// Set after payment by request of billing
-    #[serde(rename = "paid")]
-    Paid,
-    /// Order is being processed by store management
-    #[serde(rename = "in_processing")]
-    InProcessing,
-    /// Can be cancelled by any party before order being sent.
-    #[serde(rename = "cancelled")]
-    Cancelled,
-    /// Wares are on their way to the customer. Tracking ID must be set.
-    #[serde(rename = "sent")]
-    Sent,
-    /// Wares are delivered to the customer.
-    #[serde(rename = "delivered")]
-    Delivered,
-    /// Wares are received by the customer.
-    #[serde(rename = "received")]
-    Received,
-    /// Order is complete.
-    #[serde(rename = "complete")]
-    Complete,
-}
-
-impl FromStr for OrderState {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "payment_awaited" => OrderState::PaimentAwaited,
-            "paid" => OrderState::Paid,
-            "in_processing" => OrderState::InProcessing,
-            "cancelled" => OrderState::Cancelled,
-            "sent" => OrderState::Sent,
-            "delivered" => OrderState::Delivered,
-            "received" => OrderState::Received,
-            "complete" => OrderState::Complete,
-            other => {
-                return Err(format_err!("Invalid order state: {}", other).context(Error::ParseError).into());
-            }
-        })
-    }
-}
-
-impl Display for OrderState {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        use self::OrderState::*;
-
-        write!(
-            f,
-            "{}",
-            match self {
-                PaimentAwaited => "payment_awaited",
-                Paid => "paid",
-                InProcessing => "in_processing",
-                Cancelled => "cancelled",
-                Sent => "sent",
-                Delivered => "delivered",
-                Received => "received",
-                Complete => "complete",
-            }
-        )
-    }
-}
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AddressFull {
@@ -176,15 +108,6 @@ impl AddressFull {
             address: row.get(ADDRESS_COLUMN),
             place_id: row.get(PLACE_ID_COLUMN),
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
-pub struct OrderId(pub Uuid);
-
-impl OrderId {
-    pub fn new() -> Self {
-        OrderId(Uuid::new_v4())
     }
 }
 
