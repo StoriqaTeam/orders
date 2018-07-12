@@ -1,6 +1,3 @@
-#[derive(Clone, Copy, Debug, Default, Display, From, FromStr, Into, PartialEq, Serialize, Deserialize)]
-pub struct ProductPrice(pub f64);
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SetterPayload<T> {
     pub value: T,
