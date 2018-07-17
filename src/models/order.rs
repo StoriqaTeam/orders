@@ -9,9 +9,11 @@ use stq_db::statement::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
 
-use super::common::*;
+use super::*;
 
 const ID_COLUMN: &'static str = "id";
+const CREATED_FROM_COLUMN: &'static str = "created_from";
+const CONVERSION_ID_COLUMN: &'static str = "conversion_id";
 const SLUG_COLUMN: &'static str = "slug";
 const CUSTOMER_COLUMN: &'static str = "customer";
 const STORE_COLUMN: &'static str = "store";
@@ -39,20 +41,19 @@ const STATE_COLUMN: &'static str = "state";
 const PAYMENT_STATUS_COLUMN: &'static str = "payment_status";
 const DELIVERY_COMPANY_COLUMN: &'static str = "delivery_company";
 
-
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AddressFull {
-    location: Option<GeoPoint<f64>>,
-    administrative_area_level_1: Option<String>,
-    administrative_area_level_2: Option<String>,
-    country: Option<String>,
-    locality: Option<String>,
-    political: Option<String>,
-    postal_code: Option<String>,
-    route: Option<String>,
-    street_number: Option<String>,
-    address: Option<String>,
-    place_id: Option<String>,
+    pub location: Option<GeoPoint<f64>>,
+    pub administrative_area_level_1: Option<String>,
+    pub administrative_area_level_2: Option<String>,
+    pub country: Option<String>,
+    pub locality: Option<String>,
+    pub political: Option<String>,
+    pub postal_code: Option<String>,
+    pub route: Option<String>,
+    pub street_number: Option<String>,
+    pub address: Option<String>,
+    pub place_id: Option<String>,
 }
 
 impl AddressFull {
@@ -117,6 +118,8 @@ pub struct OrderSlug(pub i32);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     pub id: OrderId,
+    pub created_from: CartItemId,
+    pub conversion_id: ConversionId,
     pub slug: OrderSlug,
     pub customer: UserId,
     pub store: StoreId,
@@ -139,6 +142,8 @@ impl From<Row> for Order {
         let state_id: String = row.get(STATE_COLUMN);
         Self {
             id,
+            created_from: CartItemId(row.get(CREATED_FROM_COLUMN)),
+            conversion_id: ConversionId(row.get(CONVERSION_ID_COLUMN)),
             slug: OrderSlug(row.get(SLUG_COLUMN)),
             customer: UserId(row.get(CUSTOMER_COLUMN)),
             store: StoreId(row.get(STORE_COLUMN)),
@@ -159,7 +164,9 @@ impl From<Row> for Order {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OrderInserter {
-    pub id: OrderId,
+    pub id: Option<OrderId>,
+    pub created_from: Option<CartItemId>,
+    pub conversion_id: Option<ConversionId>,
     pub customer: UserId,
     pub store: StoreId,
     pub product: ProductId,
@@ -175,7 +182,6 @@ pub struct OrderInserter {
 impl Inserter for OrderInserter {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
         let mut b = InsertBuilder::new(table)
-            .with_arg(ID_COLUMN, self.id.0)
             .with_arg(CUSTOMER_COLUMN, self.customer.0)
             .with_arg(STORE_COLUMN, self.store.0)
             .with_arg(PRODUCT_COLUMN, self.product.0)
@@ -185,6 +191,18 @@ impl Inserter for OrderInserter {
             .with_arg(STATE_COLUMN, self.state.to_string());
 
         b = self.address.write_into_inserter(b);
+
+        if let Some(v) = self.id {
+            b = b.with_arg(ID_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.created_from {
+            b = b.with_arg(CREATED_FROM_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.conversion_id {
+            b = b.with_arg(CONVERSION_ID_COLUMN, v.0);
+        }
 
         if let Some(v) = self.track_id {
             b = b.with_arg(TRACK_ID_COLUMN, v);
@@ -217,6 +235,8 @@ pub struct OrderSearchTerms {
 #[derive(Clone, Debug, Default)]
 pub struct OrderFilter {
     pub id: Option<ValueContainer<OrderId>>,
+    pub created_from: Option<ValueContainer<CartItemId>>,
+    pub conversion_id: Option<ValueContainer<ConversionId>>,
     pub slug: Option<ValueContainer<OrderSlug>>,
     pub customer: Option<ValueContainer<UserId>>,
     pub store: Option<ValueContainer<StoreId>>,
@@ -315,11 +335,11 @@ impl Filter for OrderFilter {
         if let Some(v) = self.track_id {
             b = b.with_filter(TRACK_ID_COLUMN, v.value);
         }
-        
+
         if let Some(v) = self.created_at {
             b = b.with_filter::<DateTime<Utc>, _>(CREATED_AT_COLUMN, v.value);
         }
-        
+
         b
     }
 }

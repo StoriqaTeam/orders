@@ -1,13 +1,11 @@
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use chrono::prelude::*;
-use failure;
 use futures::future;
 use futures::prelude::*;
 
 use super::types::ServiceFuture;
-use super::CartService;
 use errors::*;
 use models::*;
 use repos::*;
@@ -26,11 +24,13 @@ pub enum RoleRemoveFilter {
 pub trait OrderService {
     fn convert_cart(
         &self,
+        conversion_id: Option<ConversionId>,
         user_id: UserId,
         prices: HashMap<ProductId, ProductPrice>,
         address: AddressFull,
         receiver_name: String,
     ) -> ServiceFuture<Vec<Order>>;
+    fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
     // fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
@@ -54,7 +54,7 @@ pub trait OrderService {
 }
 
 pub struct OrderServiceImpl {
-    pub cart_service_factory: Rc<Fn(UserId) -> Box<CartService>>,
+    pub cart_repo_factory: Rc<Fn() -> Box<ProductRepo>>,
     pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
     pub roles_repo_factory: Rc<Fn() -> Box<RolesRepo>>,
@@ -65,6 +65,7 @@ pub struct OrderServiceImpl {
 impl OrderService for OrderServiceImpl {
     fn convert_cart(
         &self,
+        conversion_id: Option<ConversionId>,
         customer_id: UserId,
         prices: HashMap<ProductId, ProductPrice>,
         address: AddressFull,
@@ -72,92 +73,164 @@ impl OrderService for OrderServiceImpl {
     ) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
-        let cart_service_factory = self.cart_service_factory.clone();
+        let cart_repo_factory = self.cart_repo_factory.clone();
         let calling_user = self.calling_user;
 
-        Box::new(
-            (cart_service_factory)(calling_user)
-                .get_cart(customer_id)
-                // Create orders from cart items
-                .and_then(move |cart: Cart| {
-                    let mut order_items = Vec::new();
-                    for (product_id, item) in cart.into_iter() {
-                        if item.selected {
-                            let price = prices.get(&product_id).cloned().ok_or(failure::Error::from(Error::MissingPrice))?;
-
-                            order_items.push((OrderInserter {
-                                id: OrderId::new(),
-                                customer: customer_id,
-                                store: item.store_id,
-                                product: product_id,
-                                quantity: item.quantity,
-                                price,
-                                address: address.clone(),
-                                receiver_name: receiver_name.clone(),
-                                state: OrderState::PaymentAwaited,
-                                delivery_company: None,
-                                track_id: None,
-                            }, item.comment))
+        Box::new(self.db_pool.run(move |conn| {
+            (cart_repo_factory)()
+                    .delete(conn, CartProductMask { user_id: Some(customer_id.into()), selected: Some(true), ..Default::default() })
+                    // Create orders from cart items
+                    .and_then(move |(cart, conn)| {
+                        let mut order_items = Vec::new();
+                        for cart_item in cart.into_iter() {
+                            if let Some(price) = prices.get(&cart_item.product_id).cloned() {
+                                order_items.push((OrderInserter {
+                                    id: None,
+                                    created_from: Some(cart_item.id),
+                                    conversion_id,
+                                    customer: customer_id,
+                                    store: cart_item.store_id,
+                                    product: cart_item.product_id,
+                                    quantity: cart_item.quantity,
+                                    price,
+                                    address: address.clone(),
+                                    receiver_name: receiver_name.clone(),
+                                    state: OrderState::PaymentAwaited,
+                                    delivery_company: None,
+                                    track_id: None,
+                                }, cart_item.comment))
+                            } else {
+                                return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
+                            }
                         }
-                    }
-                    Ok(order_items)
-                })
-                        // Insert new orders into database
-                        .and_then({
-                            let db_pool = self.db_pool.clone();
-                            move |new_orders| {
-                                db_pool.run(move |conn| {
-                                    let mut out: RepoConnectionFuture<Vec<Order>>;
-                                    out = Box::new(future::ok((Default::default(), conn)));
+                        Ok((order_items, conn))
+                    })
+                    // Insert new orders into database
+                    .and_then({
+                        move |(new_orders, conn)| {
+                            let mut out: RepoConnectionFuture<Vec<Order>>;
+                            out = Box::new(future::ok((Default::default(), conn)));
 
-                                    for (new_order, comment) in new_orders.into_iter() {
-                                        out = Box::new(out.and_then({
-                                            let comment = comment.clone();
-                                            let order_repo_factory = order_repo_factory.clone();
-                                            let order_diffs_repo_factory = order_diffs_repo_factory.clone();
-                                            move |(mut out_data, conn)| {
-                                                // Insert new order along with the record in history
-                                                (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
-                                                    (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                                        parent: inserted_order.id,
-                                                        committer: calling_user,
-                                                        committed_at: Utc::now(),
-                                                        state: OrderState::PaymentAwaited,
-                                                        comment: Some(comment),
-                                                    }).map(|(_, conn)| (inserted_order, conn))
-                                                }).map({
-                                                    move |(order, conn): (Order, RepoConnection)| {
-                                                        out_data.push(order);
-                                                        (out_data, conn)
-                                                    }
-                                                })
+                            for (new_order, comment) in new_orders.into_iter() {
+                                out = Box::new(out.and_then({
+                                    let comment = comment.clone();
+                                    let order_repo_factory = order_repo_factory.clone();
+                                    let order_diffs_repo_factory = order_diffs_repo_factory.clone();
+                                    move |(mut out_data, conn)| {
+                                        // Insert new order along with the record in history
+                                        (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
+                                            (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
+                                                parent: inserted_order.id,
+                                                committer: calling_user,
+                                                committed_at: Utc::now(),
+                                                state: OrderState::PaymentAwaited,
+                                                comment: Some(comment),
+                                            }).map(|(_, conn)| (inserted_order, conn))
+                                        }).map({
+                                            move |(order, conn): (Order, RepoConnection)| {
+                                                out_data.push(order);
+                                                (out_data, conn)
                                             }
-                                        }));
+                                        })
                                     }
+                                }));
+                            }
 
-                                    out
-                                })
-                            }
-                        })
-                        // Remove ordered products from cart
-                        .and_then({
-                            let cart_service_factory = cart_service_factory.clone();
-                            move |out_data| {
-                                let mut out: ServiceFuture<()> = Box::new(future::ok(()));
-                                for order in &out_data {
-                                        out = Box::new(out.and_then({
-                                            let user_id = order.customer;
-                                            let product_id = order.product;
-                                            let cart_service_factory = cart_service_factory.clone();
-                                            move |_| {
-                                                (cart_service_factory)(calling_user).delete_item(user_id, product_id).map(|_| ())
-                                            }
-                                        }));
+                            out
+                        }
+                    })
+        }))
+    }
+
+    fn revert_cart_conversion(&self, conversion_id: ConversionId) -> ServiceFuture<()> {
+        let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let cart_repo_factory = self.cart_repo_factory.clone();
+        Box::new(self.db_pool.run(move |conn| {
+            (order_repo_factory)()
+                .select(
+                    conn,
+                    OrderFilter {
+                        conversion_id: Some(conversion_id.into()),
+                        ..Default::default()
+                    },
+                )
+                .and_then({
+                    let order_diff_repo_factory = order_diff_repo_factory.clone();
+                    move |(orders, conn)| {
+                        let mut out = Box::new(future::ok((Default::default(), conn))) as Box<Future<Item = _, Error = _>>;
+
+                        for order in orders.into_iter() {
+                            out = Box::new(out.and_then({
+                                let order_diff_repo_factory = order_diff_repo_factory.clone();
+                                move |(mut orders_with_diffs, conn): (Vec<(Order, Vec<OrderDiff>)>, _)| {
+                                    (order_diff_repo_factory)()
+                                        .delete(
+                                            conn,
+                                            OrderDiffFilter {
+                                                parent: Some(order.id.into()),
+                                                ..Default::default()
+                                            },
+                                        )
+                                        .map(move |(order_diffs, conn)| {
+                                            orders_with_diffs.push((order, order_diffs));
+                                            (orders_with_diffs, conn)
+                                        })
                                 }
-                                out.map(move |_| out_data)
+                            }));
+                        }
+
+                        out
+                    }
+                })
+                .and_then({
+                    let order_repo_factory = order_repo_factory.clone();
+                    move |(orders_with_diffs, conn)| {
+                        (order_repo_factory)()
+                            .delete(
+                                conn,
+                                OrderFilter {
+                                    conversion_id: Some(conversion_id.into()),
+                                    ..Default::default()
+                                },
+                            )
+                            .map(move |(_, conn)| (orders_with_diffs, conn))
+                    }
+                })
+                .and_then(move |(orders_with_diffs, conn)| {
+                    let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
+                        let mut cart_item = NewCartProduct {
+                            id: Some(order.created_from),
+                            user_id: order.customer,
+                            product_id: order.product,
+                            quantity: order.quantity,
+                            selected: true,
+                            comment: "".into(),
+                            store_id: order.store,
+                        };
+                        for diff in diffs {
+                            if diff.state == OrderState::PaymentAwaited {
+                                if let Some(comment) = diff.comment {
+                                    cart_item.comment = comment;
+                                    break;
+                                }
                             }
-                        }),
-        )
+                        }
+                        CartProductInserter::Standard(cart_item)
+                    });
+
+                    let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
+
+                    for cart_item in new_cart_items {
+                        out = Box::new(out.and_then({
+                            let cart_repo_factory = cart_repo_factory.clone();
+                            move |conn| (cart_repo_factory)().insert_exactly_one(conn, cart_item).map(|(_, conn)| conn)
+                        }))
+                    }
+
+                    out.map(|conn| ((), conn))
+                })
+        }))
     }
 
     fn get_order(&self, order_id: OrderIdentifier) -> ServiceFuture<Option<Order>> {

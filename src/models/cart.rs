@@ -35,11 +35,17 @@ pub struct CartMergePayload {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConvertCartPayload {
+    pub conversion_id: Option<ConversionId>,
     pub customer_id: UserId,
     pub receiver_name: String,
     #[serde(flatten)]
     pub address: AddressFull,
     pub prices: HashMap<ProductId, ProductPrice>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConvertCartRevertPayload {
+    pub conversion_id: ConversionId,
 }
 
 /// Model for vectorized cart
@@ -50,6 +56,20 @@ pub struct CartItem {
     pub selected: bool,
     pub comment: String,
     pub store_id: StoreId,
+}
+
+impl CartItem {
+    pub fn into_meta(self) -> (ProductId, CartItemInfo) {
+        (
+            self.product_id,
+            CartItemInfo {
+                quantity: self.quantity,
+                selected: self.selected,
+                comment: self.comment,
+                store_id: self.store_id,
+            },
+        )
+    }
 }
 
 impl From<(ProductId, CartItemInfo)> for CartItem {

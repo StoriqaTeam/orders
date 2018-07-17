@@ -4,7 +4,6 @@ use uuid::Uuid;
 use stq_db::statement::*;
 use stq_types::*;
 
-
 #[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CartItemId(pub i32);
 
@@ -18,6 +17,7 @@ const STORE_ID_COLUMN: &'static str = "store_id";
 
 #[derive(Clone, Debug)]
 pub struct NewCartProduct {
+    pub id: Option<CartItemId>,
     pub user_id: UserId,
     pub product_id: ProductId,
     pub quantity: Quantity,
@@ -33,6 +33,7 @@ impl NewCartProduct {
             product_id,
             store_id,
 
+            id: None,
             quantity: Quantity(1),
             selected: true,
             comment: String::new(),
@@ -42,18 +43,25 @@ impl NewCartProduct {
 
 impl Inserter for NewCartProduct {
     fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
-        InsertBuilder::new(table)
+        let mut b = InsertBuilder::new(table)
             .with_arg(USER_ID_COLUMN, self.user_id.0)
             .with_arg(PRODUCT_ID_COLUMN, self.product_id.0)
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(SELECTED_COLUMN, self.selected)
             .with_arg(COMMENT_COLUMN, self.comment)
-            .with_arg(STORE_ID_COLUMN, self.store_id.0)
+            .with_arg(STORE_ID_COLUMN, self.store_id.0);
+
+        if let Some(v) = self.id {
+            b = b.with_arg(ID_COLUMN, v.0);
+        }
+
+        b
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum CartProductInserter {
+    Standard(NewCartProduct),
     Incrementer(NewCartProduct),
     CollisionNoOp(NewCartProduct),
 }
@@ -63,6 +71,7 @@ impl Inserter for CartProductInserter {
         use self::CartProductInserter::*;
 
         match self {
+            Standard(data) => data.into_insert_builder(table),
             Incrementer(data) => data.into_insert_builder(table)
                 .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items.quantity + 1"),
             CollisionNoOp(data) => data.into_insert_builder(table)
@@ -88,6 +97,7 @@ impl CartProduct {
         (
             self.id,
             NewCartProduct {
+                id: Some(self.id),
                 user_id: self.user_id,
                 product_id: self.product_id,
                 quantity: self.quantity,
