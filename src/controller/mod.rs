@@ -33,26 +33,25 @@ pub struct ControllerImpl {
 
 impl ControllerImpl {
     pub fn new(db_pool: DbPool, _config: Config) -> Self {
-        let cart_factory = Rc::new({
-            let db_pool = db_pool.clone();
-            move |calling_user| Box::new(CartServiceImpl::new(calling_user, db_pool.clone())) as Box<CartService>
-        });
         ControllerImpl {
             service_factory: Rc::new(ServiceFactory {
                 order_factory: Rc::new({
-                    let cart_factory = cart_factory.clone();
+                    let db_pool = db_pool.clone();
                     move |calling_user| {
                         Box::new(OrderServiceImpl {
                             calling_user,
                             db_pool: db_pool.clone(),
-                            cart_service_factory: cart_factory.clone(),
+                            cart_repo_factory: Rc::new(|| Box::new(make_product_repo())),
                             order_diff_repo_factory: Rc::new(|| Box::new(make_order_diffs_repo())),
                             order_repo_factory: Rc::new(|| Box::new(make_order_repo())),
                             roles_repo_factory: Rc::new(|| Box::new(make_su_repo())),
                         })
                     }
                 }),
-                cart_factory,
+                cart_factory: Rc::new({
+                    let db_pool = db_pool.clone();
+                    move |calling_user| Box::new(CartServiceImpl::new(calling_user, db_pool.clone())) as Box<CartService>
+                }),
             }),
             route_parser: Rc::new(routing::make_router()),
         }
@@ -217,11 +216,17 @@ impl Controller for ControllerImpl {
                             debug!("Received request to convert cart into orders for user {}", calling_user);
                             parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {
                                 Box::new((service_factory.order_factory)(calling_user).convert_cart(
-                                    calling_user,
+                                    payload.conversion_id,
+                                    payload.customer_id,
                                     payload.prices,
                                     payload.address,
                                     payload.receiver_name,
                                 ))
+                            })
+                        }),
+                        (Post, Some(Route::OrderFromCartRevert)) => serialize_future({
+                            parse_body::<ConvertCartRevertPayload>(payload).and_then(move |payload| {
+                                Box::new((service_factory.order_factory)(calling_user).revert_cart_conversion(payload.conversion_id))
                             })
                         }),
                         (Delete, Some(Route::Order { order_id })) => serialize_future({

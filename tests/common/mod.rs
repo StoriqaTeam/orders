@@ -12,13 +12,7 @@ use self::tokio_core::reactor::Core;
 use std::sync::mpsc::channel;
 use std::thread;
 
-pub struct Context {
-    pub http_client: HttpClientHandle,
-    pub base_url: String,
-    pub core: Core,
-}
-
-pub fn setup() -> Context {
+pub fn setup() -> String {
     let (tx, rx) = channel::<bool>();
     let mut rng = rand::thread_rng();
     let port = rng.gen_range(50000, 60000);
@@ -32,6 +26,11 @@ pub fn setup() -> Context {
         }
     });
     rx.recv().unwrap();
+
+    format!("http://localhost:{}", port)
+}
+
+pub fn make_utils() -> (Core, HttpClientHandle) {
     let core = Core::new().expect("Unexpected error creating event loop core");
     let client = HttpClient::new(
         &HttpConfig {
@@ -42,10 +41,5 @@ pub fn setup() -> Context {
     );
     let client_handle = client.handle();
     core.handle().spawn(client.stream().for_each(|_| Ok(())));
-
-    Context {
-        http_client: client_handle,
-        base_url: format!("http://localhost:{}", port),
-        core,
-    }
+    (core, client_handle)
 }

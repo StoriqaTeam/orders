@@ -8,12 +8,10 @@ use stq_types::*;
 use super::ValueContainer;
 use errors::*;
 
-
 const ID_COLUMN: &'static str = "id";
 const USER_ID_COLUMN: &'static str = "user_id";
 const ROLE_NAME_COLUMN: &'static str = "name";
 const ROLE_DATA_COLUMN: &'static str = "data";
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UserRoleName {
