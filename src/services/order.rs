@@ -26,7 +26,7 @@ pub trait OrderService {
         &self,
         conversion_id: Option<ConversionId>,
         user_id: UserId,
-        prices: HashMap<ProductId, ProductPrice>,
+        seller_prices: HashMap<ProductId, ProductSellerPrice>,
         address: AddressFull,
         receiver_name: String,
     ) -> ServiceFuture<Vec<Order>>;
@@ -67,7 +67,7 @@ impl OrderService for OrderServiceImpl {
         &self,
         conversion_id: Option<ConversionId>,
         customer_id: UserId,
-        prices: HashMap<ProductId, ProductPrice>,
+        seller_prices: HashMap<ProductId, ProductSellerPrice>,
         address: AddressFull,
         receiver_name: String,
     ) -> ServiceFuture<Vec<Order>> {
@@ -83,7 +83,8 @@ impl OrderService for OrderServiceImpl {
                     .and_then(move |(cart, conn)| {
                         let mut order_items = Vec::new();
                         for cart_item in cart.into_iter() {
-                            if let Some(price) = prices.get(&cart_item.product_id).cloned() {
+                            if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
+                                let ProductSellerPrice { price, currency_id } = seller_price;
                                 order_items.push((OrderInserter {
                                     id: None,
                                     created_from: Some(cart_item.id),
@@ -93,6 +94,7 @@ impl OrderService for OrderServiceImpl {
                                     product: cart_item.product_id,
                                     quantity: cart_item.quantity,
                                     price,
+                                    currency_id,
                                     address: address.clone(),
                                     receiver_name: receiver_name.clone(),
                                     state: OrderState::New,

@@ -595,8 +595,8 @@ fn test_orders_conversion() {
             ..Default::default()
         },
         prices: hashmap! {
-            cart_fixture[0].product_id => ProductPrice(41213.0),
-            cart_fixture[1].product_id => ProductPrice(84301.0),
+            cart_fixture[0].product_id => ProductSellerPrice { price: ProductPrice(41213.0), currency_id: CurrencyId(1) },
+            cart_fixture[1].product_id => ProductSellerPrice { price: ProductPrice(84301.0), currency_id: CurrencyId(2) },
         },
     };
 
@@ -624,6 +624,7 @@ fn test_orders_conversion() {
                     .cloned()
                     .next()
                     .unwrap();
+                let ProductSellerPrice { price, currency_id } = convert_cart_payload.prices[&cart_item.product_id];
                 Order {
                     id: db_data.id.clone(),
                     created_from: db_data.created_from.clone(),
@@ -632,7 +633,8 @@ fn test_orders_conversion() {
                     customer: user,
                     store: cart_item.store_id,
                     product: cart_item.product_id,
-                    price: convert_cart_payload.prices[&cart_item.product_id],
+                    price,
+                    currency_id,
                     quantity: cart_item.quantity,
                     address: convert_cart_payload.address.clone(),
                     receiver_name: convert_cart_payload.receiver_name.clone(),

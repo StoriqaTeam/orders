@@ -19,6 +19,7 @@ const CUSTOMER_COLUMN: &'static str = "customer";
 const STORE_COLUMN: &'static str = "store";
 const PRODUCT_COLUMN: &'static str = "product";
 const PRICE_COLUMN: &'static str = "price";
+const CURRENCY_ID_COLUMN: &'static str = "currency_id";
 const QUANTITY_COLUMN: &'static str = "quantity";
 const RECEIVER_NAME_COLUMN: &'static str = "receiver_name";
 
@@ -125,6 +126,7 @@ pub struct Order {
     pub store: StoreId,
     pub product: ProductId,
     pub price: ProductPrice,
+    pub currency_id: CurrencyId,
     pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
@@ -149,6 +151,7 @@ impl From<Row> for Order {
             store: StoreId(row.get(STORE_COLUMN)),
             product: ProductId(row.get(PRODUCT_COLUMN)),
             price: ProductPrice(row.get(PRICE_COLUMN)),
+            currency_id: CurrencyId(row.get(CURRENCY_ID_COLUMN)),
             quantity: Quantity(row.get(QUANTITY_COLUMN)),
             address: AddressFull::from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
@@ -171,6 +174,7 @@ pub struct OrderInserter {
     pub store: StoreId,
     pub product: ProductId,
     pub price: ProductPrice,
+    pub currency_id: CurrencyId,
     pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
@@ -187,6 +191,7 @@ impl Inserter for OrderInserter {
             .with_arg(PRODUCT_COLUMN, self.product.0)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(PRICE_COLUMN, self.price.0)
+            .with_arg(CURRENCY_ID_COLUMN, self.currency_id.0)
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(STATE_COLUMN, self.state.to_string());
 

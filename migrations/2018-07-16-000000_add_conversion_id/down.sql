@@ -1,1 +1,1 @@
-ALTER TABLE orders DROP COLUMN conversion_id;
+ALTER TABLE orders DROP COLUMN IF EXISTS conversion_id;

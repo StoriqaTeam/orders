@@ -1,2 +1,2 @@
-ALTER TABLE cart_items DROP COLUMN id;
+ALTER TABLE cart_items DROP COLUMN IF EXISTS id;
 ALTER TABLE cart_items ADD COLUMN id UUID PRIMARY KEY DEFAULT uuid_generate_v4();
