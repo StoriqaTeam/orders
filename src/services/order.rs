@@ -95,7 +95,7 @@ impl OrderService for OrderServiceImpl {
                                     price,
                                     address: address.clone(),
                                     receiver_name: receiver_name.clone(),
-                                    state: OrderState::PaymentAwaited,
+                                    state: OrderState::New,
                                     delivery_company: None,
                                     track_id: None,
                                 }, cart_item.comment))
@@ -123,7 +123,7 @@ impl OrderService for OrderServiceImpl {
                                                 parent: inserted_order.id,
                                                 committer: calling_user,
                                                 committed_at: Utc::now(),
-                                                state: OrderState::PaymentAwaited,
+                                                state: OrderState::New,
                                                 comment: Some(comment),
                                             }).map(|(_, conn)| (inserted_order, conn))
                                         }).map({
@@ -209,7 +209,7 @@ impl OrderService for OrderServiceImpl {
                             store_id: order.store,
                         };
                         for diff in diffs {
-                            if diff.state == OrderState::PaymentAwaited {
+                            if diff.state == OrderState::New {
                                 if let Some(comment) = diff.comment {
                                     cart_item.comment = comment;
                                     break;

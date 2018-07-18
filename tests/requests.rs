@@ -636,7 +636,7 @@ fn test_orders_conversion() {
                     quantity: cart_item.quantity,
                     address: convert_cart_payload.address.clone(),
                     receiver_name: convert_cart_payload.receiver_name.clone(),
-                    state: OrderState::PaymentAwaited,
+                    state: OrderState::New,
                     payment_status: false,
                     delivery_company: None,
                     track_id: None,
