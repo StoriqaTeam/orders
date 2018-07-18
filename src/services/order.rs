@@ -202,7 +202,7 @@ impl OrderService for OrderServiceImpl {
                 .and_then(move |(orders_with_diffs, conn)| {
                     let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
                         let mut cart_item = NewCartProduct {
-                            id: Some(order.created_from),
+                            id: order.created_from,
                             user_id: order.customer,
                             product_id: order.product,
                             quantity: order.quantity,
@@ -218,7 +218,7 @@ impl OrderService for OrderServiceImpl {
                                 }
                             }
                         }
-                        CartProductInserter::Standard(cart_item)
+                        CartProductInserter::Replacer(cart_item)
                     });
 
                     let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
