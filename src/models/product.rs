@@ -5,7 +5,7 @@ use stq_db::statement::*;
 use stq_types::*;
 
 #[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
-pub struct CartItemId(pub i32);
+pub struct CartItemId(pub Uuid);
 
 const ID_COLUMN: &'static str = "id";
 const USER_ID_COLUMN: &'static str = "user_id";
