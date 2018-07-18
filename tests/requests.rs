@@ -49,8 +49,20 @@ impl RpcClient {
             .unwrap()
     }
 
-    fn initialize_cart(&mut self, products: Vec<CartItem>) {
-        for (i, product) in products.iter().enumerate() {
+    fn delete_cart_item(&mut self, item: ProductId) {
+        self.core
+            .run(self.http_client.request_with_auth_header::<Cart>(
+                Method::Delete,
+                format!("{}/cart/products/{}", self.base_url, item),
+                None,
+                Some(self.user.to_string()),
+            ))
+            .unwrap();
+    }
+
+    fn set_cart_items(&mut self, products: Vec<CartItem>) {
+        for product in products.iter() {
+            self.delete_cart_item(product.product_id);
             self.core
                 .run(
                     self.http_client.request_with_auth_header::<Cart>(
@@ -98,19 +110,16 @@ impl RpcClient {
                     ),
                 )
                 .unwrap();
-
-            assert_eq!(
-                self.get_cart(),
-                products
-                    .clone()
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(n, _)| *n <= i)
-                    .map(|(_, item)| item)
-                    .map(CartItem::into_meta)
-                    .collect::<Cart>()
-            );
         }
+    }
+
+    fn initialize_cart(&mut self, products: Vec<CartItem>) {
+        self.set_cart_items(products.clone());
+
+        assert_eq!(
+            self.get_cart(),
+            products.clone().into_iter().map(CartItem::into_meta).collect::<Cart>()
+        );
     }
 
     fn clear_cart(&mut self) {
@@ -658,6 +667,8 @@ fn test_orders_conversion() {
                 .map(CartItem::into_meta)
                 .collect::<Cart>()
         );
+
+        rpc.set_cart_items(vec![cart_fixture[0].clone()]);
 
         core.run(
             http_client.request_with_auth_header::<()>(
