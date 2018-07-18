@@ -40,7 +40,7 @@ pub struct ConvertCartPayload {
     pub receiver_name: String,
     #[serde(flatten)]
     pub address: AddressFull,
-    pub prices: HashMap<ProductId, ProductPrice>,
+    pub prices: HashMap<ProductId, ProductSellerPrice>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

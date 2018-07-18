@@ -1,1 +1,1 @@
-ALTER TABLE orders DROP COLUMN created_from;
+ALTER TABLE orders DROP COLUMN IF EXISTS created_from;
