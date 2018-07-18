@@ -1,1 +1,1 @@
-ALTER TABLE orders ADD COLUMN created_from INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN created_from UUID NOT NULL DEFAULT uuid_generate_v4();
