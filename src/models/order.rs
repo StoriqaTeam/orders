@@ -246,8 +246,6 @@ pub struct OrderFilter {
     pub customer: Option<ValueContainer<UserId>>,
     pub store: Option<ValueContainer<StoreId>>,
     pub product: Option<ValueContainer<ProductId>>,
-    pub address: AddressMask,
-    pub receiver_name: Option<ValueContainer<String>>,
     pub created_at: Option<ValueContainer<Range<DateTime<Utc>>>>,
     pub updated_at: Option<ValueContainer<Range<DateTime<Utc>>>>,
     pub state: Option<ValueContainer<OrderState>>,
@@ -321,12 +319,32 @@ impl Filter for OrderFilter {
             b = b.with_filter(ID_COLUMN, v.value.0);
         }
 
+        if let Some(v) = self.created_from {
+            b = b.with_filter(CREATED_FROM_COLUMN, v.value.0);
+        }
+
+        if let Some(v) = self.conversion_id {
+            b = b.with_filter(CONVERSION_ID_COLUMN, v.value.0);
+        }
+
         if let Some(v) = self.slug {
             b = b.with_filter(SLUG_COLUMN, v.value.0);
         }
 
         if let Some(v) = self.customer {
             b = b.with_filter(CUSTOMER_COLUMN, v.value.0);
+        }
+
+        if let Some(v) = self.store {
+            b = b.with_filter(STORE_COLUMN, v.value.0);
+        }
+
+        if let Some(v) = self.product {
+            b = b.with_filter(PRODUCT_COLUMN, v.value.0);
+        }
+
+        if let Some(v) = self.created_at {
+            b = b.with_filter::<DateTime<Utc>, _>(CREATED_AT_COLUMN, v.value);
         }
 
         if let Some(v) = self.state {
@@ -337,12 +355,12 @@ impl Filter for OrderFilter {
             b = b.with_filter(PAYMENT_STATUS_COLUMN, v.value);
         }
 
-        if let Some(v) = self.track_id {
-            b = b.with_filter(TRACK_ID_COLUMN, v.value);
+        if let Some(v) = self.delivery_company {
+            b = b.with_filter(DELIVERY_COMPANY_COLUMN, v.value);
         }
 
-        if let Some(v) = self.created_at {
-            b = b.with_filter::<DateTime<Utc>, _>(CREATED_AT_COLUMN, v.value);
+        if let Some(v) = self.track_id {
+            b = b.with_filter(TRACK_ID_COLUMN, v.value);
         }
 
         b
