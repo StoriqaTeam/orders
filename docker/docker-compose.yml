@@ -15,7 +15,7 @@ services:
       - DATABASE_URL=postgresql://orders:orders@orders-pg/orders
       - "RUST_LOG=orders=debug"
     expose:
-      - 8002
+      - 8000
     stdin_open: true
     depends_on:
       - orders-pg

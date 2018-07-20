@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 use failure;
-use failure::Fail;
+use failure::ResultExt;
 use futures::future;
 use futures::prelude::*;
 use hyper;
@@ -69,12 +69,11 @@ pub fn extract_user_id(headers: Headers) -> Result<UserId, failure::Error> {
             .into());
     };
 
-    let user_id = string_id.parse().map_err(|e| -> failure::Error {
-        failure::Error::from(e)
-            .context(format!("Failed to parse user ID: {}", string_id))
-            .context(Error::UserIdParse)
-            .into()
-    })?;
+    let user_id = string_id
+        .parse()
+        .map_err(failure::Error::from)
+        .context(format!("Failed to parse user ID: {}", string_id))
+        .context(Error::UserIdParse)?;
 
     debug!("Extracted user_id: {}", user_id);
 
