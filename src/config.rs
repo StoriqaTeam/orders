@@ -1,5 +1,6 @@
 use std::env;
 use std::net::IpAddr;
+use stq_logging;
 
 use config_crate::{Config as RawConfig, ConfigError, Environment, File};
 
@@ -21,6 +22,8 @@ pub struct Config {
     pub listen: Listen,
     /// Database settings
     pub db: Database,
+    /// GrayLog settings
+    pub graylog: Option<stq_logging::GrayLogConfig>,
 }
 
 static ENV_PREFIX: &'static str = "STQ_ORDERS";

@@ -22,6 +22,7 @@ extern crate stq_acl;
 extern crate stq_db;
 #[macro_use]
 extern crate stq_http;
+extern crate stq_logging;
 extern crate stq_router;
 extern crate stq_static_resources;
 extern crate stq_types;
@@ -43,7 +44,6 @@ use stq_http::controller::Application;
 mod config;
 pub mod controller;
 pub mod errors;
-pub mod log;
 pub mod models;
 pub mod repos;
 pub mod services;
