@@ -3,7 +3,7 @@ use stq_db::statement::*;
 
 use models::*;
 
-const TABLE: &'static str = "order_diffs";
+const TABLE: &str = "order_diffs";
 
 pub struct DummyOrderDiffUpdater {}
 impl Updater for DummyOrderDiffUpdater {
@@ -12,11 +12,17 @@ impl Updater for DummyOrderDiffUpdater {
     }
 }
 
-pub trait OrderDiffRepo: DbRepo<OrderDiff, OrderDiffInserter, OrderDiffFilter, DummyOrderDiffUpdater, RepoError> {}
+pub trait OrderDiffRepo: DbRepo<DbOrderDiff, OrderDiffInserter, OrderDiffFilter, DummyOrderDiffUpdater, RepoError> {}
 
-pub type OrderDiffRepoImpl = DbRepoImpl<OrderDiff, OrderDiffInserter, OrderDiffFilter, DummyOrderDiffUpdater>;
+pub type OrderDiffRepoImpl = DbRepoImpl<DbOrderDiff, OrderDiffInserter, OrderDiffFilter, DummyOrderDiffUpdater>;
 impl OrderDiffRepo for OrderDiffRepoImpl {}
 
-pub fn make_order_diffs_repo() -> OrderDiffRepoImpl {
-    DbRepoImpl::new(TABLE)
+type Repo = OrderDiffRepoImpl;
+
+pub fn make_su_repo() -> Repo {
+    Repo::new(TABLE)
+}
+
+pub fn make_repo(login_data: UserLogin) -> Repo {
+    make_su_repo()
 }

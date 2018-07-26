@@ -1,41 +1,23 @@
 use chrono::prelude::*;
 use tokio_postgres::rows::Row;
-use uuid::Uuid;
 
+use stq_api::orders::*;
 use stq_db::statement::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
 
 use super::*;
 
-const ID_COLUMN: &'static str = "id";
-const PARENT_COLUMN: &'static str = "parent";
-const COMMITTER_COLUMN: &'static str = "committer";
-const COMMITTED_AT_COLUMN: &'static str = "committed_at";
-const STATE_COLUMN: &'static str = "state";
-const COMMENT_COLUMN: &'static str = "comment";
+const ID_COLUMN: &str = "id";
+const PARENT_COLUMN: &str = "parent";
+const COMMITTER_COLUMN: &str = "committer";
+const COMMITTED_AT_COLUMN: &str = "committed_at";
+const STATE_COLUMN: &str = "state";
+const COMMENT_COLUMN: &str = "comment";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct UpdateStatePayload {
-    pub state: OrderState,
-    pub track_id: Option<String>,
-    pub comment: Option<String>,
-}
+pub struct DbOrderDiff(pub OrderDiff);
 
-#[derive(Clone, Copy, Debug, Default, Display, Eq, FromStr, PartialEq, Hash, Serialize, Deserialize)]
-pub struct OrderDiffId(pub Uuid);
-
-#[derive(Clone, Debug, Serialize)]
-pub struct OrderDiff {
-    pub id: OrderDiffId,
-    pub parent: OrderId,
-    pub committer: UserId,
-    pub committed_at: DateTime<Utc>,
-    pub state: OrderState,
-    pub comment: Option<String>,
-}
-
-impl From<Row> for OrderDiff {
+impl From<Row> for DbOrderDiff {
     fn from(row: Row) -> Self {
         Self {
             id: OrderDiffId(row.get(ID_COLUMN)),
@@ -102,7 +84,7 @@ impl Filter for OrderDiffFilter {
         }
 
         if let Some(v) = self.committed_at {
-            b = b.with_filter(COMMITTED_AT_COLUMN, v.value.to_string());
+            b = b.with_filter(COMMITTED_AT_COLUMN, v.value);
         }
 
         if let Some(v) = self.state {

@@ -4,6 +4,7 @@ extern crate chrono;
 extern crate config as config_crate;
 #[macro_use]
 extern crate derive_more;
+extern crate either;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
@@ -22,10 +23,12 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate stq_acl;
+extern crate stq_api;
 extern crate stq_db;
 #[macro_use]
 extern crate stq_http;
 extern crate stq_logging;
+extern crate stq_roles;
 extern crate stq_router;
 extern crate stq_static_resources;
 extern crate stq_types;
@@ -90,7 +93,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
 
     let serve = Http::new()
         .serve_addr_handle(&listen_address, &core.handle(), move || {
-            let controller = controller::ControllerImpl::new(db_pool.clone(), config.clone());
+            let controller = controller::ControllerImpl::new(&db_pool, &config);
 
             // Prepare application
             let app = Application::<Error>::new(controller);

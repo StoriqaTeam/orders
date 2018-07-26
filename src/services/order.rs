@@ -8,9 +8,11 @@ use futures::prelude::*;
 use super::types::ServiceFuture;
 use errors::*;
 use models::*;
+use repos;
 use repos::*;
 use types::*;
 
+use stq_api::orders::*;
 use stq_db::repo::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
@@ -47,20 +49,35 @@ pub trait OrderService {
     ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
-
-    fn get_roles_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Role>>;
-    fn create_role(&self, item: Role) -> ServiceFuture<Role>;
-    fn remove_role(&self, filter: RoleRemoveFilter) -> ServiceFuture<Option<Role>>;
-    fn remove_all_roles(&self, user_id: UserId) -> ServiceFuture<Vec<Role>>;
 }
 
 pub struct OrderServiceImpl {
-    pub cart_repo_factory: Rc<Fn() -> Box<ProductRepo>>,
+    pub db_pool: DbPool,
+    pub login_data: UserLogin,
+    pub cart_repo_factory: Rc<Fn() -> Box<CartItemUserRepo>>,
     pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
-    pub roles_repo_factory: Rc<Fn() -> Box<RolesRepo>>,
-    pub db_pool: DbPool,
-    pub calling_user: UserId,
+}
+
+impl OrderServiceImpl {
+    pub fn new(db_pool: DbPool, login_data: UserLogin) -> Self {
+        Self {
+            db_pool: db_pool.clone(),
+            cart_repo_factory: Rc::new({
+                let login_data = login_data.clone();
+                || Box::new(repos::cart_item::make_repo(login_data.clone()))
+            }),
+            order_diff_repo_factory: Rc::new({
+                let login_data = login_data.clone();
+                || Box::new(repos::order_diff::make_repo(login_data.clone()))
+            }),
+            order_repo_factory: Rc::new({
+                let login_data = login_data.clone();
+                || Box::new(repos::order::make_repo(login_data.clone()))
+            }),
+            login_data,
+        }
+    }
 }
 
 impl OrderService for OrderServiceImpl {
@@ -80,11 +97,11 @@ impl OrderService for OrderServiceImpl {
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
-                    .delete(conn, CartProductMask { user_id: Some(customer_id.into()), selected: Some(true), ..Default::default() })
+                    .delete(conn, CartItemFilter { customer: Some(CartCustomer::User(customer_id)), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
                     // Create orders from cart items
                     .and_then(move |(cart, conn)| {
                         let mut order_items = Vec::new();
-                        for cart_item in cart.into_iter() {
+                        for cart_item in cart {
                             if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
                                 let ProductSellerPrice { price, currency_id } = seller_price;
                                 order_items.push((OrderInserter {
@@ -116,7 +133,7 @@ impl OrderService for OrderServiceImpl {
                             let mut out: RepoConnectionFuture<Vec<Order>>;
                             out = Box::new(future::ok((Default::default(), conn)));
 
-                            for (new_order, comment) in new_orders.into_iter() {
+                            for (new_order, comment) in new_orders {
                                 out = Box::new(out.and_then({
                                     let comment = comment.clone();
                                     let order_repo_factory = order_repo_factory.clone();
@@ -165,7 +182,7 @@ impl OrderService for OrderServiceImpl {
                     move |(orders, conn)| {
                         let mut out = Box::new(future::ok((Default::default(), conn))) as Box<Future<Item = _, Error = _>>;
 
-                        for order in orders.into_iter() {
+                        for order in orders {
                             out = Box::new(out.and_then({
                                 let order_diff_repo_factory = order_diff_repo_factory.clone();
                                 move |(mut orders_with_diffs, conn): (Vec<(Order, Vec<OrderDiff>)>, _)| {
@@ -204,7 +221,7 @@ impl OrderService for OrderServiceImpl {
                 })
                 .and_then(move |(orders_with_diffs, conn)| {
                     let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
-                        let mut cart_item = NewCartProduct {
+                        let mut cart_item = CartItemUser {
                             id: order.created_from,
                             user_id: order.customer,
                             product_id: order.product,
@@ -221,7 +238,7 @@ impl OrderService for OrderServiceImpl {
                                 }
                             }
                         }
-                        CartProductInserter::Replacer(cart_item)
+                        CartItemUserInserter::Replacer(cart_item)
                     });
 
                     let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
@@ -347,7 +364,7 @@ impl OrderService for OrderServiceImpl {
                                 committer: calling_user,
                                 committed_at: Utc::now(),
                                 state: order.state.clone(),
-                                comment: comment,
+                                comment,
                             }).map(move |(_, c)| (Some(order), c))
                             )
                         } else {
@@ -355,77 +372,6 @@ impl OrderService for OrderServiceImpl {
                         }
                     })
                 }),
-        )
-    }
-
-    fn get_roles_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Role>> {
-        let roles_repo_factory = self.roles_repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    (roles_repo_factory)().select(
-                        conn,
-                        RoleFilter {
-                            user_id: Some(user_id.into()),
-                            ..Default::default()
-                        },
-                    )
-                })
-                .map_err(move |e| e.context(format!("Failed to get roles for user {}", user_id.0)).into()),
-        )
-    }
-    fn create_role(&self, item: Role) -> ServiceFuture<Role> {
-        let roles_repo_factory = self.roles_repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run({
-                    let item = item.clone();
-                    move |conn| (roles_repo_factory)().insert_exactly_one(conn, item)
-                })
-                .map_err(move |e| e.context(format!("Failed to create role: {:?}", item)).into()),
-        )
-    }
-    fn remove_role(&self, filter: RoleRemoveFilter) -> ServiceFuture<Option<Role>> {
-        let roles_repo_factory = self.roles_repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run({
-                    let filter = filter.clone();
-                    move |conn| {
-                        (roles_repo_factory)().delete(
-                            conn,
-                            match filter {
-                                RoleRemoveFilter::Id(id) => RoleFilter {
-                                    id: Some(id).map(From::from),
-                                    ..Default::default()
-                                },
-                                RoleRemoveFilter::Meta((user_id, role)) => RoleFilter {
-                                    user_id: Some(user_id).map(From::from),
-                                    role: role.map(From::from),
-                                    ..Default::default()
-                                },
-                            },
-                        )
-                    }
-                })
-                .map(|mut v| v.pop())
-                .map_err(move |e| e.context(format!("Failed to remove role: {:?}", filter)).into()),
-        )
-    }
-    fn remove_all_roles(&self, user_id: UserId) -> ServiceFuture<Vec<Role>> {
-        let roles_repo_factory = self.roles_repo_factory.clone();
-        Box::new(
-            self.db_pool
-                .run(move |conn| {
-                    (roles_repo_factory)().delete(
-                        conn,
-                        RoleFilter {
-                            user_id: Some(user_id.into()),
-                            ..Default::default()
-                        },
-                    )
-                })
-                .map_err(move |e| e.context(format!("Failed to remove all roles for user {}", user_id.0)).into()),
         )
     }
 }
