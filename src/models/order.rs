@@ -239,6 +239,7 @@ pub struct OrderSearchTerms {
 
 #[derive(Clone, Debug, Default)]
 pub struct OrderFilter {
+    pub do_order: bool,
     pub id: Option<ValueContainer<OrderId>>,
     pub created_from: Option<ValueContainer<CartItemId>>,
     pub conversion_id: Option<ValueContainer<ConversionId>>,
@@ -252,6 +253,13 @@ pub struct OrderFilter {
     pub payment_status: Option<ValueContainer<bool>>,
     pub delivery_company: Option<ValueContainer<Option<String>>>,
     pub track_id: Option<ValueContainer<Option<String>>>,
+}
+
+impl OrderFilter {
+    pub fn with_ordering(mut self, flag: bool) -> Self {
+        self.do_order = flag;
+        self
+    }
 }
 
 impl From<OrderIdentifier> for OrderFilter {
@@ -361,6 +369,10 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.track_id {
             b = b.with_filter(TRACK_ID_COLUMN, v.value);
+        }
+
+        if self.do_order {
+            b = b.with_extra("ORDER BY created_at DESC");
         }
 
         b

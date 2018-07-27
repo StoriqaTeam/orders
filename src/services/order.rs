@@ -303,6 +303,7 @@ impl OrderService for OrderServiceImpl {
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(
             future::result(terms.make_filter())
+                .map(|filter| filter.with_ordering(true))
                 .and_then(move |filter| db_pool.run(move |conn| (order_repo_factory)().select(conn, filter))),
         )
     }
