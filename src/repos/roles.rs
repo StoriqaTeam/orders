@@ -61,5 +61,5 @@ fn check_acl(user_roles: Vec<Role>, entry: Role, action: Action) -> Verdict<(Rol
 }
 
 pub fn make_repo(user_roles: Vec<Role>) -> Repo {
-    make_su_repo().with_afterop_acl_engine({ move |(entry, action)| check_acl(user_roles.clone(), entry, action) })
+    make_su_repo().with_afterop_acl_engine(AsyncACLFn({ move |(entry, action)| check_acl(user_roles.clone(), entry, action) }))
 }
