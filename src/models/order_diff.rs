@@ -44,7 +44,7 @@ impl From<Row> for OrderDiff {
             parent: OrderId(row.get(PARENT_COLUMN)),
             committer: UserId(row.get(COMMITTER_COLUMN)),
             committed_at: row.get(COMMITTED_AT_COLUMN),
-            state: OrderState::from_str(&row.get::<String, _>(STATE_COLUMN)).unwrap(),
+            state: row.get(STATE_COLUMN),
             comment: row.get(COMMENT_COLUMN),
         }
     }
@@ -64,7 +64,7 @@ impl Inserter for OrderDiffInserter {
             .with_arg(PARENT_COLUMN, self.parent.0)
             .with_arg(COMMITTER_COLUMN, self.committer.0)
             .with_arg(COMMITTED_AT_COLUMN, self.committed_at)
-            .with_arg(STATE_COLUMN, self.state.to_string())
+            .with_arg(STATE_COLUMN, self.state)
             .with_arg(COMMENT_COLUMN, self.comment)
     }
 }
@@ -100,7 +100,7 @@ impl Filter for OrderDiffFilter {
         }
 
         if let Some(v) = self.state {
-            b = b.with_filter(STATE_COLUMN, v.value.to_string());
+            b = b.with_filter(STATE_COLUMN, v.value);
         }
 
         if let Some(v) = self.comment {

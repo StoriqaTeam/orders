@@ -353,7 +353,7 @@ impl Filter for OrderFilter {
         }
 
         if let Some(v) = self.state {
-            b = b.with_filter(STATE_COLUMN, v.value.to_string());
+            b = b.with_filter(STATE_COLUMN, v.value);
         }
 
         if let Some(v) = self.payment_status {
@@ -393,7 +393,7 @@ impl Updater for OrderUpdater {
         let mut b = UpdateBuilder::from(mask.into_filtered_operation_builder(table));
 
         if let Some(state) = data.state {
-            b = b.with_value(STATE_COLUMN, state.to_string());
+            b = b.with_value(STATE_COLUMN, state);
         }
 
         if let Some(track_id) = data.track_id {
