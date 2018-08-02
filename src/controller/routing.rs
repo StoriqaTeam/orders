@@ -74,7 +74,7 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok())
             .map(|store_id| Route::OrdersByStore { store_id })
     });
-    route_parser.add_route_with_params(r"^/orders/by-id/(\S+)$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-id/([a-zA-Z0-9-]+)$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
@@ -86,7 +86,7 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
             .map(|order_id| Route::Order { order_id })
     });
-    route_parser.add_route_with_params(r"^/orders/by-id/(\S+)/status$", |params| {
+    route_parser.add_route_with_params(r"^/orders/by-id/([a-zA-Z0-9-]+)/status$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
@@ -98,7 +98,7 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Slug))
             .map(|order_id| Route::OrderStatus { order_id })
     });
-    route_parser.add_route_with_params(r"^/order_diff/by-id/(\S+)$", |params| {
+    route_parser.add_route_with_params(r"^/order_diff/by-id/([a-zA-Z0-9-]+)$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok().map(OrderIdentifier::Id))
@@ -118,7 +118,7 @@ pub fn make_router() -> RouteParser<Route> {
             .and_then(|string_id| string_id.parse().ok())
             .map(|user_id| Route::RolesByUserId { user_id })
     });
-    route_parser.add_route_with_params(r"^/roles/by-id/(\S+)$", |params| {
+    route_parser.add_route_with_params(r"^/roles/by-id/([a-zA-Z0-9-]+)$", |params| {
         params
             .get(0)
             .and_then(|string_id| string_id.parse().ok())
