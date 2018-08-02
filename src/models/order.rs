@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use chrono::prelude::*;
 use failure;
 use geo::Point as GeoPoint;
@@ -141,7 +139,6 @@ pub struct Order {
 impl From<Row> for Order {
     fn from(row: Row) -> Self {
         let id = OrderId(row.get(ID_COLUMN));
-        let state_id: String = row.get(STATE_COLUMN);
         Self {
             id,
             created_from: CartItemId(row.get(CREATED_FROM_COLUMN)),
@@ -160,7 +157,7 @@ impl From<Row> for Order {
             created_at: row.get(CREATED_AT_COLUMN),
             updated_at: row.get(UPDATED_AT_COLUMN),
             track_id: row.get(TRACK_ID_COLUMN),
-            state: OrderState::from_str(&state_id).expect(&format!("Invalid order state ({}) in DB record {}", state_id, id)),
+            state: row.get(STATE_COLUMN),
         }
     }
 }
@@ -193,7 +190,7 @@ impl Inserter for OrderInserter {
             .with_arg(PRICE_COLUMN, self.price.0)
             .with_arg(CURRENCY_ID_COLUMN, self.currency_id.0)
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
-            .with_arg(STATE_COLUMN, self.state.to_string());
+            .with_arg(STATE_COLUMN, self.state);
 
         b = self.address.write_into_inserter(b);
 
