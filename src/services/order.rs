@@ -258,7 +258,9 @@ impl OrderService for OrderServiceImpl {
                 ),
             }.and_then(move |id| match id {
                 None => Box::new(future::ok(vec![])) as ServiceFuture<Vec<OrderDiff>>,
-                Some(id) => Box::new(db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id)))),
+                Some(id) => Box::new(
+                    db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id).with_ordering(true))),
+                ),
             }),
         )
     }
