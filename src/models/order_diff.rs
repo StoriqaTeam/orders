@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use chrono::prelude::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
@@ -71,12 +69,20 @@ impl Inserter for OrderDiffInserter {
 
 #[derive(Clone, Debug, Default)]
 pub struct OrderDiffFilter {
+    pub do_order: bool,
     pub id: Option<ValueContainer<OrderDiffId>>,
     pub parent: Option<ValueContainer<OrderId>>,
     pub committer: Option<ValueContainer<UserId>>,
     pub committed_at: Option<ValueContainer<DateTime<Utc>>>,
     pub state: Option<ValueContainer<OrderState>>,
     pub comment: Option<ValueContainer<Option<String>>>,
+}
+
+impl OrderDiffFilter {
+    pub fn with_ordering(mut self, flag: bool) -> Self {
+        self.do_order = flag;
+        self
+    }
 }
 
 impl Filter for OrderDiffFilter {
@@ -105,6 +111,10 @@ impl Filter for OrderDiffFilter {
 
         if let Some(v) = self.comment {
             b = b.with_filter(COMMENT_COLUMN, v.value);
+        }
+
+        if self.do_order {
+            b = b.with_extra("ORDER BY committed_at DESC");
         }
 
         b
