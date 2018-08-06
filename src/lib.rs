@@ -12,8 +12,11 @@ extern crate futures_state_stream;
 extern crate geo;
 extern crate hyper;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log as log_crate;
 extern crate postgres;
+extern crate regex;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -29,6 +32,9 @@ extern crate stq_types;
 extern crate tokio_core;
 extern crate tokio_postgres;
 extern crate uuid;
+#[macro_use]
+extern crate validator_derive;
+extern crate validator;
 
 use bb8_postgres::PostgresConnectionManager;
 use futures::future;

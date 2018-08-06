@@ -20,6 +20,7 @@ const PRICE_COLUMN: &'static str = "price";
 const CURRENCY_ID_COLUMN: &'static str = "currency_id";
 const QUANTITY_COLUMN: &'static str = "quantity";
 const RECEIVER_NAME_COLUMN: &'static str = "receiver_name";
+const RECEIVER_PHONE_COLUMN: &'static str = "receiver_phone";
 
 const LOCATION_COLUMN: &'static str = "location";
 const ADMINISTRATIVE_AREA_LEVEL_1_COLUMN: &'static str = "administrative_area_level_1";
@@ -128,6 +129,7 @@ pub struct Order {
     pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
+    pub receiver_phone: String,
     pub state: OrderState,
     pub payment_status: bool,
     pub delivery_company: Option<String>,
@@ -152,6 +154,7 @@ impl From<Row> for Order {
             quantity: Quantity(row.get(QUANTITY_COLUMN)),
             address: AddressFull::from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
+            receiver_phone: row.get(RECEIVER_PHONE_COLUMN),
             payment_status: row.get(PAYMENT_STATUS_COLUMN),
             delivery_company: row.get(DELIVERY_COMPANY_COLUMN),
             created_at: row.get(CREATED_AT_COLUMN),
@@ -175,6 +178,7 @@ pub struct OrderInserter {
     pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
+    pub receiver_phone: String,
     pub delivery_company: Option<String>,
     pub state: OrderState,
     pub track_id: Option<String>,
@@ -187,6 +191,7 @@ impl Inserter for OrderInserter {
             .with_arg(STORE_COLUMN, self.store.0)
             .with_arg(PRODUCT_COLUMN, self.product.0)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
+            .with_arg(RECEIVER_PHONE_COLUMN, self.receiver_phone)
             .with_arg(PRICE_COLUMN, self.price.0)
             .with_arg(CURRENCY_ID_COLUMN, self.currency_id.0)
             .with_arg(QUANTITY_COLUMN, self.quantity.0)

@@ -29,6 +29,7 @@ pub trait OrderService {
         seller_prices: HashMap<ProductId, ProductSellerPrice>,
         address: AddressFull,
         receiver_name: String,
+        receiver_phone: String,
     ) -> ServiceFuture<Vec<Order>>;
     fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
     // fn create_order(&self) -> ServiceFuture<Order>;
@@ -70,6 +71,7 @@ impl OrderService for OrderServiceImpl {
         seller_prices: HashMap<ProductId, ProductSellerPrice>,
         address: AddressFull,
         receiver_name: String,
+        receiver_phone: String,
     ) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
@@ -97,6 +99,7 @@ impl OrderService for OrderServiceImpl {
                                     currency_id,
                                     address: address.clone(),
                                     receiver_name: receiver_name.clone(),
+                                    receiver_phone: receiver_phone.clone(),
                                     state: OrderState::New,
                                     delivery_company: None,
                                     track_id: None,

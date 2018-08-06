@@ -598,6 +598,7 @@ fn test_orders_conversion() {
         conversion_id: Some(ConversionId::new()),
         customer_id: user,
         receiver_name: "Mr. Anderson".into(),
+        receiver_phone: "+14441234567".into(),
         address: AddressFull {
             country: Some("Matrix".into()),
             locality: Some("Central city".into()),
@@ -647,6 +648,7 @@ fn test_orders_conversion() {
                     quantity: cart_item.quantity,
                     address: convert_cart_payload.address.clone(),
                     receiver_name: convert_cart_payload.receiver_name.clone(),
+                    receiver_phone: convert_cart_payload.receiver_phone.clone(),
                     state: OrderState::New,
                     payment_status: false,
                     delivery_company: None,
