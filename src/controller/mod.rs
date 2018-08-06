@@ -6,11 +6,11 @@ use futures::prelude::*;
 use hyper;
 use hyper::{Delete, Get, Headers, Post, Put, Request};
 use std::rc::Rc;
-
 use stq_http::controller::{Controller, ControllerFuture};
 use stq_http::request_util::{parse_body, serialize_future};
 use stq_router::RouteParser;
 use stq_types::*;
+use validator::Validate;
 
 use config::*;
 use errors::*;
@@ -214,13 +214,23 @@ impl Controller for ControllerImpl {
                         (Post, Some(Route::OrderFromCart)) => serialize_future({
                             debug!("Received request to convert cart into orders for user {}", calling_user);
                             parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {
-                                Box::new((service_factory.order_factory)(calling_user).convert_cart(
-                                    payload.conversion_id,
-                                    payload.customer_id,
-                                    payload.prices,
-                                    payload.address,
-                                    payload.receiver_name,
-                                ))
+                                payload
+                                    .validate()
+                                    .map_err(failure::Error::from)
+                                    .context("Failed to validate ConvertCartPayload")
+                                    .context(Error::ParseError)
+                                    .map_err(failure::Error::from)
+                                    .into_future()
+                                    .and_then(move |_| {
+                                        Box::new((service_factory.order_factory)(calling_user).convert_cart(
+                                            payload.conversion_id,
+                                            payload.customer_id,
+                                            payload.prices,
+                                            payload.address,
+                                            payload.receiver_name,
+                                            payload.receiver_phone,
+                                        ))
+                                    })
                             })
                         }),
                         (Post, Some(Route::OrderFromCartRevert)) => serialize_future({

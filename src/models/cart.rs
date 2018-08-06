@@ -1,8 +1,9 @@
-use std::collections::HashMap;
-
-use stq_types::*;
-
 use super::*;
+
+use regex::Regex;
+use std::collections::HashMap;
+use stq_types::*;
+use validator::{Validate, ValidationError};
 
 fn return_true() -> bool {
     true
@@ -33,11 +34,29 @@ pub struct CartMergePayload {
     pub user_from: UserId,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub fn validate_phone(phone: &str) -> Result<(), ValidationError> {
+    lazy_static! {
+        static ref PHONE_VALIDATION_RE: Regex = Regex::new(r"^\+?\d{7}\d*$").unwrap();
+    }
+
+    if PHONE_VALIDATION_RE.is_match(phone) {
+        Ok(())
+    } else {
+        Err(ValidationError {
+            code: "phone".into(),
+            message: Some("Incorrect phone format".into()),
+            params: HashMap::new(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Validate)]
 pub struct ConvertCartPayload {
     pub conversion_id: Option<ConversionId>,
     pub customer_id: UserId,
     pub receiver_name: String,
+    #[validate(custom = "validate_phone")]
+    pub receiver_phone: String,
     #[serde(flatten)]
     pub address: AddressFull,
     pub prices: HashMap<ProductId, ProductSellerPrice>,

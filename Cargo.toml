@@ -20,10 +20,12 @@ geo = { version = "*", features = ["serde"] }
 geo-types = { version = "*", features = ["serde"] }
 hyper = "0.11"
 hyper-tls="0.1"
+lazy_static = "*"
 log = "*"
 maplit = "*"
 postgres = { git = "https://github.com/StoriqaTeam/rust-postgres" }
 rand = "*"
+regex = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
@@ -37,3 +39,5 @@ stq_router = { path = "vendor/libstqbackend/router" }
 stq_types = { path = "vendor/libstqbackend/types" }
 stq_static_resources = { path = "vendor/libstqbackend/static_resources" }
 uuid = { version = "*", features = ["serde", "v4"] }
+validator_derive = "*"
+validator = "*"
