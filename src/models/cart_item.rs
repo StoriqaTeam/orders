@@ -25,6 +25,7 @@ pub struct CartItemUser {
     pub store_id: StoreId,
 }
 
+#[derive(Clone, Debug)]
 pub struct CartItemSession {
     pub id: CartItemId,
     pub session_id: SessionId,
@@ -119,6 +120,7 @@ impl CartItemSession {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum CartItemMergeStrategy {
     Standard,
     Replacer,
@@ -126,6 +128,7 @@ pub enum CartItemMergeStrategy {
     CollisionNoOp,
 }
 
+#[derive(Clone, Debug)]
 pub struct CartItemInserter {
     pub strategy: CartItemMergeStrategy,
     pub data: CartItem,
@@ -157,7 +160,9 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
 }
 
 impl Inserter for CartItemInserter {
-    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {}
+    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+        unreachable!()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -272,23 +277,23 @@ pub struct CartItemMetaFilter {
 impl CartItemMetaFilter {
     pub fn write_into_filtered_operation_builder(self, mut b: FilteredOperationBuilder) -> FilteredOperationBuilder {
         if let Some(v) = self.id {
-            b = b.meta_filter.with_filter(ID_COLUMN, v);
+            b = b.with_filter(ID_COLUMN, v);
         }
 
         if let Some(v) = self.product_id {
-            b = b.meta_filter.with_filter::<i32, _>(PRODUCT_ID_COLUMN, v.convert());
+            b = b.with_filter::<i32, _>(PRODUCT_ID_COLUMN, v.convert());
         }
 
         if let Some(v) = self.selected {
-            b = b.meta_filter.with_filter(SELECTED_COLUMN, v);
+            b = b.with_filter(SELECTED_COLUMN, v);
         }
 
         if let Some(v) = self.comment {
-            b = b.meta_filter.with_filter(COMMENT_COLUMN, v);
+            b = b.with_filter(COMMENT_COLUMN, v);
         }
 
         if let Some(v) = self.store_id {
-            b = b.meta_filter.with_filter::<i32, _>(STORE_ID_COLUMN, v.convert());
+            b = b.with_filter::<i32, _>(STORE_ID_COLUMN, v.convert());
         }
 
         b
@@ -315,11 +320,11 @@ impl Filter for CartItemFilter {
             match customer {
                 CartCustomer::User(user_id) => CartItemUserFilter {
                     meta_filter: self.meta_filter,
-                    user_id,
+                    user_id: Some(user_id),
                 }.into_filtered_operation_builder(table),
                 CartCustomer::Anonymous(session_id) => CartItemSessionFilter {
                     meta_filter: self.meta_filter,
-                    session_id,
+                    session_id: Some(session_id),
                 }.into_filtered_operation_builder(table),
             }
         } else {

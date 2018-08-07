@@ -100,7 +100,7 @@ impl CartService for CartServiceImpl {
                                         product_id,
                                         store_id,
 
-                                        quantity: 1,
+                                        quantity: Quantity(1),
                                         selected: false,
                                         comment: String::new(),
                                     },
@@ -334,19 +334,21 @@ impl CartService for CartServiceImpl {
                 })
                 .and_then({
                     let repo_factory = repo_factory.clone();
-                    move |(from_products, conn)| {
+                    move |(from_items, conn)| {
                         let mut b: RepoConnectionFuture<()> = Box::new(future::ok(((), conn)));
-                        for product in from_products {
+                        for cart_item in from_items {
                             let repo_factory = repo_factory.clone();
                             b = Box::new(b.and_then(move |(_, conn)| {
-                                let mut new_cart_item = product.decompose().1;
-                                new_cart_item.user_id = to;
                                 (repo_factory)()
                                     .insert(
                                         conn,
                                         CartItemInserter {
                                             strategy: CartItemMergeStrategy::CollisionNoOp,
-                                            data: new_cart_item,
+                                            data: CartItem {
+                                                id: CartItemId::new(),
+                                                customer: CartCustomer::User(to),
+                                                ..cart_item
+                                            },
                                         },
                                     )
                                     .map(|(_, conn)| ((), conn))
@@ -357,7 +359,7 @@ impl CartService for CartServiceImpl {
                 })
                 .and_then({
                     let repo_factory = repo_factory.clone();
-                    move |(_, conn)| get_cart_from_repo(repo_factory.clone(), conn, to)
+                    move |(_, conn)| get_cart_from_repo(&repo_factory.clone(), conn, CartCustomer::User(to))
                 })
         }))
     }

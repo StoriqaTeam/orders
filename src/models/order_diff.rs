@@ -19,14 +19,14 @@ pub struct DbOrderDiff(pub OrderDiff);
 
 impl From<Row> for DbOrderDiff {
     fn from(row: Row) -> Self {
-        Self {
+        DbOrderDiff(OrderDiff {
             id: OrderDiffId(row.get(ID_COLUMN)),
             parent: OrderId(row.get(PARENT_COLUMN)),
             committer: UserId(row.get(COMMITTER_COLUMN)),
             committed_at: row.get(COMMITTED_AT_COLUMN),
             state: row.get(STATE_COLUMN),
             comment: row.get(COMMENT_COLUMN),
-        }
+        })
     }
 }
 

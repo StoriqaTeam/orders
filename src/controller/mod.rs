@@ -9,9 +9,7 @@ use std::rc::Rc;
 use stq_api::orders::*;
 use stq_http::controller::{Controller, ControllerFuture};
 use stq_http::request_util::{parse_body, serialize_future};
-use stq_roles;
-use stq_roles::{models::{RepoLogin, RoleSearchTerms},
-                routing::Controller as RoleController,
+use stq_roles::{routing::Controller as RoleController,
                 service::{get_login_data, RoleService, RoleServiceImpl}};
 use stq_router::RouteParser;
 use stq_types::*;
@@ -20,7 +18,6 @@ use validator::Validate;
 use config::*;
 use errors::*;
 use models::*;
-use repos::*;
 use services::*;
 pub mod routing;
 use types::*;
@@ -56,7 +53,7 @@ impl ControllerImpl {
                     move |login_data| Box::new(CartServiceImpl::new(db_pool.clone(), login_data)) as Box<CartService>
                 }),
             }),
-            db_pool,
+            db_pool: db_pool.clone(),
             route_parser: Rc::new(routing::make_router()),
         }
     }
@@ -98,159 +95,199 @@ impl Controller for ControllerImpl {
                     let db_pool = self.db_pool.clone();
                     move |caller_id| get_login_data(&db_pool, caller_id)
                 })
-                .and_then(move |login_data| {
-                    match (method, route) {
-                        (Get, Some(Route::Cart { customer })) => {
-                            if let (Some(from), Some(count)) =
-                                parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i32)
-                            {
-                                debug!(
-                                    "Received request to get {} products starting from {} for customer {:?}",
-                                    count, from, customer
-                                );
-                                serialize_future((service_factory.cart)(login_data).list(customer, from, count))
-                            } else {
-                                serialize_future::<String, _, _>(future::err(
-                                    format_err!("Error parsing request from gateway body").context(Error::ParseError),
-                                ))
-                            }
-                        }
-                        (Get, Some(Route::CartProducts { customer })) => serialize_future({
-                            debug!("Received request to get cart for customer {:?}", customer);
-                            Box::new((service_factory.cart)(login_data).get_cart(customer))
-                        }),
-                        (Post, Some(Route::CartClear { customer })) => serialize_future({
-                            debug!("Received request to clear cart for customer {:?}", customer);
-                            Box::new((service_factory.cart)(login_data).clear_cart(customer))
-                        }),
-                        (Delete, Some(Route::CartProduct { customer, product_id })) => serialize_future({
-                            debug!(
-                                "Received request to delete product {} from cart for customer {:?}",
-                                product_id, customer
-                            );
-                            Box::new((service_factory.cart)(login_data).delete_item(customer, product_id))
-                        }),
-                        (Put, Some(Route::CartProductQuantity { customer, product_id })) => serialize_future(
-                            parse_body::<CartProductQuantityPayload>(payload)
-                                .inspect(move |params| {
+                .and_then({
+                    let service_factory = service_factory.clone();
+                    move |login_data| {
+                        match (method, route) {
+                            (Get, Some(Route::Cart { customer })) => {
+                                return if let (Some(from), Some(count)) =
+                                    parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i32)
+                                {
                                     debug!(
-                                        "Received request to set product {} in cart to quantity {} for customer {:?}",
-                                        product_id, params.value, customer
+                                        "Received request to get {} products starting from {} for customer {:?}",
+                                        count, from, customer
                                     );
-                                })
-                                .and_then(move |params| {
-                                    (service_factory.cart)(login_data).set_quantity(customer, product_id, params.value)
-                                }),
-                        ),
-                        (Put, Some(Route::CartProductSelection { customer, product_id })) => serialize_future(
-                            parse_body::<CartProductSelectionPayload>(payload)
-                                .inspect(move |params| {
-                                    debug!(
-                                        "Received request to set product {}'s selection in cart to {} for customer {:?}",
-                                        product_id, params.value, customer
-                                    )
-                                })
-                                .and_then(move |params| {
-                                    (service_factory.cart)(login_data).set_selection(customer, product_id, params.value)
-                                }),
-                        ),
-                        (Put, Some(Route::CartProductComment { customer, product_id })) => serialize_future(
-                            parse_body::<CartProductCommentPayload>(payload)
-                                .inspect(move |comment_payload| {
-                                    debug!(
-                                        "Received request to set product {}'s comment in cart to {} for customer {:?}",
-                                        product_id, comment_payload.value, customer
-                                    )
-                                })
-                                .and_then(move |comment_payload| {
-                                    (service_factory.cart)(login_data).set_comment(customer, product_id, comment_payload.value)
-                                }),
-                        ),
-                        (Post, Some(Route::CartIncrementProduct { customer, product_id })) => serialize_future({
-                            parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
-                                debug!(
-                                    "Received request to increment product {} quantity for customer {}",
-                                    product_id, customer
-                                );
-                                (service_factory.cart)(login_data).increment_item(customer, product_id, data.store_id)
-                            })
-                        }),
-                        (Post, Some(Route::CartMerge)) => serialize_future({
-                            parse_body::<CartMergePayload>(payload).and_then(move |data| {
-                                debug!("Received request to merge cart from session {} to user {}", data.from, data.to);
-                                (service_factory.cart)(login_data).merge(data.from, data.to)
-                            })
-                        }),
-                        (Get, Some(Route::OrdersByUser { user })) => serialize_future({
-                            debug!("Received request to get orders for user {:?}", user);
-                            Box::new((service_factory.order)(login_data).get_orders_for_user(user))
-                        }),
-                        (Get, Some(Route::Order { order_id })) => serialize_future({
-                            debug!("Received request to get order {:?}", order_id);
-                            Box::new((service_factory.order)(login_data).get_order(order_id))
-                        }),
-                        (Get, Some(Route::OrderDiff { order_id })) => serialize_future({
-                            debug!("Received request to get order diff {:?}", order_id);
-                            Box::new((service_factory.order)(login_data).get_order_diff(order_id))
-                        }),
-                        (Put, Some(Route::OrderStatus { order_id })) => serialize_future({
-                            parse_body::<UpdateStatePayload>(payload).and_then(move |data| {
-                                debug!("Received request to set order {:?} status {:?}", order_id, data.state);
-                                (service_factory.order)(login_data).set_order_state(order_id, data.state, data.comment, data.track_id)
-                            })
-                        }),
-                        (Post, Some(Route::OrderSearch)) => serialize_future({
-                            parse_body::<OrderSearchTerms>(payload)
-                                .and_then(move |terms| Box::new((service_factory.order)(login_data).search(terms)))
-                        }),
-                        (Post, Some(Route::OrderFromCart)) => serialize_future({
-                            parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {
-                                debug!("Received request to convert cart into orders for user {}", payload.user);
-                                payload
-                                    .validate()
-                                    .map_err(failure::Error::from)
-                                    .context("Failed to validate ConvertCartPayload")
-                                    .context(Error::ParseError)
-                                    .map_err(failure::Error::from)
-                                    .into_future()
-                                    .and_then(move |_| {
-                                        Box::new((service_factory.order)(login_data).convert_cart(
-                                            payload.conversion_id,
-                                            payload.customer_id,
-                                            payload.prices,
-                                            payload.address,
-                                            payload.receiver_name,
-                                            payload.receiver_phone,
-                                        ))
-                                    })
-                            })
-                        }),
-                        (Post, Some(Route::OrderFromCartRevert)) => serialize_future({
-                            parse_body::<ConvertCartRevertPayload>(payload).and_then(move |payload| {
-                                Box::new((service_factory.order)(login_data).revert_cart_conversion(payload.conversion_id))
-                            })
-                        }),
-                        (Delete, Some(Route::Order { order_id })) => serialize_future({
-                            debug!("Received request to delete order {:?}", order_id);
-                            Box::new((service_factory.order)(login_data).delete_order(order_id))
-                        }),
-                        (method, Some(Route::Roles(route))) => {
-                            let c = RoleController {
-                                service: self.service_factory.role().into(),
-                            };
-                            if let Some(out) = c.call(&method, &route, payload) {
-                                return out;
+                                    serialize_future((service_factory.cart)(login_data).list(customer, from, count))
+                                } else {
+                                    serialize_future::<String, _, _>(future::err(
+                                        format_err!("Error parsing request from gateway body").context(Error::ParseError),
+                                    ))
+                                }
                             }
-                        }
-                        _ => {}
-                    };
+                            (Get, Some(Route::CartProducts { customer })) => {
+                                return serialize_future({
+                                    debug!("Received request to get cart for customer {:?}", customer);
+                                    (service_factory.cart)(login_data).get_cart(customer)
+                                })
+                            }
+                            (Post, Some(Route::CartClear { customer })) => {
+                                return serialize_future({
+                                    debug!("Received request to clear cart for customer {:?}", customer);
+                                    (service_factory.cart)(login_data).clear_cart(customer)
+                                })
+                            }
+                            (Delete, Some(Route::CartProduct { customer, product_id })) => {
+                                return serialize_future({
+                                    debug!(
+                                        "Received request to delete product {} from cart for customer {:?}",
+                                        product_id, customer
+                                    );
+                                    (service_factory.cart)(login_data).delete_item(customer, product_id)
+                                })
+                            }
+                            (Put, Some(Route::CartProductQuantity { customer, product_id })) => {
+                                return serialize_future(
+                                    parse_body::<CartProductQuantityPayload>(payload)
+                                        .inspect(move |params| {
+                                            debug!(
+                                                "Received request to set product {} in cart to quantity {} for customer {:?}",
+                                                product_id, params.value, customer
+                                            );
+                                        })
+                                        .and_then(move |params| {
+                                            (service_factory.cart)(login_data).set_quantity(customer, product_id, params.value)
+                                        }),
+                                )
+                            }
+                            (Put, Some(Route::CartProductSelection { customer, product_id })) => {
+                                return serialize_future(
+                                    parse_body::<CartProductSelectionPayload>(payload)
+                                        .inspect(move |params| {
+                                            debug!(
+                                                "Received request to set product {}'s selection in cart to {} for customer {:?}",
+                                                product_id, params.value, customer
+                                            )
+                                        })
+                                        .and_then(move |params| {
+                                            (service_factory.cart)(login_data).set_selection(customer, product_id, params.value)
+                                        }),
+                                )
+                            }
+                            (Put, Some(Route::CartProductComment { customer, product_id })) => {
+                                return serialize_future(
+                                    parse_body::<CartProductCommentPayload>(payload)
+                                        .inspect(move |comment_payload| {
+                                            debug!(
+                                                "Received request to set product {}'s comment in cart to {} for customer {:?}",
+                                                product_id, comment_payload.value, customer
+                                            )
+                                        })
+                                        .and_then(move |comment_payload| {
+                                            (service_factory.cart)(login_data).set_comment(customer, product_id, comment_payload.value)
+                                        }),
+                                )
+                            }
+                            (Post, Some(Route::CartIncrementProduct { customer, product_id })) => {
+                                return serialize_future({
+                                    parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
+                                        debug!(
+                                            "Received request to increment product {} quantity for customer {:?}",
+                                            product_id, customer
+                                        );
+                                        (service_factory.cart)(login_data).increment_item(customer, product_id, data.store_id)
+                                    })
+                                })
+                            }
+                            (Post, Some(Route::CartMerge)) => {
+                                return serialize_future({
+                                    parse_body::<CartMergePayload>(payload).and_then(move |data| {
+                                        debug!("Received request to merge cart from session {} to user {}", data.from, data.to);
+                                        (service_factory.cart)(login_data).merge(data.from, data.to)
+                                    })
+                                })
+                            }
+                            (Get, Some(Route::OrdersByUser { user })) => {
+                                return serialize_future({
+                                    debug!("Received request to get orders for user {:?}", user);
+                                    (service_factory.order)(login_data).get_orders_for_user(user)
+                                })
+                            }
+                            (Get, Some(Route::Order { order_id })) => {
+                                return serialize_future({
+                                    debug!("Received request to get order {:?}", order_id);
+                                    (service_factory.order)(login_data).get_order(order_id)
+                                })
+                            }
+                            (Get, Some(Route::OrderDiff { order_id })) => {
+                                return serialize_future({
+                                    debug!("Received request to get order diff {:?}", order_id);
+                                    (service_factory.order)(login_data).get_order_diff(order_id)
+                                })
+                            }
+                            (Put, Some(Route::OrderStatus { order_id })) => {
+                                return serialize_future({
+                                    parse_body::<UpdateStatePayload>(payload).and_then(move |data| {
+                                        debug!("Received request to set order {:?} status {:?}", order_id, data.state);
+                                        (service_factory.order)(login_data).set_order_state(
+                                            order_id,
+                                            data.state,
+                                            data.comment,
+                                            data.track_id,
+                                        )
+                                    })
+                                })
+                            }
+                            (Post, Some(Route::OrderSearch)) => {
+                                return serialize_future({
+                                    parse_body::<OrderSearchTerms>(payload)
+                                        .and_then(move |terms| (service_factory.order)(login_data).search(terms))
+                                })
+                            }
+                            (Post, Some(Route::OrderFromCart)) => {
+                                return serialize_future({
+                                    parse_body::<ConvertCartPayload>(payload).and_then(move |payload| {
+                                        debug!("Received request to convert cart into orders for user {}", payload.user_id);
+                                        payload
+                                            .validate()
+                                            .map_err(failure::Error::from)
+                                            .context("Failed to validate ConvertCartPayload")
+                                            .context(Error::ParseError)
+                                            .map_err(failure::Error::from)
+                                            .into_future()
+                                            .and_then(move |_| {
+                                                (service_factory.order)(login_data).convert_cart(
+                                                    payload.conversion_id,
+                                                    payload.user_id,
+                                                    payload.seller_prices,
+                                                    payload.address,
+                                                    payload.receiver_name,
+                                                    payload.receiver_phone,
+                                                )
+                                            })
+                                    })
+                                })
+                            }
+                            (Post, Some(Route::OrderFromCartRevert)) => {
+                                return serialize_future({
+                                    parse_body::<ConvertCartRevertPayload>(payload).and_then(move |payload| {
+                                        (service_factory.order)(login_data).revert_cart_conversion(payload.conversion_id)
+                                    })
+                                })
+                            }
+                            (Delete, Some(Route::Order { order_id })) => {
+                                return serialize_future({
+                                    debug!("Received request to delete order {:?}", order_id);
+                                    (service_factory.order)(login_data).delete_order(order_id)
+                                })
+                            }
+                            (method, Some(Route::Roles(route))) => {
+                                let c = RoleController {
+                                    service: (service_factory.role)(login_data).into(),
+                                };
+                                if let Some(out) = c.call(&method, &route, payload) {
+                                    return out;
+                                }
+                            }
+                            _ => {}
+                        };
 
-                    // Fallback
-                    Box::new(future::err(
-                        format_err!("Could not route request {} {}", method, uri.path())
-                            .context(Error::InvalidRoute)
-                            .into(),
-                    ))
+                        // Fallback
+                        Box::new(future::err(
+                            format_err!("Could not route request {} {}", method, uri.path())
+                                .context(Error::InvalidRoute)
+                                .into(),
+                        ))
+                    }
                 })
                 .then(move |res| {
                     let d = Local::now() - dt;

@@ -24,20 +24,20 @@ fn check_acl(login: UserLogin, (entry, action): &mut AclContext) -> bool {
 
     if let User { caller_roles, caller_id } = login {
         for role_entry in caller_roles {
-            match role_entry.roles {
+            match role_entry.role {
                 Superadmin => {
                     return true;
                 }
                 StoreManager(managed_store) => {
-                    if managed_store == entry.store {
-                        return action != Action::Delete;
+                    if managed_store == entry.0.store {
+                        return *action != Action::Delete;
                     }
                 }
             }
         }
 
         if caller_id == entry.0.customer {
-            return action != Action::Delete;
+            return *action != Action::Delete;
         }
     }
 

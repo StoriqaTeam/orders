@@ -36,13 +36,20 @@ impl DbRepo<CartItem, CartItemInserter, CartItemFilter, CartItemUpdater<CartItem
 impl DbRepoInsert<CartItem, CartItemInserter, RepoError> for CartItemRepoImpl {
     fn insert(&self, conn: RepoConnection, inserter: CartItemInserter) -> RepoConnectionFuture<Vec<CartItem>> {
         use self::either::Either::*;
-        use self::CartCustomer::*;
 
         let CartItemInserter { strategy, data } = inserter;
 
         match split_cart_item(data) {
-            Left(data) => self.user.insert(conn, CartItemUserInserter { strategy, data }),
-            Right(data) => self.session.insert(conn, CartItemSessionInserter { strategy, data }),
+            Left(data) => Box::new(
+                self.user
+                    .insert(conn, CartItemUserInserter { strategy, data })
+                    .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+            ),
+            Right(data) => Box::new(
+                self.session
+                    .insert(conn, CartItemSessionInserter { strategy, data })
+                    .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+            ),
         }
     }
 }
@@ -61,50 +68,64 @@ impl DbRepoSelect<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
 
         match customer {
             Some(customer) => match customer {
-                Anonymous(session_id) => self.session.select_full(
-                    conn,
-                    CartItemSessionFilter {
-                        meta_filter,
-                        session_id: Some(session_id),
-                    },
-                    limit,
-                    op,
+                Anonymous(session_id) => Box::new(
+                    self.session
+                        .select_full(
+                            conn,
+                            CartItemSessionFilter {
+                                meta_filter,
+                                session_id: Some(session_id),
+                            },
+                            limit,
+                            op,
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
-                User(user_id) => self.user.select_full(
-                    conn,
-                    CartItemUserFilter {
-                        meta_filter,
-                        user_id: Some(user_id),
-                    },
-                    limit,
-                    op,
+                User(user_id) => Box::new(
+                    self.user
+                        .select_full(
+                            conn,
+                            CartItemUserFilter {
+                                meta_filter,
+                                user_id: Some(user_id),
+                            },
+                            limit,
+                            op,
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
                 let user = self.user.clone();
                 let session = self.session.clone();
 
-                future::ok((vec![], conn))
-                    .and_then({
-                        let meta_filter = meta_filter.clone();
-                        move |(mut out, conn)| {
-                            user.select_full(conn, meta_filter.into(), limit, op).map(move |(v, conn)| {
-                                out.append(v);
+                Box::new(
+                    future::ok((vec![], conn))
+                        .and_then({
+                            let meta_filter = meta_filter.clone();
+                            move |(mut out, conn)| {
+                                user.select_full(conn, meta_filter.into(), limit, op).map(move |(v, conn)| {
+                                    for item in v {
+                                        out.push(item.into());
+                                    }
 
-                                (out, conn)
-                            })
-                        }
-                    })
-                    .and_then({
-                        let meta_filter = meta_filter.clone();
-                        move |(mut out, conn)| {
-                            session.select_full(conn, meta_filter.into(), limit, op).map(move |(v, conn)| {
-                                out.append(v);
+                                    (out, conn)
+                                })
+                            }
+                        })
+                        .and_then({
+                            let meta_filter = meta_filter.clone();
+                            move |(mut out, conn)| {
+                                session.select_full(conn, meta_filter.into(), limit, op).map(move |(v, conn)| {
+                                    for item in v {
+                                        out.push(item.into());
+                                    }
 
-                                (out, conn)
-                            })
-                        }
-                    })
+                                    (out, conn)
+                                })
+                            }
+                        }),
+                )
             }
         }
     }
@@ -118,52 +139,88 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
 
         match filter.customer {
             Some(customer) => match customer {
-                Anonymous(session_id) => self.session.update(
-                    conn,
-                    CartItemSessionUpdater {
-                        data,
-                        filter: CartItemSessionFilter {
-                            session_id: Some(session_id),
-                            meta_filter: filter.meta_filter,
-                        },
-                    },
+                Anonymous(session_id) => Box::new(
+                    self.session
+                        .update(
+                            conn,
+                            CartItemSessionUpdater {
+                                data,
+                                filter: CartItemSessionFilter {
+                                    session_id: Some(session_id),
+                                    meta_filter: filter.meta_filter,
+                                },
+                            },
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
-                User(user_id) => self.user.update(
-                    conn,
-                    CartItemUserUpdater {
-                        data,
-                        filter: CartItemUserFilter {
-                            user_id: Some(user_id),
-                            meta_filter: filter.meta_filter,
-                        },
-                    },
+                User(user_id) => Box::new(
+                    self.user
+                        .update(
+                            conn,
+                            CartItemUserUpdater {
+                                data,
+                                filter: CartItemUserFilter {
+                                    user_id: Some(user_id),
+                                    meta_filter: filter.meta_filter,
+                                },
+                            },
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
                 let user = self.user.clone();
                 let session = self.session.clone();
 
-                future::ok((vec![], conn))
-                    .and_then({
-                        let meta_filter = filter.meta_filter.clone();
-                        move |(mut out, conn)| {
-                            user.update(conn, meta_filter.into()).map(move |(v, conn)| {
-                                out.append(v);
+                Box::new(
+                    future::ok((vec![], conn))
+                        .and_then({
+                            let data = data.clone();
+                            let meta_filter = filter.meta_filter.clone();
+                            move |(mut out, conn)| {
+                                user.update(
+                                    conn,
+                                    CartItemUserUpdater {
+                                        data,
+                                        filter: CartItemUserFilter {
+                                            user_id: None,
+                                            meta_filter: filter.meta_filter,
+                                        },
+                                    },
+                                ).map(move |(v, conn)| {
+                                    for item in v {
+                                        out.push(item.into());
+                                    }
 
-                                (out, conn)
-                            })
-                        }
-                    })
-                    .and_then({
-                        let meta_filter = filter.meta_filter.clone();
-                        move |(mut out, conn)| {
-                            session.update(conn, meta_filter.into()).map(move |(v, conn)| {
-                                out.append(v);
+                                    (out, conn)
+                                })
+                            }
+                        })
+                        .and_then({
+                            let data = data.clone();
+                            let meta_filter = filter.meta_filter.clone();
+                            move |(mut out, conn)| {
+                                session
+                                    .update(
+                                        conn,
+                                        CartItemSessionUpdater {
+                                            data,
+                                            filter: CartItemSessionFilter {
+                                                session_id: None,
+                                                meta_filter: filter.meta_filter,
+                                            },
+                                        },
+                                    )
+                                    .map(move |(v, conn)| {
+                                        for item in v {
+                                            out.push(item.into());
+                                        }
 
-                                (out, conn)
-                            })
-                        }
-                    })
+                                        (out, conn)
+                                    })
+                            }
+                        }),
+                )
             }
         }
     }
@@ -177,46 +234,60 @@ impl DbRepoDelete<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
 
         match customer {
             Some(customer) => match customer {
-                Anonymous(session_id) => self.session.delete(
-                    conn,
-                    CartItemSessionFilter {
-                        meta_filter,
-                        session_id: Some(session_id),
-                    },
+                Anonymous(session_id) => Box::new(
+                    self.session
+                        .delete(
+                            conn,
+                            CartItemSessionFilter {
+                                meta_filter,
+                                session_id: Some(session_id),
+                            },
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
-                User(user_id) => self.user.delete(
-                    conn,
-                    CartItemUserFilter {
-                        meta_filter,
-                        user_id: Some(user_id),
-                    },
+                User(user_id) => Box::new(
+                    self.user
+                        .delete(
+                            conn,
+                            CartItemUserFilter {
+                                meta_filter,
+                                user_id: Some(user_id),
+                            },
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
                 let user = self.user.clone();
                 let session = self.session.clone();
 
-                future::ok((vec![], conn))
-                    .and_then({
-                        let meta_filter = meta_filter.clone();
-                        move |(mut out, conn)| {
-                            user.delete(conn, meta_filter.into()).map(move |(v, conn)| {
-                                out.append(v);
+                Box::new(
+                    future::ok((vec![], conn))
+                        .and_then({
+                            let meta_filter = meta_filter.clone();
+                            move |(mut out, conn)| {
+                                user.delete(conn, meta_filter.into()).map(move |(v, conn)| {
+                                    for item in v {
+                                        out.push(item.into());
+                                    }
 
-                                (out, conn)
-                            })
-                        }
-                    })
-                    .and_then({
-                        let meta_filter = meta_filter.clone();
-                        move |(mut out, conn)| {
-                            session.delete(conn, meta_filter.into()).map(move |(v, conn)| {
-                                out.append(v);
+                                    (out, conn)
+                                })
+                            }
+                        })
+                        .and_then({
+                            let meta_filter = meta_filter.clone();
+                            move |(mut out, conn)| {
+                                session.delete(conn, meta_filter.into()).map(move |(v, conn)| {
+                                    for item in v {
+                                        out.push(item.into());
+                                    }
 
-                                (out, conn)
-                            })
-                        }
-                    })
+                                    (out, conn)
+                                })
+                            }
+                        }),
+                )
             }
         }
     }
@@ -257,10 +328,11 @@ fn check_acl(login: UserLogin, (entry, action): &mut AclContext) -> bool {
 pub fn make_repo(login: UserLogin) -> CartItemRepoImpl {
     let CartItemRepoImpl { user, session } = make_su_repo();
     CartItemRepoImpl {
-        user: user.try_unwrap()
-            .unwrap()
-            .with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
-            .into(),
+        user: match Rc::try_unwrap(user) {
+            Ok(v) => v.with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
+                .into(),
+            Err(_) => unreachable!(),
+        },
         session: session.into(),
     }
 }
