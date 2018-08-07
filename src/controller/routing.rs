@@ -102,16 +102,10 @@ pub fn make_router() -> RouteParser<Route> {
         None
     });
     route_parser.add_route_with_params(r"^/cart/by-user/(\d+)/products$", |params| {
-        if let Some(customer_id_s) = params.get(0) {
-            if let Some(product_id_s) = params.get(0) {
-                if let Ok(customer) = customer_id_s.parse().map(UserId).map(CartCustomer::User) {
-                    if let Ok(product_id) = product_id_s.parse().map(ProductId) {
-                        return Some(Route::CartProducts { customer });
-                    }
-                }
-            }
-        }
-        None
+        params
+            .get(0)
+            .and_then(|string_id| string_id.parse().ok().map(CartCustomer::User))
+            .map(|customer| Route::CartProducts { customer })
     });
     route_parser.add_route_with_params(r"^/cart/by-user/(\d+)/clear$", |params| {
         params

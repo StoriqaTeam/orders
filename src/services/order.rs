@@ -65,15 +65,15 @@ impl OrderServiceImpl {
             db_pool: db_pool.clone(),
             cart_repo_factory: Rc::new({
                 let login_data = login_data.clone();
-                || Box::new(repos::cart_item::make_repo(login_data.clone()))
+                move || Box::new(repos::cart_item::make_repo(login_data.clone()))
             }),
             order_diff_repo_factory: Rc::new({
                 let login_data = login_data.clone();
-                || Box::new(repos::order_diff::make_repo(login_data.clone()))
+                move || Box::new(repos::order_diff::make_repo(login_data.clone()))
             }),
             order_repo_factory: Rc::new({
                 let login_data = login_data.clone();
-                || Box::new(repos::order::make_repo(login_data.clone()))
+                move || Box::new(repos::order::make_repo(login_data.clone()))
             }),
             login_data,
         }
@@ -243,7 +243,10 @@ impl OrderService for OrderServiceImpl {
                                 }
                             }
                         }
-                        CartItemInserter { strategy: CartItemMergeStrategy::Replacer, data: cart_item }
+                        CartItemInserter {
+                            strategy: CartItemMergeStrategy::Replacer,
+                            data: cart_item,
+                        }
                     });
 
                     let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
@@ -265,7 +268,7 @@ impl OrderService for OrderServiceImpl {
         Box::new(
             self.db_pool
                 .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
-                .map(|orders| orders.first().cloned()),
+                .map(|mut orders| orders.pop().map(|v| v.0)),
         )
     }
 
@@ -279,12 +282,14 @@ impl OrderService for OrderServiceImpl {
                 OrderIdentifier::Slug(_slug) => Box::new(
                     db_pool
                         .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
-                        .map(|orders| orders.first().map(|order| order.id)),
+                        .map(|mut orders| orders.pop().map(|order| order.0.id)),
                 ),
             }.and_then(move |id| match id {
                 None => Box::new(future::ok(vec![])) as ServiceFuture<Vec<OrderDiff>>,
                 Some(id) => Box::new(
-                    db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id).with_ordering(true))),
+                    db_pool
+                        .run(move |conn| (order_diff_repo_factory)().select(conn, OrderDiffFilter::from(id).with_ordering(true)))
+                        .map(|v| v.into_iter().map(|v| v.0).collect()),
                 ),
             }),
         )
@@ -292,28 +297,36 @@ impl OrderService for OrderServiceImpl {
 
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)().select(
-                conn,
-                OrderFilter {
-                    store: Some(store_id.into()),
-                    ..Default::default()
-                },
-            )
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (order_repo_factory)().select(
+                        conn,
+                        OrderFilter {
+                            store: Some(store_id.into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .map(|v| v.into_iter().map(|v| v.0).collect()),
+        )
     }
 
     fn get_orders_for_user(&self, customer: UserId) -> ServiceFuture<Vec<Order>> {
         let order_repo_factory = self.order_repo_factory.clone();
-        Box::new(self.db_pool.run(move |conn| {
-            (order_repo_factory)().select(
-                conn,
-                OrderFilter {
-                    customer: Some(customer.into()),
-                    ..Default::default()
-                },
-            )
-        }))
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (order_repo_factory)().select(
+                        conn,
+                        OrderFilter {
+                            customer: Some(customer.into()),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .map(|v| v.into_iter().map(|v| v.0).collect()),
+        )
     }
 
     fn delete_order(&self, order_id: OrderIdentifier) -> ServiceFuture<()> {
@@ -329,9 +342,10 @@ impl OrderService for OrderServiceImpl {
         let db_pool = self.db_pool.clone();
         let order_repo_factory = self.order_repo_factory.clone();
         Box::new(
-            future::result(terms.make_filter())
+            future::result(OrderFilter::from_search_terms(terms))
                 .map(|filter| filter.with_ordering(true))
-                .and_then(move |filter| db_pool.run(move |conn| (order_repo_factory)().select(conn, filter))),
+                .and_then(move |filter| db_pool.run(move |conn| (order_repo_factory)().select(conn, filter)))
+                .map(|v| v.into_iter().map(|v| v.0).collect()),
         )
     }
 
@@ -342,10 +356,15 @@ impl OrderService for OrderServiceImpl {
         comment: Option<String>,
         track_id: Option<String>,
     ) -> ServiceFuture<Option<Order>> {
+        use self::RepoLogin::*;
+
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diff_repo_factory = self.order_diff_repo_factory.clone();
         let db_pool = self.db_pool.clone();
-        let calling_user = self.calling_user;
+        let calling_user = match self.login_data.clone() {
+            User { caller_id, .. } => caller_id,
+            _ => UserId(-1),
+        };
         Box::new(
             db_pool
                 .run(move |conn| {
@@ -365,15 +384,15 @@ impl OrderService for OrderServiceImpl {
                         if let Some(order) = updated_order {
                             Box::new(
                                 (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                parent: order.id,
+                                parent: order.0.id,
                                 committer: calling_user,
                                 committed_at: Utc::now(),
-                                state: order.state.clone(),
+                                state: order.0.state.clone(),
                                 comment,
-                            }).map(move |(_, c)| (Some(order), c))
+                            }).map(move |(_, c)| (Some(order.0), c))
                             )
                         } else {
-                            Box::new(future::ok((None,conn))) as RepoConnectionFuture<Option<Order>>
+                            Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>
                         }
                     })
                 }),

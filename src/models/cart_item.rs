@@ -160,7 +160,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
 }
 
 impl Inserter for CartItemInserter {
-    fn into_insert_builder(self, table: &'static str) -> InsertBuilder {
+    fn into_insert_builder(self, _table: &'static str) -> InsertBuilder {
         unreachable!()
     }
 }
@@ -174,14 +174,14 @@ pub struct CartItemUpdateData {
 
 #[derive(Clone, Debug)]
 pub struct CartItemUserInserter {
-    strategy: CartItemMergeStrategy,
-    data: CartItemUser,
+    pub strategy: CartItemMergeStrategy,
+    pub data: CartItemUser,
 }
 
 #[derive(Clone, Debug)]
 pub struct CartItemSessionInserter {
-    strategy: CartItemMergeStrategy,
-    data: CartItemSession,
+    pub strategy: CartItemMergeStrategy,
+    pub data: CartItemSession,
 }
 
 impl Inserter for CartItemUserInserter {
@@ -302,7 +302,7 @@ impl CartItemMetaFilter {
 
 impl Filter for CartItemMetaFilter {
     fn into_filtered_operation_builder(self, table: &'static str) -> FilteredOperationBuilder {
-        let mut b = FilteredOperationBuilder::new(table);
+        let b = FilteredOperationBuilder::new(table);
 
         self.write_into_filtered_operation_builder(b)
     }

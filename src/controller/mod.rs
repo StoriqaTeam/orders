@@ -98,7 +98,7 @@ impl Controller for ControllerImpl {
                 .and_then({
                     let service_factory = service_factory.clone();
                     move |login_data| {
-                        match (method, route) {
+                        match (method.clone(), route.clone()) {
                             (Get, Some(Route::Cart { customer })) => {
                                 return if let (Some(from), Some(count)) =
                                     parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i32)

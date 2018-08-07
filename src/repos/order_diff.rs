@@ -23,6 +23,6 @@ pub fn make_su_repo() -> Repo {
     Repo::new(TABLE)
 }
 
-pub fn make_repo(login_data: UserLogin) -> Repo {
+pub fn make_repo(_login_data: UserLogin) -> Repo {
     make_su_repo()
 }

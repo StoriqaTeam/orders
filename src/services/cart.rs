@@ -46,9 +46,12 @@ impl CartServiceImpl {
     /// Create new cart service with provided DB connection pool
     pub fn new(db_pool: DbPool, login_data: UserLogin) -> Self {
         Self {
-            login_data,
             db_pool,
-            repo_factory: Rc::new(|| Box::new(repos::cart_item::make_repo(login_data))),
+            repo_factory: Rc::new({
+                let login_data = login_data.clone();
+                move || Box::new(repos::cart_item::make_repo(login_data.clone()))
+            }),
+            login_data,
         }
     }
 }

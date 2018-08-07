@@ -184,7 +184,7 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                         data,
                                         filter: CartItemUserFilter {
                                             user_id: None,
-                                            meta_filter: filter.meta_filter,
+                                            meta_filter,
                                         },
                                     },
                                 ).map(move |(v, conn)| {
@@ -207,7 +207,7 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                             data,
                                             filter: CartItemSessionFilter {
                                                 session_id: None,
-                                                meta_filter: filter.meta_filter,
+                                                meta_filter,
                                             },
                                         },
                                     )
@@ -302,7 +302,7 @@ pub fn make_su_repo() -> CartItemRepoImpl {
 
 type AclContext = (CartItemUser, Action);
 
-fn check_acl(login: UserLogin, (entry, action): &mut AclContext) -> bool {
+fn check_acl(login: UserLogin, (entry, _action): &mut AclContext) -> bool {
     use self::RepoLogin::*;
     use models::UserRole::*;
 
