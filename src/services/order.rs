@@ -54,7 +54,7 @@ pub trait OrderService {
 pub struct OrderServiceImpl {
     pub db_pool: DbPool,
     pub login_data: UserLogin,
-    pub cart_repo_factory: Rc<Fn() -> Box<CartItemUserRepo>>,
+    pub cart_repo_factory: Rc<Fn() -> Box<CartItemRepo>>,
     pub order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     pub order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
 }
@@ -90,10 +90,15 @@ impl OrderService for OrderServiceImpl {
         receiver_name: String,
         receiver_phone: String,
     ) -> ServiceFuture<Vec<Order>> {
+        use self::RepoLogin::*;
+
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
         let cart_repo_factory = self.cart_repo_factory.clone();
-        let calling_user = self.calling_user;
+        let calling_user = match self.login_data.clone() {
+            User { caller_id, .. } => caller_id,
+            _ => UserId(-1),
+        };
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
@@ -142,15 +147,15 @@ impl OrderService for OrderServiceImpl {
                                         // Insert new order along with the record in history
                                         (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
                                             (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                                parent: inserted_order.id,
+                                                parent: inserted_order.0.id,
                                                 committer: calling_user,
                                                 committed_at: Utc::now(),
                                                 state: OrderState::New,
                                                 comment: Some(comment),
                                             }).map(|(_, conn)| (inserted_order, conn))
                                         }).map({
-                                            move |(order, conn): (Order, RepoConnection)| {
-                                                out_data.push(order);
+                                            move |(order, conn): (DbOrder, RepoConnection)| {
+                                                out_data.push(order.0);
                                                 (out_data, conn)
                                             }
                                         })
@@ -185,12 +190,12 @@ impl OrderService for OrderServiceImpl {
                         for order in orders {
                             out = Box::new(out.and_then({
                                 let order_diff_repo_factory = order_diff_repo_factory.clone();
-                                move |(mut orders_with_diffs, conn): (Vec<(Order, Vec<OrderDiff>)>, _)| {
+                                move |(mut orders_with_diffs, conn): (Vec<(DbOrder, Vec<DbOrderDiff>)>, _)| {
                                     (order_diff_repo_factory)()
                                         .delete(
                                             conn,
                                             OrderDiffFilter {
-                                                parent: Some(order.id.into()),
+                                                parent: Some(order.0.id.into()),
                                                 ..Default::default()
                                             },
                                         )
@@ -221,24 +226,24 @@ impl OrderService for OrderServiceImpl {
                 })
                 .and_then(move |(orders_with_diffs, conn)| {
                     let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
-                        let mut cart_item = CartItemUser {
-                            id: order.created_from,
-                            user_id: order.customer,
-                            product_id: order.product,
-                            quantity: order.quantity,
+                        let mut cart_item = CartItem {
+                            id: order.0.created_from,
+                            customer: CartCustomer::User(order.0.customer),
+                            product_id: order.0.product,
+                            quantity: order.0.quantity,
                             selected: true,
                             comment: "".into(),
-                            store_id: order.store,
+                            store_id: order.0.store,
                         };
                         for diff in diffs {
-                            if diff.state == OrderState::New {
-                                if let Some(comment) = diff.comment {
+                            if diff.0.state == OrderState::New {
+                                if let Some(comment) = diff.0.comment {
                                     cart_item.comment = comment;
                                     break;
                                 }
                             }
                         }
-                        CartItemUserInserter::Replacer(cart_item)
+                        CartItemInserter { strategy: CartItemMergeStrategy::Replacer, data: cart_item }
                     });
 
                     let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;

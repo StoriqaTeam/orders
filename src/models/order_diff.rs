@@ -15,6 +15,7 @@ const COMMITTED_AT_COLUMN: &str = "committed_at";
 const STATE_COLUMN: &str = "state";
 const COMMENT_COLUMN: &str = "comment";
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct DbOrderDiff(pub OrderDiff);
 
 impl From<Row> for DbOrderDiff {

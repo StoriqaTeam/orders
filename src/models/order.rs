@@ -94,6 +94,7 @@ pub fn address_from_row(row: &Row) -> AddressFull {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct DbOrder(pub Order);
 
 impl From<Row> for DbOrder {
@@ -177,13 +178,6 @@ impl Inserter for OrderInserter {
 }
 
 pub type AddressMask = AddressFull;
-
-/// Anything that can uniquely identify an Order
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum OrderIdentifier {
-    Id(OrderId),
-    Slug(OrderSlug),
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct OrderFilter {
