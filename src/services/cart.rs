@@ -37,7 +37,6 @@ pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
 
 /// Default implementation of user cart service
 pub struct CartServiceImpl {
-    login_data: UserLogin,
     db_pool: DbPool,
     repo_factory: ProductRepoFactory,
 }
@@ -51,7 +50,6 @@ impl CartServiceImpl {
                 let login_data = login_data.clone();
                 move || Box::new(repos::cart_item::make_repo(login_data.clone()))
             }),
-            login_data,
         }
     }
 }
