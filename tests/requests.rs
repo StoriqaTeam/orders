@@ -21,7 +21,7 @@ struct RpcClient {
 }
 
 impl RpcClient {
-    fn new<S>(base_url: &S, user: UserId) -> Self
+    pub fn new<S>(base_url: &S, user: UserId) -> Self
     where
         S: ToString,
     {
@@ -30,7 +30,7 @@ impl RpcClient {
         }
     }
 
-    fn set_cart_items(&self, products: Vec<CartItem>) {
+    pub fn set_cart_items(&self, products: Vec<CartItem>) {
         let mut core = Core::new().unwrap();
         for product in products {
             core.run(self.inner.delete_item(product.customer, product.product_id)).unwrap();
@@ -45,10 +45,13 @@ impl RpcClient {
         }
     }
 
-    fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
+    pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
         let mut core = Core::new().unwrap();
-        let mut rsp = core.run(self.inner.increment_item(customer, product_id, store_id)).unwrap();
-        let v = rsp.into_iter().filter(|cart_item| cart_item.product_id == product_id).next().unwrap();
+        let rsp = core.run(self.inner.increment_item(customer, product_id, store_id)).unwrap();
+        let v = rsp.into_iter()
+            .filter(|cart_item| cart_item.product_id == product_id)
+            .next()
+            .unwrap();
         assert_eq!(
             v,
             CartItem {
@@ -81,7 +84,7 @@ fn test_carts_service() {
     let store_id = StoreId(1337);
 
     for id in vec![user_1, anon_1] {
-        println!("Clearing cart for {:?}", id);
+        println!("Clearing cart for {}", id);
         assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![]);
     }
 

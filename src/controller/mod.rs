@@ -104,32 +104,32 @@ impl Controller for ControllerImpl {
                                     parse_query!(uri.query().unwrap_or_default(), "offset" => ProductId, "count" => i32)
                                 {
                                     debug!(
-                                        "Received request to get {} products starting from {} for customer {:?}",
+                                        "Received request to get {} products starting from {} for customer {}",
                                         count, from, customer
                                     );
                                     serialize_future((service_factory.cart)(login_data).list(customer, from, count))
                                 } else {
                                     serialize_future::<String, _, _>(future::err(
-                                        format_err!("Error parsing request from gateway body").context(Error::ParseError),
+                                        format_err!("Failed to retrieve query parameters from request").context(Error::ParseError),
                                     ))
                                 }
                             }
                             (Get, Some(Route::CartProducts { customer })) => {
                                 return serialize_future({
-                                    debug!("Received request to get cart for customer {:?}", customer);
+                                    debug!("Received request to get cart for customer {}", customer);
                                     (service_factory.cart)(login_data).get_cart(customer)
                                 })
                             }
                             (Post, Some(Route::CartClear { customer })) => {
                                 return serialize_future({
-                                    debug!("Received request to clear cart for customer {:?}", customer);
+                                    debug!("Received request to clear cart for customer {}", customer);
                                     (service_factory.cart)(login_data).clear_cart(customer)
                                 })
                             }
                             (Delete, Some(Route::CartProduct { customer, product_id })) => {
                                 return serialize_future({
                                     debug!(
-                                        "Received request to delete product {} from cart for customer {:?}",
+                                        "Received request to delete product {} from cart for customer {}",
                                         product_id, customer
                                     );
                                     (service_factory.cart)(login_data).delete_item(customer, product_id)
@@ -140,7 +140,7 @@ impl Controller for ControllerImpl {
                                     parse_body::<CartProductQuantityPayload>(payload)
                                         .inspect(move |params| {
                                             debug!(
-                                                "Received request to set product {} in cart to quantity {} for customer {:?}",
+                                                "Received request to set product {} in cart to quantity {} for customer {}",
                                                 product_id, params.value, customer
                                             );
                                         })
@@ -154,7 +154,7 @@ impl Controller for ControllerImpl {
                                     parse_body::<CartProductSelectionPayload>(payload)
                                         .inspect(move |params| {
                                             debug!(
-                                                "Received request to set product {}'s selection in cart to {} for customer {:?}",
+                                                "Received request to set product {}'s selection in cart to {} for customer {}",
                                                 product_id, params.value, customer
                                             )
                                         })
@@ -168,7 +168,7 @@ impl Controller for ControllerImpl {
                                     parse_body::<CartProductCommentPayload>(payload)
                                         .inspect(move |comment_payload| {
                                             debug!(
-                                                "Received request to set product {}'s comment in cart to {} for customer {:?}",
+                                                "Received request to set product {}'s comment in cart to {} for customer {}",
                                                 product_id, comment_payload.value, customer
                                             )
                                         })
@@ -180,10 +180,7 @@ impl Controller for ControllerImpl {
                             (Post, Some(Route::CartIncrementProduct { customer, product_id })) => {
                                 return serialize_future({
                                     parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
-                                        debug!(
-                                            "Received request to increment product {} for customer {:?}",
-                                            product_id, customer
-                                        );
+                                        debug!("Received request to increment product {} for customer {}", product_id, customer);
                                         (service_factory.cart)(login_data).increment_item(customer, product_id, data.store_id)
                                     })
                                 })
@@ -191,14 +188,14 @@ impl Controller for ControllerImpl {
                             (Post, Some(Route::CartMerge)) => {
                                 return serialize_future({
                                     parse_body::<CartMergePayload>(payload).and_then(move |data| {
-                                        debug!("Received request to merge cart from session {:?} to user {:?}", data.from, data.to);
+                                        debug!("Received request to merge cart from customer {} to customer {}", data.from, data.to);
                                         (service_factory.cart)(login_data).merge(data.from, data.to)
                                     })
                                 })
                             }
                             (Get, Some(Route::OrdersByUser { user })) => {
                                 return serialize_future({
-                                    debug!("Received request to get orders for user {:?}", user);
+                                    debug!("Received request to get orders for user {}", user);
                                     (service_factory.order)(login_data).get_orders_for_user(user)
                                 })
                             }

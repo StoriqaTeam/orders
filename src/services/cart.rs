@@ -66,7 +66,7 @@ fn get_cart_from_repo(repo_factory: &ProductRepoFactory, conn: RepoConnection, c
 
 impl CartService for CartServiceImpl {
     fn get_cart(&self, customer: CartCustomer) -> ServiceFuture<Cart> {
-        debug!("Getting cart for customer {:?}.", customer);
+        debug!("Getting cart for customer {}.", customer);
         Box::new(self.db_pool.run({
             let repo_factory = self.repo_factory.clone();
             move |conn| {
@@ -82,7 +82,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn increment_item(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart> {
-        debug!("Adding 1 item {} into cart for customer {:?}", product_id, customer);
+        debug!("Adding 1 item {} into cart for customer {}", product_id, customer);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run({
@@ -102,7 +102,7 @@ impl CartService for CartServiceImpl {
                                         store_id,
 
                                         quantity: Quantity(1),
-                                        selected: false,
+                                        selected: true,
                                         comment: String::new(),
                                     },
                                 },
@@ -126,10 +126,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn set_quantity(&self, customer: CartCustomer, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Cart> {
-        debug!(
-            "Setting quantity for item {} for customer {:?} to {}",
-            product_id, customer, quantity
-        );
+        debug!("Setting quantity for item {} for customer {} to {}", product_id, customer, quantity);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -167,7 +164,7 @@ impl CartService for CartServiceImpl {
 
     fn set_selection(&self, customer: CartCustomer, product_id: ProductId, selected: bool) -> ServiceFuture<Cart> {
         debug!(
-            "Setting selection for item {} for customer {:?} to {}",
+            "Setting selection for item {} for customer {} to {}",
             product_id, customer, selected
         );
 
@@ -206,7 +203,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn set_comment(&self, customer: CartCustomer, product_id: ProductId, comment: String) -> ServiceFuture<Cart> {
-        debug!("Setting comment for item {} for customer {:?} to {}", product_id, customer, comment);
+        debug!("Setting comment for item {} for customer {} to {}", product_id, customer, comment);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -243,7 +240,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn delete_item(&self, customer: CartCustomer, product_id: ProductId) -> ServiceFuture<Cart> {
-        debug!("Deleting item {} for customer {:?}", product_id, customer);
+        debug!("Deleting item {} for customer {}", product_id, customer);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -274,7 +271,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn clear_cart(&self, customer: CartCustomer) -> ServiceFuture<Cart> {
-        debug!("Clearing cart for user {:?}", customer);
+        debug!("Clearing cart for user {}", customer);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(
@@ -293,7 +290,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn list(&self, customer: CartCustomer, from: ProductId, count: i32) -> ServiceFuture<Cart> {
-        debug!("Getting {} cart items starting from {} for customer {:?}", count, from, customer);
+        debug!("Getting {} cart items starting from {} for customer {}", count, from, customer);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
@@ -316,7 +313,7 @@ impl CartService for CartServiceImpl {
     }
 
     fn merge(&self, from: CartCustomer, to: CartCustomer) -> ServiceFuture<Cart> {
-        debug!("Merging cart contents from {:?} to {:?}", from, to);
+        debug!("Merging cart contents from {} to {}", from, to);
 
         let repo_factory = self.repo_factory.clone();
         Box::new(self.db_pool.run(move |conn| {
