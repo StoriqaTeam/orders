@@ -34,7 +34,7 @@ impl RpcClient {
         }
     }
 
-    fn set_cart_items(&mut self, products: Vec<CartItem>) {
+    fn set_cart_items(&self, products: Vec<CartItem>) {
         for product in products.iter() {
             tokio::run(self.inner.delete_item(product.customer, product.product_id)).unwrap();
             tokio::run(self.inner.increment_item(product.customer, product.store, product.store_id)).unwrap();
@@ -43,6 +43,26 @@ impl RpcClient {
             tokio::run(self.inner.set_comment(product.customer, product.product_id, product.comment)).unwrap();
         }
     }
+
+    fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) {
+        let rsp = core.run(rpc.inner.increment_cart(customer, product_id, store_id)).unwrap();
+        assert_eq!(
+            rsp,
+            vec![
+                product_id.clone(),
+                CartItem {
+                    id: *rsp.iter().last().unwrap().id,
+                    customer,
+                    product_id: product_id,
+                    quantity: Quantity(1),
+                    selected: true,
+                    comment: String::new(),
+                    store_id,
+                },
+            ]
+        );
+        rsp.pop().unwrap()
+    }
 }
 
 #[test]
@@ -50,8 +70,8 @@ fn test_carts_service() {
     let base_url = common::setup();
     let (mut core, http_client) = common::make_utils();
 
-    let user_id = UserId(777);
-    let user_id_2 = UserId(24361345);
+    let user_1 = CartCustomer::User(UserId(777));
+    let anon_1 = CartCustomer::Session(SessionId(24361345));
 
     let su_rpc = RpcClient::new(base_url.clone(), UserId(1));
     let rpc = RpcClient::new(base_url.clone(), user_id);
@@ -62,19 +82,18 @@ fn test_carts_service() {
     let product_id_3 = ProductId(88888);
     let quantity_3 = Quantity(9002);
 
-    for id in vec![user_id, user_id_2] {
-        assert_eq!(core.run(su_rpc.inner.clear_cart(CartCustomer::User(user_id))).unwrap(), hashmap!{},);
+    for id in vec![user_1, anon_1] {
+        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![],);
     }
 
     let product_id_1 = ProductId(12345);
     let mut product_1 = {
-        let rsp = core.run(rpc.inner.increment_cart(CartCustomer::User(user_id), product_id_1))
-            .unwrap();
+        let rsp = core.run(rpc.inner.increment_cart(user_1, product_id_1)).unwrap();
         assert_eq!(
             rsp,
             vec![CartItem {
                 id: rsp[0].id,
-                customer: CartCustomer::User(user_id),
+                customer: user_1,
                 product_id: product_id_1,
                 quantity: Quantity(1),
                 selected: true,
@@ -85,43 +104,36 @@ fn test_carts_service() {
         rsp.pop().unwrap()
     };
 
-    assert_eq!(
-        core.run(rpc.inner.get_cart(CartCustomer::User(user_id))).unwrap(),
-        vec![product_1.clone()]
-    );
+    assert_eq!(core.run(rpc.inner.get_cart(user_1)).unwrap(), vec![product_1.clone()]);
 
     product_1.quantity = 5;
     assert_eq!(
-        core.run(rpc.inner.set_quantity(CartCustomer::User(user_id), product_id_1, 5))
-            .unwrap(),
+        core.run(rpc.inner.set_quantity(user_1, product_id_1, 5)).unwrap(),
         vec![product_1.clone()]
     );
 
     product_1.selected = false;
     assert_eq!(
-        core.run(rpc.inner.set_selected(CartCustomer::User(user_id), product_id_1, false))
-            .unwrap(),
+        core.run(rpc.inner.set_selected(user_1, product_id_1, false)).unwrap(),
         vec![product_1.clone()]
     );
 
     product_1.comment = "MyComment".into();
     assert_eq!(
-        core.run(rpc.inner.set_comment(CartCustomer::User(user_id), product_id_1, "MyComment".into()))
-            .unwrap(),
+        core.run(rpc.inner.set_comment(user_1, product_id_1, "MyComment".into())).unwrap(),
         vec![product_1.clone()]
     );
 
     let product_id_2 = ProductId(67890);
     let mut product_2 = {
-        let rsp = core.run(rpc.inner.increment_cart(CartCustomer::User(user_id), product_id_1))
-            .unwrap();
+        let rsp = core.run(rpc.inner.increment_cart(user_1, product_id_1)).unwrap();
         assert_eq!(
             rsp,
             vec![
                 product_id_1.clone(),
                 CartItem {
-                    id: rsp[0].id,
-                    customer: CartCustomer::User(user_id),
+                    id: *rsp.iter().last().unwrap().id,
+                    customer: user_1,
                     product_id: product_id_2,
                     quantity: Quantity(1),
                     selected: true,
@@ -135,182 +147,60 @@ fn test_carts_service() {
 
     product_2.quantity.0 += 1;
     assert_eq!(
-        core.run(rpc.inner.increment(CartCustomer::User(user_id), product_id_2)).unwrap(),
+        core.run(rpc.inner.increment(user_1, product_id_2)).unwrap(),
         vec![product_1.clone(), product_2.clone()]
     );
 
     assert_eq!(
-        core.run(rpc.inner.set_quantity(CartCustomer::User(user_id), product_id_3, quantity_3)).unwrap().into_iter().filter(|cart_item| cart_item.product_id == product_id_3).first()
+        core.run(rpc.inner.set_quantity(user_1, product_id_3, quantity_3))
+            .unwrap()
+            .into_iter()
+            .filter(|cart_item| cart_item.product_id == product_id_3)
+            .first(),
         None,
     );
 
     assert_eq!(
-        core.run(rpc.inner.list(CartCustomer::User(user_id), ProductId(0), 2)).unwrap(),
-        hashmap!{
-            vec![product_1.clone(), product_2.clone()]
-        },
+        core.run(rpc.inner.list(user_1, ProductId(0), 2)).unwrap(),
+        vec![product_1.clone(), product_2.clone()],
     );
 
     assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Get,
-            format!("{}/cart/products", base_url),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap!{
-            product_id => CartItemInfo {
-                quantity,
-                selected: false,
-                comment: "MyComment".into(),
-                store_id,
-            },
-            product_id_2 => CartItemInfo {
-                quantity: quantity_2,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
+        core.run(rpc.inner.get_cart(user_1)).unwrap(),
+        vec![product_1.clone(), product_2.clone()],
     );
 
     {
         // Merge testing
-        let user_from = user_id_2;
-        let to_user = user_id;
+        let user_from = anon_1;
+        let to_user = user_1;
         let from_existing_product_id = product_id_2;
         let from_existing_product_quantity = Quantity(912673);
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/products/{}/increment", base_url, from_existing_product_id),
-                Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-                Some(user_from.to_string()),
-            )).unwrap(),
-            hashmap! {
-                from_existing_product_id => CartItemInfo {
-                    quantity: Quantity(1),
-                    selected: true,
-                comment: String::new(),
-                    store_id,
-                },
-            },
-        );
+        let mut from_existing_product = rpc.create_product(user_from, from_existing_product_id, store_id);
 
         let from_new_product_id = ProductId(2351143);
         let from_new_product_quantity = Quantity(2324);
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/products/{}/increment", base_url, from_new_product_id),
-                Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-                Some(user_from.to_string()),
-            )).unwrap(),
-            hashmap! {
-                from_existing_product_id => CartItemInfo {
-                    quantity: Quantity(1),
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                },
-                from_new_product_id => CartItemInfo {
-                    quantity: Quantity(1),
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                },
-            },
-        );
+        let mut from_new_product = rpc.create_product(user_from, from_new_product_id, store_id);
+
+        from_existing_product.quantity = from_existing_product_quantity;
+        rpc.inner
+            .set_quantity(user_from, from_existing_product_id, from_existing_product_quantity);
+
+        from_new_product.quantity = from_new_product_quantity;
+        rpc.inner.set_quantity(user_from, from_new_product_id, from_new_product_quantity);
+
+        from_new_product.customer = to_user;
 
         assert_eq!(
-            core.run(
-                http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/quantity", base_url, from_existing_product_id),
-                    Some(
-                        serde_json::to_string(&CartProductQuantityPayload {
-                            value: from_existing_product_quantity,
-                        }).unwrap(),
-                    ),
-                    Some(user_from.to_string()),
-                )
-            ).unwrap()
-                .remove(&from_existing_product_id)
-                .unwrap(),
-            CartItemInfo {
-                quantity: from_existing_product_quantity,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        );
-
-        assert_eq!(
-            core.run(
-                http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/quantity", base_url, from_new_product_id),
-                    Some(
-                        serde_json::to_string(&CartProductQuantityPayload {
-                            value: from_new_product_quantity,
-                        }).unwrap(),
-                    ),
-                    Some(user_from.to_string()),
-                )
-            ).unwrap()
-                .remove(&from_new_product_id)
-                .unwrap(),
-            CartItemInfo {
-                quantity: from_new_product_quantity,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        );
-
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/merge", base_url),
-                Some(serde_json::to_string(&CartMergePayload { user_from }).unwrap()),
-                Some(to_user.to_string()),
-            )).unwrap(),
-            hashmap!{
-                product_id => CartItemInfo {
-                    quantity,
-                    selected: false,
-                    comment: "MyComment".into(),
-                    store_id,
-                },
-                product_id_2 => CartItemInfo {
-                    quantity: quantity_2,
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                },
-                from_new_product_id => CartItemInfo {
-                    quantity: from_new_product_quantity,
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                }
-            },
+            core.run(rpc.inner.merge(user_from, to_user)).unwrap(),
+            vec![product_1.clone(), product_2.clone(), from_new_product.clone()],
         );
         // End of merge testing
     }
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Delete,
-            format!("{}/cart/products/{}", base_url, product_id_1),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id_1),
-        None,
-    );
-
-    rpc.clear_cart();
+    for id in vec![user_1, anon_1] {
+        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![],);
+    }
 }
 
 #[test]

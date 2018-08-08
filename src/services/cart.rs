@@ -30,7 +30,7 @@ pub trait CartService {
     /// Iterate over cart
     fn list(&self, customer: CartCustomer, from: ProductId, count: i32) -> ServiceFuture<Cart>;
     /// Merge carts
-    fn merge(&self, from: SessionId, to: UserId) -> ServiceFuture<Cart>;
+    fn merge(&self, from: CartCustomer, to: CartCustomer) -> ServiceFuture<Cart>;
 }
 
 pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
@@ -315,7 +315,7 @@ impl CartService for CartServiceImpl {
         }))
     }
 
-    fn merge(&self, from: SessionId, to: UserId) -> ServiceFuture<Cart> {
+    fn merge(&self, from: CartCustomer, to: CartCustomer) -> ServiceFuture<Cart> {
         debug!("Merging cart contents from {:?} to {:?}", from, to);
 
         let repo_factory = self.repo_factory.clone();
@@ -327,7 +327,7 @@ impl CartService for CartServiceImpl {
                         (repo_factory)().delete(
                             conn,
                             CartItemFilter {
-                                customer: Some(CartCustomer::Anonymous(from)),
+                                customer: Some(from),
                                 ..Default::default()
                             },
                         )
@@ -347,7 +347,7 @@ impl CartService for CartServiceImpl {
                                             strategy: CartItemMergeStrategy::CollisionNoOp,
                                             data: CartItem {
                                                 id: CartItemId::new(),
-                                                customer: CartCustomer::User(to),
+                                                customer: to,
                                                 ..cart_item
                                             },
                                         },
@@ -360,7 +360,7 @@ impl CartService for CartServiceImpl {
                 })
                 .and_then({
                     let repo_factory = repo_factory.clone();
-                    move |(_, conn)| get_cart_from_repo(&repo_factory.clone(), conn, CartCustomer::User(to))
+                    move |(_, conn)| get_cart_from_repo(&repo_factory.clone(), conn, to)
                 })
         }))
     }
