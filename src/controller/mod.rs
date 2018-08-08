@@ -191,7 +191,7 @@ impl Controller for ControllerImpl {
                             (Post, Some(Route::CartMerge)) => {
                                 return serialize_future({
                                     parse_body::<CartMergePayload>(payload).and_then(move |data| {
-                                        debug!("Received request to merge cart from session {} to user {}", data.from, data.to);
+                                        debug!("Received request to merge cart from session {:?} to user {:?}", data.from, data.to);
                                         (service_factory.cart)(login_data).merge(data.from, data.to)
                                     })
                                 })
