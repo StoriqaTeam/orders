@@ -48,7 +48,7 @@ impl RpcClient {
     fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
         let mut core = Core::new().unwrap();
         let mut rsp = core.run(self.inner.increment_item(customer, product_id, store_id)).unwrap();
-        let v = rsp.pop().unwrap();
+        let v = rsp.into_iter().filter(|cart_item| cart_item.product_id == product_id).next().unwrap();
         assert_eq!(
             v,
             CartItem {
