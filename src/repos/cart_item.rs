@@ -9,7 +9,7 @@ use stq_db::repo::*;
 use stq_db::statement::*;
 use stq_types::*;
 
-const USER_TABLE: &str = "cart_items";
+const USER_TABLE: &str = "cart_items_user";
 const SESSION_TABLE: &str = "cart_items_session";
 
 pub trait CartItemUserRepo: DbRepo<CartItemUser, CartItemUserInserter, CartItemUserFilter, CartItemUserUpdater, RepoError> {}

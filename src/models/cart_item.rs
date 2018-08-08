@@ -204,7 +204,7 @@ impl Inserter for CartItemUserInserter {
                  user_id = EXCLUDED.user_id\
                  ",
             ),
-            Incrementer => b.with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items.quantity + 1"),
+            Incrementer => b.with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items_user.quantity + 1"),
             CollisionNoOp => b.with_extra("ON CONFLICT (user_id, product_id) DO NOTHING"),
         }
     }
@@ -230,7 +230,7 @@ impl Inserter for CartItemSessionInserter {
                  session_id = EXCLUDED.session_id\
                  ",
             ),
-            Incrementer => b.with_extra("ON CONFLICT (session_id, product_id) DO UPDATE SET quantity = cart_items.quantity + 1"),
+            Incrementer => b.with_extra("ON CONFLICT (session_id, product_id) DO UPDATE SET quantity = cart_items_session.quantity + 1"),
             CollisionNoOp => b.with_extra("ON CONFLICT (session_id, product_id) DO NOTHING"),
         }
     }

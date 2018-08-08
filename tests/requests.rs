@@ -81,7 +81,8 @@ fn test_carts_service() {
     let store_id = StoreId(1337);
 
     for id in vec![user_1, anon_1] {
-        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![],);
+        println!("Clearing cart for {:?}", id);
+        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![]);
     }
 
     let product_id_1 = ProductId(12345);
@@ -150,7 +151,7 @@ fn test_carts_service() {
             .set_quantity(user_from, from_existing_product_id, from_existing_product_quantity);
 
         from_new_product.quantity = from_new_product_quantity;
-        rpc.inner.set_quantity(user_from, from_new_product_id,   from_new_product_quantity);
+        rpc.inner.set_quantity(user_from, from_new_product_id, from_new_product_quantity);
 
         from_new_product.customer = to_user;
 
