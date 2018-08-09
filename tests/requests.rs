@@ -30,19 +30,23 @@ impl RpcClient {
         }
     }
 
-    pub fn set_cart_items(&self, products: Vec<CartItem>) {
+    pub fn set_cart_items(&self, products: Cart) -> Cart {
+        let mut out = Cart::new();
+
         let mut core = Core::new().unwrap();
         for product in products {
             core.run(self.inner.delete_item(product.customer, product.product_id)).unwrap();
-            core.run(self.inner.increment_item(product.customer, product.product_id, product.store_id))
+            out = core.run(self.inner.increment_item(product.customer, product.product_id, product.store_id))
                 .unwrap();
-            core.run(self.inner.set_quantity(product.customer, product.product_id, product.quantity))
+            out = core.run(self.inner.set_quantity(product.customer, product.product_id, product.quantity))
                 .unwrap();
-            core.run(self.inner.set_selection(product.customer, product.product_id, product.selected))
+            out = core.run(self.inner.set_selection(product.customer, product.product_id, product.selected))
                 .unwrap();
-            core.run(self.inner.set_comment(product.customer, product.product_id, product.comment))
+            out = core.run(self.inner.set_comment(product.customer, product.product_id, product.comment))
                 .unwrap();
         }
+
+        out
     }
 
     pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
@@ -182,16 +186,20 @@ fn test_carts_service() {
     }
 }
 
-/*
 #[test]
 fn test_orders_conversion() {
     let base_url = common::setup();
-    let (mut core, http_client) = common::make_utils();
+    let mut core = Core::new().unwrap();
 
     let user = UserId(7234212);
 
-    let cart_fixture = vec![
+    let rpc = RpcClient::new(&base_url, user);
+
+    core.run(rpc.inner.clear_cart(user)).unwrap();
+    let cart_fixture = core.run(rpc.set_cart_items(vec![
         CartItem {
+            id: CartItemId::new(),
+            customer: CartCustomer::User(user),
             product_id: ProductId(634824),
             quantity: Quantity(1),
             selected: true,
@@ -199,6 +207,8 @@ fn test_orders_conversion() {
             store_id: StoreId(1001),
         },
         CartItem {
+            id: CartItemId::new(),
+            customer: CartCustomer::User(user),
             product_id: ProductId(5612213),
             quantity: Quantity(25),
             selected: true,
@@ -206,41 +216,50 @@ fn test_orders_conversion() {
             store_id: StoreId(1001),
         },
         CartItem {
+            id: CartItemId::new(),
+            customer: CartCustomer::User(user),
             product_id: ProductId(112314512),
             quantity: Quantity(12),
             selected: false,
             comment: "Product 3 comment".into(),
             store_id: StoreId(1001),
         },
-    ];
+    ]));
 
-    let convert_cart_payload = ConvertCartPayload {
-        conversion_id: Some(ConversionId::new()),
-        customer_id: user,
-        receiver_name: "Mr. Anderson".into(),
-        receiver_phone: "+14441234567".into(),
-        address: AddressFull {
-            country: Some("Matrix".into()),
-            locality: Some("Central city".into()),
-            ..Default::default()
-        },
-        prices: hashmap! {
-            cart_fixture[0].product_id => ProductSellerPrice { price: ProductPrice(41213.0), currency_id: CurrencyId(1) },
-            cart_fixture[1].product_id => ProductSellerPrice { price: ProductPrice(84301.0), currency_id: CurrencyId(2) },
-        },
+    let conversion_id = ConversionId::new();
+    let prices = [
+        (
+            cart_fixture[0].product_id,
+            ProductSellerPrice {
+                price: ProductPrice(41213.0),
+                currency_id: CurrencyId(1),
+            },
+        ),
+        (
+            cart_fixture[1].product_id,
+            ProductSellerPrice {
+                price: ProductPrice(84301.0),
+                currency_id: CurrencyId(2),
+            },
+        ),
+    ].into_iter()
+        .collect();
+    let address = AddressFull {
+        country: Some("Matrix".into()),
+        locality: Some("Central city".into()),
+        ..Default::default()
     };
-
-    let mut rpc = RpcClient::new(base_url.clone(), user);
-
-    rpc.clear_cart();
-    rpc.initialize_cart(cart_fixture.clone());
+    let receiver_name = "Mr. Anderson".to_string();
+    let receiver_phone = "+14441234567".to_string();
 
     {
-        let new_orders = core.run(http_client.request_with_auth_header::<Vec<Order>>(
-            Method::Post,
-            format!("{}/orders/create_from_cart", base_url),
-            Some(serde_json::to_string(&convert_cart_payload).unwrap()),
-            Some(user.to_string()),
+        let new_orders = core.run(rpc.convert_cart(
+            Some(conversion_id),
+            user,
+            prices.clone(),
+            address.clone(),
+            receiver_name.clone(),
+            receiver_phone.clone(),
         )).unwrap();
 
         let created_orders_fixture = cart_fixture
@@ -281,7 +300,7 @@ fn test_orders_conversion() {
 
         assert_eq!(new_orders, created_orders_fixture);
         assert_eq!(
-            core.run(rpc.inner.get_cart()),
+            core.run(rpc.inner.get_cart(CartCustomer::User(user))),
             cart_fixture
                 .clone()
                 .into_iter()
@@ -292,28 +311,13 @@ fn test_orders_conversion() {
 
         rpc.set_cart_items(vec![cart_fixture[0].clone()]);
 
-        core.run(
-            http_client.request_with_auth_header::<()>(
-                Method::Post,
-                format!("{}/orders/create_from_cart/revert", base_url),
-                Some(
-                    serde_json::to_string(&ConvertCartRevertPayload {
-                        conversion_id: convert_cart_payload.conversion_id.unwrap(),
-                    }).unwrap(),
-                ),
-                Some(user.to_string()),
-            ),
-        ).unwrap();
+        core.run(rpc.inner.revert_cart_conversion(convertsion_id)).unwrap();
 
         for order in created_orders_fixture.iter() {
-            assert_eq!(rpc.get_order(order.id), None);
+            assert_eq!(core.run(rpc.inner.get_order(OrderIdentifier::Id(order.id))).unwrap(), None);
         }
-        assert_eq!(
-            rpc.get_cart(),
-            cart_fixture.clone().into_iter().map(CartItem::into_meta).collect::<Cart>()
-        );
+        assert_eq!(rpc.inner.get_cart(CartCustomer::User(user)), cart_fixture);
     }
 
-    rpc.clear_cart();
+    core.run(rpc.inner.clear_cart(CartCustomer::User(user))).unwrap();
 }
-*/
