@@ -83,11 +83,12 @@ fn test_carts_service() {
 
     let store_id = StoreId(1337);
 
+    // Clear cart
     for id in vec![user_1, anon_1] {
-        println!("Clearing cart for {}", id);
         assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![]);
     }
 
+    // Create product and set metadata
     let product_id_1 = ProductId(12345);
     let mut product_1 = rpc.create_product(user_1, product_id_1, store_id);
 
@@ -111,8 +112,9 @@ fn test_carts_service() {
         vec![product_1.clone()]
     );
 
+    // Create another product and set meta
     let product_id_2 = ProductId(67890);
-    let mut product_2 = rpc.create_product(user_1, product_id_1, store_id);
+    let mut product_2 = rpc.create_product(user_1, product_id_2, store_id);
 
     product_2.quantity.0 += 1;
     assert_eq!(
@@ -120,7 +122,7 @@ fn test_carts_service() {
         vec![product_1.clone(), product_2.clone()]
     );
 
-    // We cannot set quantity for the product that does not exist
+    // Check that we cannot set quantity for the product that does not exist
     let product_id_3 = ProductId(88888);
     let quantity_3 = Quantity(9002);
     for cart_item in core.run(rpc.inner.set_quantity(user_1, product_id_3, quantity_3)).unwrap() {
@@ -137,8 +139,8 @@ fn test_carts_service() {
         vec![product_1.clone(), product_2.clone()],
     );
 
+    // Test merging
     {
-        // Merge testing
         let user_from = anon_1;
         let to_user = user_1;
         let from_existing_product_id = product_id_2;
@@ -150,11 +152,20 @@ fn test_carts_service() {
         let mut from_new_product = rpc.create_product(user_from, from_new_product_id, store_id);
 
         from_existing_product.quantity = from_existing_product_quantity;
-        rpc.inner
-            .set_quantity(user_from, from_existing_product_id, from_existing_product_quantity);
+        assert_eq!(
+            core.run(
+                rpc.inner
+                    .set_quantity(user_from, from_existing_product_id, from_existing_product_quantity)
+            ).unwrap(),
+            vec![from_existing_product.clone(), from_new_product.clone()]
+        );
 
         from_new_product.quantity = from_new_product_quantity;
-        rpc.inner.set_quantity(user_from, from_new_product_id, from_new_product_quantity);
+        assert_eq!(
+            core.run(rpc.inner.set_quantity(user_from, from_new_product_id, from_new_product_quantity))
+                .unwrap(),
+            vec![from_existing_product.clone(), from_new_product.clone()]
+        );
 
         from_new_product.customer = to_user;
 
@@ -167,7 +178,7 @@ fn test_carts_service() {
 
     // Clear cart after testing
     for id in vec![user_1, anon_1] {
-        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![],);
+        assert_eq!(core.run(su_rpc.inner.clear_cart(id)).unwrap(), vec![]);
     }
 }
 

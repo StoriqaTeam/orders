@@ -342,11 +342,7 @@ impl CartService for CartServiceImpl {
                                         conn,
                                         CartItemInserter {
                                             strategy: CartItemMergeStrategy::CollisionNoOp,
-                                            data: CartItem {
-                                                id: CartItemId::new(),
-                                                customer: to,
-                                                ..cart_item
-                                            },
+                                            data: CartItem { customer: to, ..cart_item },
                                         },
                                     )
                                     .map(|(_, conn)| ((), conn))

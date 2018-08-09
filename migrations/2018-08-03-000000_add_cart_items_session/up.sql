@@ -4,7 +4,8 @@ CREATE TABLE cart_items_session (
     product_id INTEGER NOT NULL,
     quantity   INTEGER NOT NULL,
     store_id   INTEGER NOT NULL,
-    comment    VARCHAR NOT NULL,
+    comment    VARCHAR NOT NULL DEFAULT '',
+    selected   BOOLEAN NOT NULL DEFAULT TRUE,
 
     CONSTRAINT cart_items_session_constraint UNIQUE (session_id, product_id)
 );
