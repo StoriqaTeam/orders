@@ -102,7 +102,7 @@ impl OrderService for OrderServiceImpl {
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
-                    .delete(conn, CartItemFilter { customer: Some(CartCustomer::User(customer_id)), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
+                    .delete(conn, CartItemFilter { customer: Some(customer_id.into()), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
                     // Create orders from cart items
                     .and_then(move |(cart, conn)| {
                         let mut order_items = Vec::new();

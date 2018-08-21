@@ -92,8 +92,8 @@ fn test_services() {
         // Carts
         {
             let u = UserId(777);
-            let user_1 = CartCustomer::User(u);
-            let anon_1 = CartCustomer::Anonymous(SessionId::new());
+            let user_1 = u.into();
+            let anon_1 = SessionId::new().into();
 
             let rpc = RpcClient::new(&base_url, u);
 
@@ -207,7 +207,7 @@ fn test_services() {
 
             let rpc = RpcClient::new(&base_url, user);
 
-            rpc.inner.clear_cart(CartCustomer::User(user)).wait().unwrap();
+            rpc.inner.clear_cart(user.into()).wait().unwrap();
 
             let product_id_1 = ProductId(634824);
             let product_id_2 = ProductId(5612213);
@@ -216,7 +216,7 @@ fn test_services() {
             let cart_fixture = rpc.set_cart_items(hashset![
                 CartItem {
                     id: CartItemId::new(),
-                    customer: CartCustomer::User(user),
+                    customer: user.into(),
                     product_id: product_id_1,
                     quantity: Quantity(1),
                     selected: true,
@@ -225,7 +225,7 @@ fn test_services() {
                 },
                 CartItem {
                     id: CartItemId::new(),
-                    customer: CartCustomer::User(user),
+                    customer: user.into(),
                     product_id: product_id_2,
                     quantity: Quantity(25),
                     selected: true,
@@ -234,7 +234,7 @@ fn test_services() {
                 },
                 CartItem {
                     id: CartItemId::new(),
-                    customer: CartCustomer::User(user),
+                    customer: user.into(),
                     product_id: product_id_3,
                     quantity: Quantity(12),
                     selected: false,
@@ -331,7 +331,7 @@ fn test_services() {
                         .collect::<HashMap<_, _>>()
                 );
                 assert_eq!(
-                    rpc.inner.get_cart(CartCustomer::User(user)).wait().unwrap(),
+                    rpc.inner.get_cart(user.into()).wait().unwrap(),
                     cart_fixture.clone().into_iter().filter(|item| !item.selected).collect::<Cart>()
                 );
 
@@ -340,12 +340,12 @@ fn test_services() {
                 su_rpc.inner.revert_cart_conversion(conversion_id).wait().unwrap();
 
                 for order in created_orders_fixture.iter() {
-                    assert_eq!(rpc.inner.get_order(OrderIdentifier::Id(order.id)).wait().unwrap(), None);
+                    assert_eq!(rpc.inner.get_order(order.id.into()).wait().unwrap(), None);
                 }
-                assert_eq!(rpc.inner.get_cart(CartCustomer::User(user)).wait().unwrap(), cart_fixture);
+                assert_eq!(rpc.inner.get_cart(user.into()).wait().unwrap(), cart_fixture);
             }
 
-            rpc.inner.clear_cart(CartCustomer::User(user)).wait().unwrap();
+            rpc.inner.clear_cart(user.into()).wait().unwrap();
         }
     }));
 }

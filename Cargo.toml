@@ -10,7 +10,7 @@ path = "src/lib.rs"
 bb8 = { git = "https://github.com/StoriqaTeam/bb8" }
 bb8-postgres = { git = "https://github.com/StoriqaTeam/bb8" }
 chrono = { version = "*", features = ["serde"] }
-config = "*"
+config = { version = "0.9", default-features = false, features = ["toml"] }
 derive_more = "0.11"
 either = "*"
 env_logger = "*"

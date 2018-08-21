@@ -40,7 +40,7 @@ impl From<CartItemUser> for CartItem {
     fn from(v: CartItemUser) -> Self {
         Self {
             id: v.id,
-            customer: CartCustomer::User(v.user_id),
+            customer: v.user_id.into(),
             product_id: v.product_id,
             quantity: v.quantity,
             selected: v.selected,
@@ -54,7 +54,7 @@ impl From<CartItemSession> for CartItem {
     fn from(v: CartItemSession) -> Self {
         Self {
             id: v.id,
-            customer: CartCustomer::Anonymous(v.session_id),
+            customer: v.session_id.into(),
             product_id: v.product_id,
             quantity: v.quantity,
             selected: v.selected,
