@@ -2,8 +2,7 @@ extern crate bb8;
 extern crate bb8_postgres;
 extern crate chrono;
 extern crate config as config_crate;
-#[macro_use]
-extern crate derive_more;
+extern crate either;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
@@ -11,8 +10,6 @@ extern crate futures;
 extern crate futures_state_stream;
 extern crate geo;
 extern crate hyper;
-#[macro_use]
-extern crate lazy_static;
 #[macro_use]
 extern crate log as log_crate;
 extern crate postgres;
@@ -22,18 +19,18 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate stq_acl;
+extern crate stq_api;
 extern crate stq_db;
 #[macro_use]
 extern crate stq_http;
 extern crate stq_logging;
+extern crate stq_roles;
 extern crate stq_router;
 extern crate stq_static_resources;
 extern crate stq_types;
 extern crate tokio_core;
 extern crate tokio_postgres;
 extern crate uuid;
-#[macro_use]
-extern crate validator_derive;
 extern crate validator;
 
 use bb8_postgres::PostgresConnectionManager;
@@ -90,7 +87,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
 
     let serve = Http::new()
         .serve_addr_handle(&listen_address, &core.handle(), move || {
-            let controller = controller::ControllerImpl::new(db_pool.clone(), config.clone());
+            let controller = controller::ControllerImpl::new(&db_pool, &config);
 
             // Prepare application
             let app = Application::<Error>::new(controller);

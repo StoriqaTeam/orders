@@ -1,6 +1,7 @@
 extern crate futures;
 extern crate rand;
 extern crate stq_http;
+extern crate stq_logging;
 extern crate tokio_core;
 
 extern crate orders_lib as lib;
@@ -13,6 +14,8 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 pub fn setup() -> String {
+    stq_logging::init(None);
+
     let (tx, rx) = channel::<bool>();
     let mut rng = rand::thread_rng();
     let port = rng.gen_range(50000, 60000);

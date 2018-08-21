@@ -4,695 +4,348 @@ extern crate hyper;
 extern crate maplit;
 extern crate orders_lib as lib;
 extern crate serde_json;
+extern crate stq_api;
 extern crate stq_http;
 extern crate stq_static_resources;
 extern crate stq_types;
-extern crate tokio_core;
+extern crate tokio;
 
 pub mod common;
 
-use hyper::{header::{Authorization, Cookie},
-            Headers,
-            Method};
-use lib::models::*;
-use stq_http::client::ClientHandle as HttpClientHandle;
+use futures::{future, prelude::*};
+use std::collections::HashMap;
+use stq_api::orders::*;
+use stq_api::rpc_client::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
-use tokio_core::reactor::Core;
 
 struct RpcClient {
-    http_client: HttpClientHandle,
-    core: Core,
-    base_url: String,
-    user: UserId,
+    pub inner: RestApiClient,
 }
 
 impl RpcClient {
-    fn new(base_url: String, user: UserId) -> Self {
-        let (core, http_client) = common::make_utils();
-        RpcClient {
-            http_client,
-            core,
-            base_url,
-            user,
+    pub fn new<S>(base_url: &S, user: UserId) -> Self
+    where
+        S: ToString,
+    {
+        Self {
+            inner: RestApiClient::new(base_url, Some(user)),
         }
     }
 
-    fn get_cart(&mut self) -> Cart {
-        self.core
-            .run(self.http_client.request_with_auth_header::<Cart>(
-                Method::Get,
-                format!("{}/cart/products", self.base_url),
-                None,
-                Some(self.user.to_string()),
-            ))
-            .unwrap()
+    pub fn set_cart_items(&self, products: Cart) -> Cart {
+        let mut out = Cart::new();
+
+        for product in products {
+            self.inner.delete_item(product.customer, product.product_id).wait().unwrap();
+            self.inner
+                .increment_item(product.customer, product.product_id, product.store_id)
+                .wait()
+                .unwrap();
+            self.inner
+                .set_quantity(product.customer, product.product_id, product.quantity)
+                .wait()
+                .unwrap();
+            self.inner
+                .set_selection(product.customer, product.product_id, product.selected)
+                .wait()
+                .unwrap();
+            out = self.inner
+                .set_comment(product.customer, product.product_id, product.comment)
+                .wait()
+                .unwrap();
+        }
+
+        out
     }
 
-    fn delete_cart_item(&mut self, item: ProductId) {
-        self.core
-            .run(self.http_client.request_with_auth_header::<Cart>(
-                Method::Delete,
-                format!("{}/cart/products/{}", self.base_url, item),
-                None,
-                Some(self.user.to_string()),
-            ))
+    pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
+        let rsp = self.inner.increment_item(customer, product_id, store_id).wait().unwrap();
+        let v = rsp.into_iter()
+            .filter(|cart_item| cart_item.product_id == product_id)
+            .next()
             .unwrap();
-    }
-
-    fn set_cart_items(&mut self, products: Vec<CartItem>) {
-        for product in products.iter() {
-            self.delete_cart_item(product.product_id);
-            self.core
-                .run(
-                    self.http_client.request_with_auth_header::<Cart>(
-                        Method::Post,
-                        format!("{}/cart/products/{}/increment", self.base_url, product.product_id),
-                        Some(
-                            serde_json::to_string(&CartProductIncrementPayload {
-                                store_id: product.store_id,
-                            }).unwrap(),
-                        ),
-                        Some(self.user.to_string()),
-                    ),
-                )
-                .unwrap();
-
-            self.core
-                .run(self.http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/quantity", self.base_url, product.product_id),
-                    Some(serde_json::to_string(&CartProductQuantityPayload { value: product.quantity }).unwrap()),
-                    Some(self.user.to_string()),
-                ))
-                .unwrap();
-
-            self.core
-                .run(self.http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/selection", self.base_url, product.product_id),
-                    Some(serde_json::to_string(&CartProductSelectionPayload { value: product.selected }).unwrap()),
-                    Some(self.user.to_string()),
-                ))
-                .unwrap();
-
-            self.core
-                .run(
-                    self.http_client.request_with_auth_header::<Cart>(
-                        Method::Put,
-                        format!("{}/cart/products/{}/comment", self.base_url, product.product_id),
-                        Some(
-                            serde_json::to_string(&CartProductCommentPayload {
-                                value: product.comment.clone(),
-                            }).unwrap(),
-                        ),
-                        Some(self.user.to_string()),
-                    ),
-                )
-                .unwrap();
-        }
-    }
-
-    fn initialize_cart(&mut self, products: Vec<CartItem>) {
-        self.set_cart_items(products.clone());
-
         assert_eq!(
-            self.get_cart(),
-            products.clone().into_iter().map(CartItem::into_meta).collect::<Cart>()
+            v,
+            CartItem {
+                id: v.id,
+                customer,
+                product_id,
+                quantity: Quantity(1),
+                selected: true,
+                comment: String::new(),
+                store_id,
+            },
         );
-    }
 
-    fn clear_cart(&mut self) {
-        assert_eq!(
-            self.core
-                .run(self.http_client.request_with_auth_header::<Cart>(
-                    Method::Post,
-                    format!("{}/cart/clear", self.base_url),
-                    None,
-                    Some(self.user.to_string()),
-                ))
-                .unwrap(),
-            hashmap!{},
-        );
-    }
-
-    fn get_order(&mut self, id: OrderId) -> Option<Order> {
-        self.core
-            .run(self.http_client.request_with_auth_header::<Option<Order>>(
-                Method::Get,
-                format!("{}/orders/by-id/{}", self.base_url, id),
-                None,
-                Some(self.user.to_string()),
-            ))
-            .unwrap()
+        v
     }
 }
 
 #[test]
-fn test_carts_service() {
+fn test_services() {
     let base_url = common::setup();
-    let (mut core, http_client) = common::make_utils();
 
-    let user_id = UserId(777);
-    let user_id_2 = UserId(24361345);
+    tokio::run(future::ok(()).map(move |_| {
+        let su_rpc = RpcClient::new(&base_url, UserId(1));
 
-    let mut rpc = RpcClient::new(base_url.clone(), user_id);
+        // Carts
+        {
+            let u = UserId(777);
+            let user_1 = u.into();
+            let anon_1 = SessionId::new().into();
 
-    let store_id = StoreId(1337);
-    let product_id = ProductId(12345);
-    let quantity = Quantity(9000);
+            let rpc = RpcClient::new(&base_url, u);
 
-    let product_id_2 = ProductId(67890);
-    let mut quantity_2 = Quantity(0);
+            let store_id = StoreId(1337);
 
-    let product_id_3 = ProductId(88888);
-    let quantity_3 = Quantity(9002);
+            // Clear cart
+            for id in vec![user_1, anon_1] {
+                assert_eq!(su_rpc.inner.clear_cart(id).wait().unwrap(), hashset![]);
+            }
 
-    for id in vec![user_id, user_id_2] {
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/clear", base_url),
-                None,
-                Some(id.to_string())
-            )).unwrap(),
-            hashmap!{},
-        );
-    }
+            // Create product and set metadata
+            let product_id_1 = ProductId(12345);
+            let mut product_1 = rpc.create_product(user_1, product_id_1, store_id);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Post,
-            format!("{}/cart/products/{}/increment", base_url, product_id),
-            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity: Quantity(1),
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            assert_eq!(rpc.inner.get_cart(user_1).wait().unwrap(), hashset![product_1.clone()]);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Get,
-            format!("{}/cart/products", base_url),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity: Quantity(1),
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            product_1.quantity = Quantity(5);
+            assert_eq!(
+                rpc.inner.set_quantity(user_1, product_id_1, Quantity(5)).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
 
-    assert_eq!(
-        core.run(http_client.request::<Cart>(
-            Method::Get,
-            format!("{}/cart/products", base_url),
-            None,
-            Some({
-                let mut h = Headers::new();
+            product_1.selected = false;
+            assert_eq!(
+                rpc.inner.set_selection(user_1, product_id_1, false).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
 
-                let mut c = Cookie::new();
-                c.set("SESSION_ID", user_id.to_string());
+            product_1.comment = "MyComment".into();
+            assert_eq!(
+                rpc.inner.set_comment(user_1, product_id_1, "MyComment".into()).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
 
-                h.set(c);
-                h
-            }),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity: Quantity(1),
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            // Create another product and set meta
+            let product_id_2 = ProductId(67890);
+            let mut product_2 = rpc.create_product(user_1, product_id_2, store_id);
 
-    assert_eq!(
-        core.run(http_client.request::<Cart>(
-            Method::Get,
-            format!("{}/cart/products", base_url),
-            None,
-            Some({
-                let mut h = Headers::new();
+            product_2.quantity.0 += 1;
+            assert_eq!(
+                rpc.inner.increment_item(user_1, product_id_2, store_id).wait().unwrap(),
+                hashset![product_1.clone(), product_2.clone()]
+            );
 
-                h.set(Authorization(user_id.to_string()));
+            // Check that we cannot set quantity for the product that does not exist
+            let product_id_3 = ProductId(88888);
+            let quantity_3 = Quantity(9002);
+            for cart_item in rpc.inner.set_quantity(user_1, product_id_3, quantity_3).wait().unwrap() {
+                assert_ne!(cart_item.product_id, product_id_3);
+            }
 
-                let mut c = Cookie::new();
-                c.set("SESSION_ID", UserId(user_id.0 + 1000).to_string());
+            assert_eq!(
+                rpc.inner.list(user_1, ProductId(0), 2).wait().unwrap(),
+                hashset![product_1.clone(), product_2.clone()],
+            );
 
-                h.set(c);
-                h
-            }),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity: Quantity(1),
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            assert_eq!(
+                rpc.inner.get_cart(user_1).wait().unwrap(),
+                hashset![product_1.clone(), product_2.clone()],
+            );
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Put,
-            format!("{}/cart/products/{}/quantity", base_url, product_id),
-            Some(serde_json::to_string(&CartProductQuantityPayload { value: quantity }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id)
-            .unwrap(),
-        CartItemInfo {
-            quantity,
-            selected: true,
-            comment: String::new(),
-            store_id,
-        },
-    );
+            // Test merging
+            {
+                let user_from = anon_1;
+                let to_user = user_1;
+                let from_existing_product_id = product_id_2;
+                let from_existing_product_quantity = Quantity(912673);
+                let mut from_existing_product = rpc.create_product(user_from, from_existing_product_id, store_id);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Put,
-            format!("{}/cart/products/{}/selection", base_url, product_id),
-            Some(serde_json::to_string(&CartProductSelectionPayload { value: false }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id)
-            .unwrap(),
-        CartItemInfo {
-            quantity,
-            selected: false,
-            comment: String::new(),
-            store_id,
+                let from_new_product_id = ProductId(2351143);
+                let from_new_product_quantity = Quantity(2324);
+                let mut from_new_product = rpc.create_product(user_from, from_new_product_id, store_id);
+
+                from_existing_product.quantity = from_existing_product_quantity;
+                assert_eq!(
+                    rpc.inner
+                        .set_quantity(user_from, from_existing_product_id, from_existing_product_quantity)
+                        .wait()
+                        .unwrap(),
+                    hashset![from_existing_product.clone(), from_new_product.clone()]
+                );
+
+                from_new_product.quantity = from_new_product_quantity;
+                assert_eq!(
+                    rpc.inner
+                        .set_quantity(user_from, from_new_product_id, from_new_product_quantity)
+                        .wait()
+                        .unwrap(),
+                    hashset![from_existing_product.clone(), from_new_product.clone()]
+                );
+
+                from_new_product.customer = to_user;
+
+                assert_eq!(
+                    rpc.inner.merge(user_from, to_user).wait().unwrap(),
+                    hashset![product_1.clone(), product_2.clone(), from_new_product.clone()],
+                );
+                // End of merge testing
+            }
+
+            // Clear cart after testing
+            for id in vec![user_1, anon_1] {
+                assert_eq!(su_rpc.inner.clear_cart(id).wait().unwrap(), hashset![]);
+            }
         }
-    );
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Put,
-            format!("{}/cart/products/{}/comment", base_url, product_id),
-            Some(serde_json::to_string(&CartProductCommentPayload { value: "MyComment".into() }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id)
-            .unwrap(),
-        CartItemInfo {
-            quantity,
-            selected: false,
-            comment: "MyComment".into(),
-            store_id,
-        }
-    );
+        // Orders
 
-    quantity_2.0 += 1;
+        {
+            let user = UserId(7234212);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Post,
-            format!("{}/cart/products/{}/increment", base_url, product_id_2),
-            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity,
-                selected: false,
-                comment: "MyComment".into(),
-                store_id,
-            },
-            product_id_2 => CartItemInfo {
-                quantity: quantity_2,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            let rpc = RpcClient::new(&base_url, user);
 
-    quantity_2.0 += 1;
+            rpc.inner.clear_cart(user.into()).wait().unwrap();
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Post,
-            format!("{}/cart/products/{}/increment", base_url, product_id_2),
-            Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap! {
-            product_id => CartItemInfo {
-                quantity,
-                selected: false,
-                comment: "MyComment".into(),
-                store_id,
-            },
-            product_id_2 => CartItemInfo {
-                quantity: quantity_2,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
+            let product_id_1 = ProductId(634824);
+            let product_id_2 = ProductId(5612213);
+            let product_id_3 = ProductId(112314512);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Put,
-            format!("{}/cart/products/{}/quantity", base_url, product_id_3),
-            Some(serde_json::to_string(&CartProductQuantityPayload { value: quantity_3 }).unwrap()),
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id_3),
-        None,
-    );
-
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Get,
-            format!("{}/cart?offset=0&count=2", base_url),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap!{
-            product_id => CartItemInfo {
-                quantity,
-                selected: false,
-                comment: "MyComment".into(),
-                store_id,
-            },
-            product_id_2 => CartItemInfo {
-                quantity: quantity_2,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
-
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Get,
-            format!("{}/cart/products", base_url),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap(),
-        hashmap!{
-            product_id => CartItemInfo {
-                quantity,
-                selected: false,
-                comment: "MyComment".into(),
-                store_id,
-            },
-            product_id_2 => CartItemInfo {
-                quantity: quantity_2,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        },
-    );
-
-    {
-        // Merge testing
-        let user_from = user_id_2;
-        let to_user = user_id;
-        let from_existing_product_id = product_id_2;
-        let from_existing_product_quantity = Quantity(912673);
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/products/{}/increment", base_url, from_existing_product_id),
-                Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-                Some(user_from.to_string()),
-            )).unwrap(),
-            hashmap! {
-                from_existing_product_id => CartItemInfo {
+            let cart_fixture = rpc.set_cart_items(hashset![
+                CartItem {
+                    id: CartItemId::new(),
+                    customer: user.into(),
+                    product_id: product_id_1,
                     quantity: Quantity(1),
                     selected: true,
-                comment: String::new(),
-                    store_id,
+                    comment: "Product 1 comment".into(),
+                    store_id: StoreId(1001),
                 },
-            },
-        );
-
-        let from_new_product_id = ProductId(2351143);
-        let from_new_product_quantity = Quantity(2324);
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/products/{}/increment", base_url, from_new_product_id),
-                Some(serde_json::to_string(&CartProductIncrementPayload { store_id }).unwrap()),
-                Some(user_from.to_string()),
-            )).unwrap(),
-            hashmap! {
-                from_existing_product_id => CartItemInfo {
-                    quantity: Quantity(1),
+                CartItem {
+                    id: CartItemId::new(),
+                    customer: user.into(),
+                    product_id: product_id_2,
+                    quantity: Quantity(25),
                     selected: true,
-                    comment: String::new(),
-                    store_id,
+                    comment: "Product 2 comment".into(),
+                    store_id: StoreId(1001),
                 },
-                from_new_product_id => CartItemInfo {
-                    quantity: Quantity(1),
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                },
-            },
-        );
-
-        assert_eq!(
-            core.run(
-                http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/quantity", base_url, from_existing_product_id),
-                    Some(
-                        serde_json::to_string(&CartProductQuantityPayload {
-                            value: from_existing_product_quantity,
-                        }).unwrap(),
-                    ),
-                    Some(user_from.to_string()),
-                )
-            ).unwrap()
-                .remove(&from_existing_product_id)
-                .unwrap(),
-            CartItemInfo {
-                quantity: from_existing_product_quantity,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        );
-
-        assert_eq!(
-            core.run(
-                http_client.request_with_auth_header::<Cart>(
-                    Method::Put,
-                    format!("{}/cart/products/{}/quantity", base_url, from_new_product_id),
-                    Some(
-                        serde_json::to_string(&CartProductQuantityPayload {
-                            value: from_new_product_quantity,
-                        }).unwrap(),
-                    ),
-                    Some(user_from.to_string()),
-                )
-            ).unwrap()
-                .remove(&from_new_product_id)
-                .unwrap(),
-            CartItemInfo {
-                quantity: from_new_product_quantity,
-                selected: true,
-                comment: String::new(),
-                store_id,
-            },
-        );
-
-        assert_eq!(
-            core.run(http_client.request_with_auth_header::<Cart>(
-                Method::Post,
-                format!("{}/cart/merge", base_url),
-                Some(serde_json::to_string(&CartMergePayload { user_from }).unwrap()),
-                Some(to_user.to_string()),
-            )).unwrap(),
-            hashmap!{
-                product_id => CartItemInfo {
-                    quantity,
+                CartItem {
+                    id: CartItemId::new(),
+                    customer: user.into(),
+                    product_id: product_id_3,
+                    quantity: Quantity(12),
                     selected: false,
-                    comment: "MyComment".into(),
-                    store_id,
+                    comment: "Product 3 comment".into(),
+                    store_id: StoreId(1001),
                 },
-                product_id_2 => CartItemInfo {
-                    quantity: quantity_2,
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                },
-                from_new_product_id => CartItemInfo {
-                    quantity: from_new_product_quantity,
-                    selected: true,
-                    comment: String::new(),
-                    store_id,
-                }
-            },
-        );
-        // End of merge testing
-    }
+            ]);
 
-    assert_eq!(
-        core.run(http_client.request_with_auth_header::<Cart>(
-            Method::Delete,
-            format!("{}/cart/products/{}", base_url, product_id),
-            None,
-            Some(user_id.to_string()),
-        )).unwrap()
-            .remove(&product_id),
-        None,
-    );
-
-    rpc.clear_cart();
-}
-
-#[test]
-fn test_orders_conversion() {
-    let base_url = common::setup();
-    let (mut core, http_client) = common::make_utils();
-
-    let user = UserId(7234212);
-
-    let cart_fixture = vec![
-        CartItem {
-            product_id: ProductId(634824),
-            quantity: Quantity(1),
-            selected: true,
-            comment: "Product 1 comment".into(),
-            store_id: StoreId(1001),
-        },
-        CartItem {
-            product_id: ProductId(5612213),
-            quantity: Quantity(25),
-            selected: true,
-            comment: "Product 2 comment".into(),
-            store_id: StoreId(1001),
-        },
-        CartItem {
-            product_id: ProductId(112314512),
-            quantity: Quantity(12),
-            selected: false,
-            comment: "Product 3 comment".into(),
-            store_id: StoreId(1001),
-        },
-    ];
-
-    let convert_cart_payload = ConvertCartPayload {
-        conversion_id: Some(ConversionId::new()),
-        customer_id: user,
-        receiver_name: "Mr. Anderson".into(),
-        receiver_phone: "+14441234567".into(),
-        address: AddressFull {
-            country: Some("Matrix".into()),
-            locality: Some("Central city".into()),
-            ..Default::default()
-        },
-        prices: hashmap! {
-            cart_fixture[0].product_id => ProductSellerPrice { price: ProductPrice(41213.0), currency_id: CurrencyId(1) },
-            cart_fixture[1].product_id => ProductSellerPrice { price: ProductPrice(84301.0), currency_id: CurrencyId(2) },
-        },
-    };
-
-    let mut rpc = RpcClient::new(base_url.clone(), user);
-
-    rpc.clear_cart();
-    rpc.initialize_cart(cart_fixture.clone());
-
-    {
-        let new_orders = core.run(http_client.request_with_auth_header::<Vec<Order>>(
-            Method::Post,
-            format!("{}/orders/create_from_cart", base_url),
-            Some(serde_json::to_string(&convert_cart_payload).unwrap()),
-            Some(user.to_string()),
-        )).unwrap();
-
-        let created_orders_fixture = cart_fixture
-            .clone()
-            .into_iter()
-            .filter(|cart_item| cart_item.selected)
-            .map(|cart_item| {
-                let db_data = new_orders
-                    .iter()
-                    .filter(|order| order.product == cart_item.product_id)
-                    .cloned()
-                    .next()
-                    .unwrap();
-                let ProductSellerPrice { price, currency_id } = convert_cart_payload.prices[&cart_item.product_id];
-                Order {
-                    id: db_data.id.clone(),
-                    created_from: db_data.created_from.clone(),
-                    conversion_id: convert_cart_payload.conversion_id.unwrap(),
-                    slug: db_data.slug,
-                    customer: user,
-                    store: cart_item.store_id,
-                    product: cart_item.product_id,
-                    price,
-                    currency_id,
-                    quantity: cart_item.quantity,
-                    address: convert_cart_payload.address.clone(),
-                    receiver_name: convert_cart_payload.receiver_name.clone(),
-                    receiver_phone: convert_cart_payload.receiver_phone.clone(),
-                    state: OrderState::New,
-                    payment_status: false,
-                    delivery_company: None,
-                    track_id: None,
-                    created_at: db_data.created_at.clone(),
-                    updated_at: db_data.updated_at.clone(),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(new_orders, created_orders_fixture);
-        assert_eq!(
-            rpc.get_cart(),
-            cart_fixture
-                .clone()
-                .into_iter()
-                .filter(|item| !item.selected)
-                .map(CartItem::into_meta)
-                .collect::<Cart>()
-        );
-
-        rpc.set_cart_items(vec![cart_fixture[0].clone()]);
-
-        core.run(
-            http_client.request_with_auth_header::<()>(
-                Method::Post,
-                format!("{}/orders/create_from_cart/revert", base_url),
-                Some(
-                    serde_json::to_string(&ConvertCartRevertPayload {
-                        conversion_id: convert_cart_payload.conversion_id.unwrap(),
-                    }).unwrap(),
+            let conversion_id = ConversionId::new();
+            let prices = vec![
+                (
+                    product_id_1,
+                    ProductSellerPrice {
+                        price: ProductPrice(41213.0),
+                        currency_id: CurrencyId(1),
+                    },
                 ),
-                Some(user.to_string()),
-            ),
-        ).unwrap();
+                (
+                    product_id_2,
+                    ProductSellerPrice {
+                        price: ProductPrice(84301.0),
+                        currency_id: CurrencyId(2),
+                    },
+                ),
+            ].into_iter()
+                .collect::<HashMap<_, _>>();
+            let address = AddressFull {
+                country: Some("Matrix".into()),
+                locality: Some("Central city".into()),
+                ..Default::default()
+            };
+            let receiver_name = "Mr. Anderson".to_string();
+            let receiver_phone = "+14441234567".to_string();
 
-        for order in created_orders_fixture.iter() {
-            assert_eq!(rpc.get_order(order.id), None);
+            {
+                let new_orders = rpc.inner
+                    .convert_cart(
+                        Some(conversion_id),
+                        user,
+                        prices.clone(),
+                        address.clone(),
+                        receiver_name.clone(),
+                        receiver_phone.clone(),
+                    )
+                    .wait()
+                    .unwrap();
+
+                let created_orders_fixture = cart_fixture
+                    .clone()
+                    .into_iter()
+                    .filter(|cart_item| cart_item.selected)
+                    .map(|cart_item| {
+                        let db_data = new_orders
+                            .iter()
+                            .filter(|order| order.product == cart_item.product_id)
+                            .cloned()
+                            .next()
+                            .unwrap();
+                        let ProductSellerPrice { price, currency_id } = prices[&cart_item.product_id].clone();
+                        Order {
+                            id: db_data.id.clone(),
+                            created_from: db_data.created_from.clone(),
+                            conversion_id,
+                            slug: db_data.slug,
+                            customer: user,
+                            store: cart_item.store_id,
+                            product: cart_item.product_id,
+                            price,
+                            currency_id,
+                            quantity: cart_item.quantity,
+                            address: address.clone(),
+                            receiver_name: receiver_name.clone(),
+                            receiver_phone: receiver_phone.clone(),
+                            state: OrderState::New,
+                            payment_status: false,
+                            delivery_company: None,
+                            track_id: None,
+                            created_at: db_data.created_at.clone(),
+                            updated_at: db_data.updated_at.clone(),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    new_orders
+                        .clone()
+                        .into_iter()
+                        .map(|order| (order.id, order))
+                        .collect::<HashMap<_, _>>(),
+                    created_orders_fixture
+                        .clone()
+                        .into_iter()
+                        .map(|order| (order.id, order))
+                        .collect::<HashMap<_, _>>()
+                );
+                assert_eq!(
+                    rpc.inner.get_cart(user.into()).wait().unwrap(),
+                    cart_fixture.clone().into_iter().filter(|item| !item.selected).collect::<Cart>()
+                );
+
+                rpc.set_cart_items(hashset![cart_fixture.iter().next().unwrap().clone()]);
+
+                su_rpc.inner.revert_cart_conversion(conversion_id).wait().unwrap();
+
+                for order in created_orders_fixture.iter() {
+                    assert_eq!(rpc.inner.get_order(order.id.into()).wait().unwrap(), None);
+                }
+                assert_eq!(rpc.inner.get_cart(user.into()).wait().unwrap(), cart_fixture);
+            }
+
+            rpc.inner.clear_cart(user.into()).wait().unwrap();
         }
-        assert_eq!(
-            rpc.get_cart(),
-            cart_fixture.clone().into_iter().map(CartItem::into_meta).collect::<Cart>()
-        );
-    }
-
-    rpc.clear_cart();
+    }));
 }
