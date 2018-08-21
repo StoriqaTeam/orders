@@ -33,7 +33,7 @@ pipeline:
       - master
       - release
   test:
-    image: rust:1.26-stretch
+    image: rust:1.28-stretch
     environment:
     - RUN_MODE=k8s
     - DATABASE_HOST=db-postgresql
@@ -64,7 +64,7 @@ pipeline:
 ###
 
   build:
-    image: rust:1.26-stretch
+    image: rust:1.28-stretch
     environment:
     - CARGO_HOME=deps
     commands:

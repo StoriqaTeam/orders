@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use failure;
+use failure::Fallible;
 use stq_api::orders::*;
 use stq_db::statement::*;
 use stq_static_resources::OrderState;
@@ -220,12 +220,13 @@ impl OrderFilter {
         self
     }
 
-    pub fn from_search_terms(terms: OrderSearchTerms) -> Result<Self, failure::Error> {
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    pub fn from_search_terms(terms: OrderSearchTerms) -> Fallible<Self> {
         let mut mask = OrderFilter::default();
 
         mask.slug = terms.slug.map(From::from);
 
-        mask.created_at = if let (Some(from), Some(to)) = (terms.created_from, terms.created_to).clone() {
+        mask.created_at = if let (Some(from), Some(to)) = (terms.created_from, terms.created_to) {
             Some(
                 Range::Between((
                     {

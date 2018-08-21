@@ -308,12 +308,9 @@ fn check_acl(login: UserLogin, (entry, _action): &mut AclContext) -> bool {
 
     if let User { caller_roles, caller_id } = login {
         for user_entry in caller_roles {
-            match user_entry.role {
+            if user_entry.role == Superadmin {
                 // Superadmins can access in all cases.
-                Superadmin => {
-                    return true;
-                }
-                _ => {}
+                return true;
             }
         }
 
@@ -329,10 +326,11 @@ pub fn make_repo(login: UserLogin) -> CartItemRepoImpl {
     let CartItemRepoImpl { user, session } = make_su_repo();
     CartItemRepoImpl {
         user: match Rc::try_unwrap(user) {
-            Ok(v) => v.with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
+            Ok(v) => v
+                .with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
                 .into(),
             Err(_) => unreachable!(),
         },
-        session: session.into(),
+        session,
     }
 }

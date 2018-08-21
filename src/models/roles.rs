@@ -1,6 +1,6 @@
 use errors::*;
 
-use failure;
+use failure::Fallible;
 use serde_json::{from_value, to_value, Value};
 use stq_roles;
 pub use stq_roles::models::RepoLogin;
@@ -29,7 +29,7 @@ impl stq_roles::models::RoleModel for UserRole {
         }
     }
 
-    fn from_db(variant: &str, data: Value) -> Result<Self, failure::Error> {
+    fn from_db(variant: &str, data: Value) -> Fallible<Self> {
         use self::UserRole::*;
 
         match variant {
