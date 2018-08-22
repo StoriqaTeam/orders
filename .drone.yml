@@ -43,7 +43,7 @@ pipeline:
     - CARGO_HOME=deps
     commands:
     - rustup component add rustfmt-preview
-    - cargo fmt --all -- --write-mode=diff
+    - cargo fmt -- --check
     - apt-get update && apt-get install -y ca-certificates wget gnupg2
     - update-ca-certificates
     - wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | apt-key add -
