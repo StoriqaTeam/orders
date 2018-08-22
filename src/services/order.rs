@@ -62,7 +62,6 @@ pub struct OrderServiceImpl {
 impl OrderServiceImpl {
     pub fn new(db_pool: DbPool, login_data: UserLogin) -> Self {
         Self {
-            db_pool: db_pool.clone(),
             cart_repo_factory: Rc::new({
                 let login_data = login_data.clone();
                 move || Box::new(repos::cart_item::make_repo(login_data.clone()))
@@ -75,6 +74,7 @@ impl OrderServiceImpl {
                 let login_data = login_data.clone();
                 move || Box::new(repos::order::make_repo(login_data.clone()))
             }),
+            db_pool,
             login_data,
         }
     }
@@ -387,7 +387,7 @@ impl OrderService for OrderServiceImpl {
                                 parent: order.0.id,
                                 committer: calling_user,
                                 committed_at: Utc::now(),
-                                state: order.0.state.clone(),
+                                state: order.0.state,
                                 comment,
                             }).map(move |(_, c)| (Some(order.0), c))
                             )

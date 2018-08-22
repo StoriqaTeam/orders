@@ -46,10 +46,7 @@ impl CartServiceImpl {
     pub fn new(db_pool: DbPool, login_data: UserLogin) -> Self {
         Self {
             db_pool,
-            repo_factory: Rc::new({
-                let login_data = login_data.clone();
-                move || Box::new(repos::cart_item::make_repo(login_data.clone()))
-            }),
+            repo_factory: Rc::new({ move || Box::new(repos::cart_item::make_repo(login_data.clone())) }),
         }
     }
 }
@@ -65,7 +62,7 @@ impl CartService for CartServiceImpl {
                         (repo_factory)().select(
                             conn,
                             CartItemFilter {
-                                customer: Some(customer.into()),
+                                customer: Some(customer),
                                 ..Default::default()
                             },
                         )
@@ -135,7 +132,7 @@ impl CartService for CartServiceImpl {
                             conn,
                             CartItemUpdater {
                                 filter: CartItemFilter {
-                                    customer: Some(customer.into()),
+                                    customer: Some(customer),
                                     meta_filter: CartItemMetaFilter {
                                         product_id: Some(product_id.into()),
                                         ..Default::default()
@@ -153,7 +150,7 @@ impl CartService for CartServiceImpl {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
-                                        customer: Some(customer.into()),
+                                        customer: Some(customer),
                                         ..Default::default()
                                     },
                                 )
@@ -179,7 +176,7 @@ impl CartService for CartServiceImpl {
                             conn,
                             CartItemUpdater {
                                 filter: CartItemFilter {
-                                    customer: Some(customer.into()),
+                                    customer: Some(customer),
                                     meta_filter: CartItemMetaFilter {
                                         product_id: Some(product_id.into()),
                                         ..Default::default()
@@ -197,7 +194,7 @@ impl CartService for CartServiceImpl {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
-                                        customer: Some(customer.into()),
+                                        customer: Some(customer),
                                         ..Default::default()
                                     },
                                 )
@@ -220,7 +217,7 @@ impl CartService for CartServiceImpl {
                             conn,
                             CartItemUpdater {
                                 filter: CartItemFilter {
-                                    customer: Some(customer.into()),
+                                    customer: Some(customer),
                                     meta_filter: CartItemMetaFilter {
                                         product_id: Some(product_id.into()),
                                         ..Default::default()
@@ -238,7 +235,7 @@ impl CartService for CartServiceImpl {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
-                                        customer: Some(customer.into()),
+                                        customer: Some(customer),
                                         ..Default::default()
                                     },
                                 )
@@ -260,7 +257,7 @@ impl CartService for CartServiceImpl {
                         .delete(
                             conn,
                             CartItemFilter {
-                                customer: Some(customer.into()),
+                                customer: Some(customer),
                                 meta_filter: CartItemMetaFilter {
                                     product_id: Some(product_id.into()),
                                     ..Default::default()
@@ -273,7 +270,7 @@ impl CartService for CartServiceImpl {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
-                                        customer: Some(customer.into()),
+                                        customer: Some(customer),
                                         ..Default::default()
                                     },
                                 )
@@ -294,7 +291,7 @@ impl CartService for CartServiceImpl {
                     (repo_factory)().delete(
                         conn,
                         CartItemFilter {
-                            customer: Some(customer.into()),
+                            customer: Some(customer),
                             ..Default::default()
                         },
                     )
@@ -313,7 +310,7 @@ impl CartService for CartServiceImpl {
                     (repo_factory)().select_full(
                         conn,
                         CartItemFilter {
-                            customer: Some(customer.into()),
+                            customer: Some(customer),
                             meta_filter: CartItemMetaFilter {
                                 product_id: Some(Range::From(RangeLimit {
                                     value: from,
@@ -377,7 +374,7 @@ impl CartService for CartServiceImpl {
                                 Box::new((repo_factory)().select(
                                     conn,
                                     CartItemFilter {
-                                        customer: Some(to.into()),
+                                        customer: Some(to),
                                         ..Default::default()
                                     },
                                 ))

@@ -50,7 +50,8 @@ impl RpcClient {
                 .set_selection(product.customer, product.product_id, product.selected)
                 .wait()
                 .unwrap();
-            out = self.inner
+            out = self
+                .inner
                 .set_comment(product.customer, product.product_id, product.comment)
                 .wait()
                 .unwrap();
@@ -61,7 +62,8 @@ impl RpcClient {
 
     pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
         let rsp = self.inner.increment_item(customer, product_id, store_id).wait().unwrap();
-        let v = rsp.into_iter()
+        let v = rsp
+            .into_iter()
             .filter(|cart_item| cart_item.product_id == product_id)
             .next()
             .unwrap();
@@ -270,7 +272,8 @@ fn test_services() {
             let receiver_phone = "+14441234567".to_string();
 
             {
-                let new_orders = rpc.inner
+                let new_orders = rpc
+                    .inner
                     .convert_cart(
                         Some(conversion_id),
                         user,
@@ -335,7 +338,7 @@ fn test_services() {
                     cart_fixture.clone().into_iter().filter(|item| !item.selected).collect::<Cart>()
                 );
 
-                rpc.set_cart_items(hashset![cart_fixture.iter().next().unwrap().clone()]);
+                rpc.set_cart_items(hashset![cart_fixture.iter().filter(|v| v.selected).next().unwrap().clone()]);
 
                 su_rpc.inner.revert_cart_conversion(conversion_id).wait().unwrap();
 

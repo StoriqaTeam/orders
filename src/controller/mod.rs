@@ -1,16 +1,17 @@
 use chrono::prelude::*;
-use failure;
-use failure::ResultExt;
-use futures::future;
-use futures::prelude::*;
-use hyper;
-use hyper::{Delete, Get, Headers, Post, Put, Request};
+use failure::{self, Fallible, ResultExt};
+use futures::{future, prelude::*};
+use hyper::{self, Delete, Get, Headers, Post, Put, Request};
 use std::rc::Rc;
 use stq_api::orders::*;
-use stq_http::controller::{Controller, ControllerFuture};
-use stq_http::request_util::{parse_body, serialize_future};
-use stq_roles::{routing::Controller as RoleController,
-                service::{get_login_data, RoleService, RoleServiceImpl}};
+use stq_http::{
+    controller::{Controller, ControllerFuture},
+    request_util::{parse_body, serialize_future},
+};
+use stq_roles::{
+    routing::Controller as RoleController,
+    service::{get_login_data, RoleService, RoleServiceImpl},
+};
 use stq_router::RouteParser;
 use stq_types::*;
 use validator::Validate;
@@ -59,7 +60,7 @@ impl ControllerImpl {
     }
 }
 
-pub fn extract_user_id(headers: Headers) -> Result<Option<UserId>, failure::Error> {
+pub fn extract_user_id(headers: &Headers) -> Fallible<Option<UserId>> {
     let string_id: String = if let Some(auth) = headers.get::<hyper::header::Authorization<String>>() {
         auth.0.clone()
     } else if let Some(s) = headers.get::<hyper::header::Cookie>().and_then(|c| c.get("SESSION_ID")) {
@@ -89,7 +90,7 @@ impl Controller for ControllerImpl {
 
         let route = route_parser.test(uri.path());
         Box::new(
-            future::result(extract_user_id(headers))
+            future::result(extract_user_id(&headers))
                 .map_err(|e| e.context("Failed to extract user ID").into())
                 .and_then({
                     let db_pool = self.db_pool.clone();
