@@ -1,6 +1,6 @@
 CREATE TABLE cart_items_session (
     id         UUID PRIMARY KEY,
-    session_id UUID NOT NULL,
+    session_id INTEGER NOT NULL,
     product_id INTEGER NOT NULL,
     quantity   INTEGER NOT NULL,
     store_id   INTEGER NOT NULL,

@@ -95,7 +95,7 @@ fn test_services() {
         {
             let u = UserId(777);
             let user_1 = u.into();
-            let anon_1 = SessionId::new().into();
+            let anon_1 = SessionId(613415346).into();
 
             let rpc = RpcClient::new(&base_url, u);
 
