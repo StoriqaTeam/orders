@@ -16,7 +16,7 @@ use futures::{future, prelude::*};
 use std::collections::HashMap;
 use stq_api::orders::*;
 use stq_api::rpc_client::*;
-use stq_static_resources::OrderState;
+use stq_static_resources::{Currency, OrderState};
 use stq_types::*;
 
 struct RpcClient {
@@ -251,14 +251,14 @@ fn test_services() {
                     product_id_1,
                     ProductSellerPrice {
                         price: ProductPrice(41213.0),
-                        currency_id: CurrencyId(1),
+                        currency: Currency::RUB,
                     },
                 ),
                 (
                     product_id_2,
                     ProductSellerPrice {
                         price: ProductPrice(84301.0),
-                        currency_id: CurrencyId(2),
+                        currency: Currency::EUR,
                     },
                 ),
             ].into_iter()
@@ -296,7 +296,7 @@ fn test_services() {
                             .cloned()
                             .next()
                             .unwrap();
-                        let ProductSellerPrice { price, currency_id } = prices[&cart_item.product_id].clone();
+                        let ProductSellerPrice { price, currency } = prices[&cart_item.product_id].clone();
                         Order {
                             id: db_data.id.clone(),
                             created_from: db_data.created_from.clone(),
@@ -306,7 +306,7 @@ fn test_services() {
                             store: cart_item.store_id,
                             product: cart_item.product_id,
                             price,
-                            currency_id,
+                            currency,
                             quantity: cart_item.quantity,
                             address: address.clone(),
                             receiver_name: receiver_name.clone(),
