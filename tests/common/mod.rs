@@ -39,6 +39,7 @@ pub fn make_utils() -> (Core, HttpClientHandle) {
         &HttpConfig {
             http_client_retries: 3,
             http_client_buffer_size: 3,
+            timeout_duration_ms: 5000,
         },
         &core.handle(),
     );
