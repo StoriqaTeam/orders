@@ -108,7 +108,7 @@ impl OrderService for OrderServiceImpl {
                         let mut order_items = Vec::new();
                         for cart_item in cart {
                             if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
-                                let ProductSellerPrice { price, currency_id } = seller_price;
+                                let ProductSellerPrice { price, currency } = seller_price;
                                 order_items.push((OrderInserter {
                                     id: None,
                                     created_from: Some(cart_item.id),
@@ -118,7 +118,7 @@ impl OrderService for OrderServiceImpl {
                                     product: cart_item.product_id,
                                     quantity: cart_item.quantity,
                                     price,
-                                    currency_id,
+                                    currency,
                                     address: address.clone(),
                                     receiver_name: receiver_name.clone(),
                                     receiver_phone: receiver_phone.clone(),

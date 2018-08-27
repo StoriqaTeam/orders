@@ -1,7 +1,9 @@
 use chrono::prelude::*;
 use failure::Fallible;
+use std::str::FromStr;
 use stq_api::orders::*;
 use stq_db::statement::*;
+use stq_static_resources::Currency;
 use stq_static_resources::OrderState;
 use stq_types::*;
 use tokio_postgres::rows::Row;
@@ -16,7 +18,7 @@ const CUSTOMER_COLUMN: &str = "customer";
 const STORE_COLUMN: &str = "store";
 const PRODUCT_COLUMN: &str = "product";
 const PRICE_COLUMN: &str = "price";
-const CURRENCY_ID_COLUMN: &str = "currency_id";
+const CURRENCY_COLUMN: &str = "currency";
 const QUANTITY_COLUMN: &str = "quantity";
 const RECEIVER_NAME_COLUMN: &str = "receiver_name";
 const RECEIVER_PHONE_COLUMN: &str = "receiver_phone";
@@ -108,7 +110,7 @@ impl From<Row> for DbOrder {
             store: StoreId(row.get(STORE_COLUMN)),
             product: ProductId(row.get(PRODUCT_COLUMN)),
             price: ProductPrice(row.get(PRICE_COLUMN)),
-            currency_id: CurrencyId(row.get(CURRENCY_ID_COLUMN)),
+            currency: Currency::from_str(row.get(CURRENCY_COLUMN)).unwrap(),
             quantity: Quantity(row.get(QUANTITY_COLUMN)),
             address: address_from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
@@ -132,7 +134,7 @@ pub struct OrderInserter {
     pub store: StoreId,
     pub product: ProductId,
     pub price: ProductPrice,
-    pub currency_id: CurrencyId,
+    pub currency: Currency,
     pub quantity: Quantity,
     pub address: AddressFull,
     pub receiver_name: String,
@@ -151,7 +153,7 @@ impl Inserter for OrderInserter {
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(RECEIVER_PHONE_COLUMN, self.receiver_phone)
             .with_arg(PRICE_COLUMN, self.price.0)
-            .with_arg(CURRENCY_ID_COLUMN, self.currency_id.0)
+            .with_arg(CURRENCY_COLUMN, self.currency.to_string())
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(STATE_COLUMN, self.state);
 
