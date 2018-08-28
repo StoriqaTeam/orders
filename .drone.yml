@@ -89,7 +89,7 @@ pipeline:
     - docker_username
     - docker_password
     when:
-      event: push
+      event: tag
   deploy2nightly:
     image: jackthestripper/drone_setimage
     namespace: default
