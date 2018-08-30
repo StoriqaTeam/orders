@@ -11,9 +11,10 @@ extern crate tokio_core;
 
 pub mod common;
 
-use hyper::{header::{Authorization, Cookie},
-            Headers,
-            Method};
+use hyper::{
+    header::{Authorization, Cookie},
+    Headers, Method,
+};
 use lib::models::*;
 use stq_http::client::ClientHandle as HttpClientHandle;
 use stq_static_resources::OrderState;
@@ -616,12 +617,13 @@ fn test_orders_conversion() {
     rpc.initialize_cart(cart_fixture.clone());
 
     {
-        let new_orders = core.run(http_client.request_with_auth_header::<Vec<Order>>(
-            Method::Post,
-            format!("{}/orders/create_from_cart", base_url),
-            Some(serde_json::to_string(&convert_cart_payload).unwrap()),
-            Some(user.to_string()),
-        )).unwrap();
+        let new_orders =
+            core.run(http_client.request_with_auth_header::<Vec<Order>>(
+                Method::Post,
+                format!("{}/orders/create_from_cart", base_url),
+                Some(serde_json::to_string(&convert_cart_payload).unwrap()),
+                Some(user.to_string()),
+            )).unwrap();
 
         let created_orders_fixture = cart_fixture
             .clone()

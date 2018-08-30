@@ -86,9 +86,11 @@ impl Inserter for CartProductInserter {
                  user_id = EXCLUDED.user_id\
                  ",
             ),
-            Incrementer(data) => data.into_insert_builder(table)
+            Incrementer(data) => data
+                .into_insert_builder(table)
                 .with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items.quantity + 1"),
-            CollisionNoOp(data) => data.into_insert_builder(table)
+            CollisionNoOp(data) => data
+                .into_insert_builder(table)
                 .with_extra("ON CONFLICT (user_id, product_id) DO NOTHING"),
         }
     }
