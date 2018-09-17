@@ -181,8 +181,7 @@ impl OrderService for OrderServiceImpl {
                         conversion_id: Some(conversion_id.into()),
                         ..Default::default()
                     },
-                )
-                .and_then({
+                ).and_then({
                     let order_diff_repo_factory = order_diff_repo_factory.clone();
                     move |(orders, conn)| {
                         let mut out = Box::new(future::ok((Default::default(), conn))) as Box<Future<Item = _, Error = _>>;
@@ -198,8 +197,7 @@ impl OrderService for OrderServiceImpl {
                                                 parent: Some(order.0.id.into()),
                                                 ..Default::default()
                                             },
-                                        )
-                                        .map(move |(order_diffs, conn)| {
+                                        ).map(move |(order_diffs, conn)| {
                                             orders_with_diffs.push((order, order_diffs));
                                             (orders_with_diffs, conn)
                                         })
@@ -209,8 +207,7 @@ impl OrderService for OrderServiceImpl {
 
                         out
                     }
-                })
-                .and_then({
+                }).and_then({
                     let order_repo_factory = order_repo_factory.clone();
                     move |(orders_with_diffs, conn)| {
                         (order_repo_factory)()
@@ -220,11 +217,9 @@ impl OrderService for OrderServiceImpl {
                                     conversion_id: Some(conversion_id.into()),
                                     ..Default::default()
                                 },
-                            )
-                            .map(move |(_, conn)| (orders_with_diffs, conn))
+                            ).map(move |(_, conn)| (orders_with_diffs, conn))
                     }
-                })
-                .and_then(move |(orders_with_diffs, conn)| {
+                }).and_then(move |(orders_with_diffs, conn)| {
                     let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
                         let mut cart_item = CartItem {
                             id: order.0.created_from,
@@ -307,8 +302,7 @@ impl OrderService for OrderServiceImpl {
                             ..Default::default()
                         },
                     )
-                })
-                .map(|v| v.into_iter().map(|v| v.0).collect()),
+                }).map(|v| v.into_iter().map(|v| v.0).collect()),
         )
     }
 
@@ -324,8 +318,7 @@ impl OrderService for OrderServiceImpl {
                             ..Default::default()
                         },
                     )
-                })
-                .map(|v| v.into_iter().map(|v| v.0).collect()),
+                }).map(|v| v.into_iter().map(|v| v.0).collect()),
         )
     }
 

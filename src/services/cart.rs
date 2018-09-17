@@ -67,8 +67,7 @@ impl CartService for CartServiceImpl {
                             },
                         )
                     }
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -101,8 +100,7 @@ impl CartService for CartServiceImpl {
                                         },
                                     )
                                 }
-                            })
-                            .and_then({
+                            }).and_then({
                                 let repo_factory = repo_factory.clone();
                                 move |(_, conn)| {
                                     (repo_factory)().select(
@@ -115,8 +113,7 @@ impl CartService for CartServiceImpl {
                                 }
                             })
                     }
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -143,8 +140,7 @@ impl CartService for CartServiceImpl {
                                     ..Default::default()
                                 },
                             },
-                        )
-                        .and_then({
+                        ).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(_, conn)| {
                                 (repo_factory)().select(
@@ -156,8 +152,7 @@ impl CartService for CartServiceImpl {
                                 )
                             }
                         })
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -187,8 +182,7 @@ impl CartService for CartServiceImpl {
                                     ..Default::default()
                                 },
                             },
-                        )
-                        .and_then({
+                        ).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(_, conn)| {
                                 (repo_factory)().select(
@@ -200,8 +194,7 @@ impl CartService for CartServiceImpl {
                                 )
                             }
                         })
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -228,8 +221,7 @@ impl CartService for CartServiceImpl {
                                     ..Default::default()
                                 },
                             },
-                        )
-                        .and_then({
+                        ).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(_, conn)| {
                                 (repo_factory)().select(
@@ -241,8 +233,7 @@ impl CartService for CartServiceImpl {
                                 )
                             }
                         })
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -263,8 +254,7 @@ impl CartService for CartServiceImpl {
                                     ..Default::default()
                                 },
                             },
-                        )
-                        .and_then({
+                        ).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(_, conn)| {
                                 (repo_factory)().select(
@@ -276,8 +266,7 @@ impl CartService for CartServiceImpl {
                                 )
                             }
                         })
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -295,8 +284,7 @@ impl CartService for CartServiceImpl {
                             ..Default::default()
                         },
                     )
-                })
-                .map(|_| Default::default()),
+                }).map(|_| Default::default()),
         )
     }
 
@@ -322,8 +310,7 @@ impl CartService for CartServiceImpl {
                         Some(count),
                         None,
                     )
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 
@@ -346,8 +333,7 @@ impl CartService for CartServiceImpl {
                                     },
                                 )
                             }
-                        })
-                        .and_then({
+                        }).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(from_items, conn)| {
                                 let mut b: RepoConnectionFuture<()> = Box::new(future::ok(((), conn)));
@@ -361,14 +347,12 @@ impl CartService for CartServiceImpl {
                                                     strategy: CartItemMergeStrategy::CollisionNoOp,
                                                     data: CartItem { customer: to, ..cart_item },
                                                 },
-                                            )
-                                            .map(|(_, conn)| ((), conn))
+                                            ).map(|(_, conn)| ((), conn))
                                     }));
                                 }
                                 b
                             }
-                        })
-                        .and_then({
+                        }).and_then({
                             let repo_factory = repo_factory.clone();
                             move |(_, conn)| {
                                 Box::new((repo_factory)().select(
@@ -380,8 +364,7 @@ impl CartService for CartServiceImpl {
                                 ))
                             }
                         })
-                })
-                .map(|c| c.into_iter().collect()),
+                }).map(|c| c.into_iter().collect()),
         )
     }
 }

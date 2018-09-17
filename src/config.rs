@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use stq_logging;
 
 use config_crate::{Config as RawConfig, ConfigError, Environment, File};
+use sentry_integration::SentryConfig;
 
 /// Service configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,6 +25,7 @@ pub struct Config {
     pub db: Database,
     /// GrayLog settings
     pub graylog: Option<stq_logging::GrayLogConfig>,
+    pub sentry: Option<SentryConfig>,
 }
 
 static ENV_PREFIX: &'static str = "STQ_ORDERS";
