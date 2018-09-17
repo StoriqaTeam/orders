@@ -262,7 +262,7 @@ fn test_services() {
                     },
                 ),
             ].into_iter()
-                .collect::<HashMap<_, _>>();
+            .collect::<HashMap<_, _>>();
             let address = AddressFull {
                 country: Some("Matrix".into()),
                 locality: Some("Central city".into()),
@@ -281,8 +281,7 @@ fn test_services() {
                         address.clone(),
                         receiver_name.clone(),
                         receiver_phone.clone(),
-                    )
-                    .wait()
+                    ).wait()
                     .unwrap();
 
                 let created_orders_fixture = cart_fixture
@@ -318,8 +317,7 @@ fn test_services() {
                             created_at: db_data.created_at.clone(),
                             updated_at: db_data.updated_at.clone(),
                         }
-                    })
-                    .collect::<Vec<_>>();
+                    }).collect::<Vec<_>>();
 
                 assert_eq!(
                     new_orders

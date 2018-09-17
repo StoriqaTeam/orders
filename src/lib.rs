@@ -32,6 +32,8 @@ extern crate tokio_core;
 extern crate tokio_postgres;
 extern crate uuid;
 extern crate validator;
+#[macro_use]
+extern crate sentry;
 
 use bb8_postgres::PostgresConnectionManager;
 use futures::future;
@@ -49,6 +51,7 @@ pub mod controller;
 pub mod errors;
 pub mod models;
 pub mod repos;
+pub mod sentry_integration;
 pub mod services;
 pub mod types;
 
@@ -93,8 +96,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
             let app = Application::<Error>::new(controller);
 
             Ok(app)
-        })
-        .unwrap_or_else(|why| {
+        }).unwrap_or_else(|why| {
             error!("Http Server Initialization Error: {}", why);
             exit(1);
         });
@@ -108,8 +110,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
                     handle.spawn(conn.map(|_| ()).map_err(|why| error!("Server Error: {:?}", why)));
                     Ok(())
                 }
-            })
-            .map_err(|_| ()),
+            }).map_err(|_| ()),
     );
 
     info!("Listening on http://{}", listen_address);
