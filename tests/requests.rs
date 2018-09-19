@@ -329,6 +329,8 @@ fn test_services() {
                             track_id: None,
                             created_at: db_data.created_at.clone(),
                             updated_at: db_data.updated_at.clone(),
+                            pre_order: false,
+                            pre_order_days: 0,
                         }
                     }).collect::<Vec<_>>();
 

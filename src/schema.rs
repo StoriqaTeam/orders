@@ -68,6 +68,8 @@ table! {
         conversion_id -> Uuid,
         receiver_phone -> Nullable<Varchar>,
         currency -> Varchar,
+        pre_order -> Bool,
+        pre_order_days -> Int4,
     }
 }
 
