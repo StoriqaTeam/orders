@@ -173,7 +173,7 @@ impl Controller for ControllerImpl {
                                 return serialize_future({
                                     parse_body::<CartProductIncrementPayload>(payload).and_then(move |data| {
                                         debug!("Received request to increment product {} for customer {}", product_id, customer);
-                                        (service_factory.cart)(login_data).increment_item(customer, product_id, data.store_id)
+                                        (service_factory.cart)(login_data).increment_item(customer, product_id, data)
                                     })
                                 })
                             }

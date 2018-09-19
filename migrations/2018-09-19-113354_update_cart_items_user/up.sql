@@ -1,0 +1,2 @@
+ALTER TABLE cart_items_user ADD COLUMN pre_order BOOLEAN NOT NULL DEFAULT 'f';
+ALTER TABLE cart_items_user ADD COLUMN pre_order_days INTEGER NOT NULL DEFAULT 0;

@@ -7,6 +7,7 @@ use types::*;
 use futures::future;
 use futures::prelude::*;
 use std::rc::Rc;
+use stq_api::orders::*;
 use stq_db::repo::*;
 use stq_db::statement::*;
 use stq_types::*;
@@ -16,7 +17,7 @@ pub trait CartService {
     /// Get user's cart contents
     fn get_cart(&self, customer: CartCustomer) -> ServiceFuture<Cart>;
     /// Increase item's quantity by 1
-    fn increment_item(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart>;
+    fn increment_item(&self, customer: CartCustomer, product_id: ProductId, payload: CartProductIncrementPayload) -> ServiceFuture<Cart>;
     /// Set item to desired quantity in user's cart
     fn set_quantity(&self, customer: CartCustomer, product_id: ProductId, quantity: Quantity) -> ServiceFuture<Cart>;
     /// Set selection of the item in user's cart
@@ -71,7 +72,7 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn increment_item(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> ServiceFuture<Cart> {
+    fn increment_item(&self, customer: CartCustomer, product_id: ProductId, payload: CartProductIncrementPayload) -> ServiceFuture<Cart> {
         debug!("Adding 1 item {} into cart for customer {}", product_id, customer);
 
         let repo_factory = self.repo_factory.clone();
@@ -91,11 +92,13 @@ impl CartService for CartServiceImpl {
                                                 id: CartItemId::new(),
                                                 customer,
                                                 product_id,
-                                                store_id,
+                                                store_id: payload.store_id,
 
                                                 quantity: Quantity(1),
                                                 selected: true,
                                                 comment: String::new(),
+                                                pre_order: payload.pre_order,
+                                                pre_order_days: payload.pre_order_days,
                                             },
                                         },
                                     )

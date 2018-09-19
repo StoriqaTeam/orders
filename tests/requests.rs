@@ -39,8 +39,13 @@ impl RpcClient {
         for product in products {
             self.inner.delete_item(product.customer, product.product_id).wait().unwrap();
             self.inner
-                .increment_item(product.customer, product.product_id, product.store_id)
-                .wait()
+                .increment_item(
+                    product.customer,
+                    product.product_id,
+                    product.store_id,
+                    product.pre_order,
+                    product.pre_order_days,
+                ).wait()
                 .unwrap();
             self.inner
                 .set_quantity(product.customer, product.product_id, product.quantity)
@@ -61,7 +66,7 @@ impl RpcClient {
     }
 
     pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
-        let rsp = self.inner.increment_item(customer, product_id, store_id).wait().unwrap();
+        let rsp = self.inner.increment_item(customer, product_id, store_id, false, 0).wait().unwrap();
         let v = rsp
             .into_iter()
             .filter(|cart_item| cart_item.product_id == product_id)
@@ -77,6 +82,8 @@ impl RpcClient {
                 selected: true,
                 comment: String::new(),
                 store_id,
+                pre_order: false,
+                pre_order_days: 0,
             },
         );
 
@@ -136,7 +143,7 @@ fn test_services() {
 
             product_2.quantity.0 += 1;
             assert_eq!(
-                rpc.inner.increment_item(user_1, product_id_2, store_id).wait().unwrap(),
+                rpc.inner.increment_item(user_1, product_id_2, store_id, false, 0).wait().unwrap(),
                 hashset![product_1.clone(), product_2.clone()]
             );
 
@@ -224,6 +231,8 @@ fn test_services() {
                     selected: true,
                     comment: "Product 1 comment".into(),
                     store_id: StoreId(1001),
+                    pre_order: false,
+                    pre_order_days: 0,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -233,6 +242,8 @@ fn test_services() {
                     selected: true,
                     comment: "Product 2 comment".into(),
                     store_id: StoreId(1001),
+                    pre_order: false,
+                    pre_order_days: 0,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -242,6 +253,8 @@ fn test_services() {
                     selected: false,
                     comment: "Product 3 comment".into(),
                     store_id: StoreId(1001),
+                    pre_order: false,
+                    pre_order_days: 0,
                 },
             ]);
 
