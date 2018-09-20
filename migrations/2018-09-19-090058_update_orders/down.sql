@@ -1,0 +1,2 @@
+ALTER TABLE orders DROP COLUMN IF EXISTS pre_order;
+ALTER TABLE orders DROP COLUMN IF EXISTS pre_order_days;

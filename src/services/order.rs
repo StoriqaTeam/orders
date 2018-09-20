@@ -125,6 +125,8 @@ impl OrderService for OrderServiceImpl {
                                     state: OrderState::New,
                                     delivery_company: None,
                                     track_id: None,
+                                    pre_order: cart_item.pre_order,
+                                    pre_order_days: cart_item.pre_order_days,
                                 }, cart_item.comment))
                             } else {
                                 return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
@@ -229,6 +231,8 @@ impl OrderService for OrderServiceImpl {
                             selected: true,
                             comment: "".into(),
                             store_id: order.0.store,
+                            pre_order: false,  // TODO get from order fields
+                            pre_order_days: 0, // TODO get from order fields
                         };
                         for diff in diffs {
                             if diff.0.state == OrderState::New {

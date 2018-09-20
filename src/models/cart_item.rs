@@ -13,6 +13,8 @@ const STORE_ID_COLUMN: &str = "store_id";
 
 const USER_ID_COLUMN: &str = "user_id";
 const SESSION_ID_COLUMN: &str = "session_id";
+const PRE_ORDER_COLUMN: &str = "pre_order";
+const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 
 #[derive(Clone, Debug)]
 pub struct CartItemUser {
@@ -23,6 +25,8 @@ pub struct CartItemUser {
     pub selected: bool,
     pub comment: String,
     pub store_id: StoreId,
+    pub pre_order: bool,
+    pub pre_order_days: i32,
 }
 
 #[derive(Clone, Debug)]
@@ -34,6 +38,8 @@ pub struct CartItemSession {
     pub selected: bool,
     pub comment: String,
     pub store_id: StoreId,
+    pub pre_order: bool,
+    pub pre_order_days: i32,
 }
 
 impl From<CartItemUser> for CartItem {
@@ -46,6 +52,8 @@ impl From<CartItemUser> for CartItem {
             selected: v.selected,
             comment: v.comment,
             store_id: v.store_id,
+            pre_order: v.pre_order,
+            pre_order_days: v.pre_order_days,
         }
     }
 }
@@ -60,6 +68,8 @@ impl From<CartItemSession> for CartItem {
             selected: v.selected,
             comment: v.comment,
             store_id: v.store_id,
+            pre_order: v.pre_order,
+            pre_order_days: v.pre_order_days,
         }
     }
 }
@@ -74,6 +84,8 @@ impl Inserter for CartItemUser {
             .with_arg(SELECTED_COLUMN, self.selected)
             .with_arg(STORE_ID_COLUMN, self.store_id.0)
             .with_arg(USER_ID_COLUMN, self.user_id.0)
+            .with_arg(PRE_ORDER_COLUMN, self.pre_order)
+            .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
     }
 }
 
@@ -87,11 +99,13 @@ impl Inserter for CartItemSession {
             .with_arg(SELECTED_COLUMN, self.selected)
             .with_arg(STORE_ID_COLUMN, self.store_id.0)
             .with_arg(SESSION_ID_COLUMN, self.session_id.0)
+            .with_arg(PRE_ORDER_COLUMN, self.pre_order)
+            .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
     }
 }
 
 impl CartItemUser {
-    pub fn new(user_id: UserId, product_id: ProductId, store_id: StoreId) -> Self {
+    pub fn new(user_id: UserId, product_id: ProductId, store_id: StoreId, pre_order: bool, pre_order_days: i32) -> Self {
         Self {
             user_id,
             product_id,
@@ -101,12 +115,14 @@ impl CartItemUser {
             quantity: Quantity(1),
             selected: true,
             comment: String::new(),
+            pre_order,
+            pre_order_days,
         }
     }
 }
 
 impl CartItemSession {
-    pub fn new(session_id: SessionId, product_id: ProductId, store_id: StoreId) -> Self {
+    pub fn new(session_id: SessionId, product_id: ProductId, store_id: StoreId, pre_order: bool, pre_order_days: i32) -> Self {
         Self {
             session_id,
             product_id,
@@ -116,6 +132,8 @@ impl CartItemSession {
             quantity: Quantity(1),
             selected: true,
             comment: String::new(),
+            pre_order,
+            pre_order_days,
         }
     }
 }
@@ -146,6 +164,8 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             selected: v.selected,
             comment: v.comment,
             store_id: v.store_id,
+            pre_order: v.pre_order,
+            pre_order_days: v.pre_order_days,
         }),
         Anonymous(session_id) => Either::Right(CartItemSession {
             session_id,
@@ -155,6 +175,8 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             selected: v.selected,
             comment: v.comment,
             store_id: v.store_id,
+            pre_order: v.pre_order,
+            pre_order_days: v.pre_order_days,
         }),
     }
 }
@@ -246,6 +268,8 @@ impl From<Row> for CartItemUser {
             selected: row.get(SELECTED_COLUMN),
             comment: row.get(COMMENT_COLUMN),
             store_id: StoreId(row.get(STORE_ID_COLUMN)),
+            pre_order: row.get(PRE_ORDER_COLUMN),
+            pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
         }
     }
 }
@@ -260,6 +284,8 @@ impl From<Row> for CartItemSession {
             selected: row.get(SELECTED_COLUMN),
             comment: row.get(COMMENT_COLUMN),
             store_id: StoreId(row.get(STORE_ID_COLUMN)),
+            pre_order: row.get(PRE_ORDER_COLUMN),
+            pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
         }
     }
 }

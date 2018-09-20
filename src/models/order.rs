@@ -41,6 +41,8 @@ const UPDATED_AT_COLUMN: &str = "updated_at";
 const STATE_COLUMN: &str = "state";
 const PAYMENT_STATUS_COLUMN: &str = "payment_status";
 const DELIVERY_COMPANY_COLUMN: &str = "delivery_company";
+const PRE_ORDER_COLUMN: &str = "pre_order";
+const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.location {
@@ -121,6 +123,8 @@ impl From<Row> for DbOrder {
             updated_at: row.get(UPDATED_AT_COLUMN),
             track_id: row.get(TRACK_ID_COLUMN),
             state: row.get(STATE_COLUMN),
+            pre_order: row.get(PRE_ORDER_COLUMN),
+            pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
         })
     }
 }
@@ -142,6 +146,8 @@ pub struct OrderInserter {
     pub delivery_company: Option<String>,
     pub state: OrderState,
     pub track_id: Option<String>,
+    pub pre_order: bool,
+    pub pre_order_days: i32,
 }
 
 impl Inserter for OrderInserter {
@@ -155,7 +161,9 @@ impl Inserter for OrderInserter {
             .with_arg(PRICE_COLUMN, self.price.0)
             .with_arg(CURRENCY_COLUMN, self.currency.to_string())
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
-            .with_arg(STATE_COLUMN, self.state);
+            .with_arg(STATE_COLUMN, self.state)
+            .with_arg(PRE_ORDER_COLUMN, self.pre_order)
+            .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days);
 
         b = write_address_into_inserter(self.address, b);
 
@@ -197,6 +205,8 @@ pub struct OrderFilter {
     pub payment_status: Option<ValueContainer<bool>>,
     pub delivery_company: Option<ValueContainer<Option<String>>>,
     pub track_id: Option<ValueContainer<Option<String>>>,
+    pub pre_order: Option<ValueContainer<bool>>,
+    pub pre_order_days: Option<ValueContainer<i32>>,
 }
 
 impl From<OrderIdentifier> for OrderFilter {
@@ -312,6 +322,14 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.track_id {
             b = b.with_filter(TRACK_ID_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.pre_order {
+            b = b.with_filter(PRE_ORDER_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.pre_order_days {
+            b = b.with_filter(PRE_ORDER_DAYS_COLUMN, v.value);
         }
 
         if self.do_order {
