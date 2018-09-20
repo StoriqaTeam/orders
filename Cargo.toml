@@ -27,22 +27,22 @@ maplit = "*"
 postgres = { git = "https://github.com/StoriqaTeam/rust-postgres" }
 rand = "*"
 regex = "*"
+sentry = "0.3"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
-tokio = "*"
-tokio-core = "*"
-tokio-postgres = { git = "https://github.com/StoriqaTeam/rust-postgres", features = ["with-serde_json-1", "with-chrono-0.4", "with-uuid-0.6", "with-geo-0.10"] }
-stq_api = { path = "vendor/libstqbackend/api" }
 stq_acl = { path = "vendor/libstqbackend/acl" }
+stq_api = { path = "vendor/libstqbackend/api" }
 stq_db = { path = "vendor/libstqbackend/db" }
 stq_http = { path = "vendor/libstqbackend/http" }
 stq_logging = { path = "vendor/libstqbackend/logging" }
 stq_roles = { path = "vendor/libstqbackend/roles" }
 stq_router = { path = "vendor/libstqbackend/router" }
-stq_types = { path = "vendor/libstqbackend/types" }
 stq_static_resources = { path = "vendor/libstqbackend/static_resources" }
+stq_types = { path = "vendor/libstqbackend/types" }
+tokio = "*"
+tokio-core = "*"
+tokio-postgres = { git = "https://github.com/StoriqaTeam/rust-postgres", features = ["with-serde_json-1", "with-chrono-0.4", "with-uuid-0.6", "with-geo-0.10"] }
 uuid = { version = "*", features = ["serde", "v4"] }
 validator = "0.7.1"
 validator_derive = "0.7.2"
-sentry = "0.3"
