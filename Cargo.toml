@@ -27,7 +27,7 @@ maplit = "*"
 postgres = { git = "https://github.com/StoriqaTeam/rust-postgres" }
 rand = "*"
 regex = "*"
-sentry = "0.3"
+sentry = "0.12"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
