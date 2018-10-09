@@ -6,6 +6,7 @@ use std::rc::Rc;
 use stq_api::orders::*;
 use stq_http::{
     controller::{Controller, ControllerFuture},
+    errors::ErrorMessageWrapper,
     request_util::{parse_body, serialize_future},
 };
 use stq_roles::{
@@ -18,6 +19,7 @@ use validator::Validate;
 use config::*;
 use errors::*;
 use models::*;
+use sentry_integration::log_and_capture_error;
 use services::*;
 use types::*;
 
@@ -285,6 +287,14 @@ impl Controller for ControllerImpl {
                         d.num_seconds(),
                         d.num_milliseconds()
                     );
+
+                    if let Err(ref err) = res {
+                        let wrapper = ErrorMessageWrapper::<Error>::from(err);
+                        if wrapper.inner.code == 500 {
+                            log_and_capture_error(err);
+                        }
+                    }
+
                     res
                 }),
         )
