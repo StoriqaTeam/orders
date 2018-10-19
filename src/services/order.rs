@@ -33,8 +33,8 @@ pub trait OrderService {
         receiver_name: String,
         receiver_phone: String,
     ) -> ServiceFuture<Vec<Order>>;
+    fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
     fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
-    // fn create_order(&self) -> ServiceFuture<Order>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
@@ -259,6 +259,79 @@ impl OrderService for OrderServiceImpl {
 
                     out.map(|conn| ((), conn))
                 })
+        }))
+    }
+
+    fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>> {
+        use self::RepoLogin::*;
+
+        let order_repo_factory = self.order_repo_factory.clone();
+        let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
+        let calling_user = match self.login_data.clone() {
+            User { caller_id, .. } => caller_id,
+            _ => UserId(-1),
+        };
+
+        Box::new(self.db_pool.run(move |conn| {
+            let order_item = (
+                OrderInserter {
+                    id: None,
+                    created_from: None,
+                    conversion_id,
+                    customer: payload.customer_id,
+                    store: payload.store_id,
+                    product: payload.product_id,
+                    quantity: payload.quantity,
+                    price: payload.price.price,
+                    currency: payload.price.currency,
+                    address: payload.address,
+                    receiver_name: payload.receiver_name,
+                    receiver_phone: payload.receiver_phone,
+                    state: OrderState::New,
+                    delivery_company: None,
+                    track_id: None,
+                    pre_order: payload.pre_order,
+                    pre_order_days: payload.pre_order_days,
+                },
+                "Buy now".to_string(),
+            );
+
+            let order_items = vec![order_item];
+            let mut out: RepoConnectionFuture<Vec<Order>>;
+            out = Box::new(future::ok((Default::default(), conn)));
+
+            for (new_order, comment) in order_items {
+                out = Box::new(out.and_then({
+                    let comment = comment.clone();
+                    let order_repo_factory = order_repo_factory.clone();
+                    let order_diffs_repo_factory = order_diffs_repo_factory.clone();
+                    move |(mut out_data, conn)| {
+                        // Insert new order along with the record in history
+                        (order_repo_factory)()
+                            .insert_exactly_one(conn, new_order)
+                            .and_then(move |(inserted_order, conn)| {
+                                let order_diff = OrderDiffInserter {
+                                    parent: inserted_order.0.id,
+                                    committer: calling_user,
+                                    committed_at: Utc::now(),
+                                    state: OrderState::New,
+                                    comment: Some(comment),
+                                };
+
+                                (order_diffs_repo_factory)()
+                                    .insert_exactly_one(conn, order_diff)
+                                    .map(|(_, conn)| (inserted_order, conn))
+                            }).map({
+                                move |(order, conn): (DbOrder, RepoConnection)| {
+                                    out_data.push(order.0);
+                                    (out_data, conn)
+                                }
+                            })
+                    }
+                }));
+            }
+
+            out
         }))
     }
 

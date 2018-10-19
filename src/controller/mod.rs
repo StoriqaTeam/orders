@@ -248,6 +248,24 @@ impl Controller for ControllerImpl {
                                     })
                                 })
                             }
+                            (Post, Some(Route::OrderFromBuyNow)) => {
+                                return serialize_future({
+                                    parse_body::<BuyNowPayload>(payload).and_then(move |payload| {
+                                        debug!("Received request to create order from buy_now data");
+                                        payload
+                                            .buy_now
+                                            .validate()
+                                            .map_err(failure::Error::from)
+                                            .context("Failed to validate BuyNowPayload")
+                                            .context(Error::ParseError)
+                                            .map_err(failure::Error::from)
+                                            .into_future()
+                                            .and_then(move |_| {
+                                                (service_factory.order)(login_data).create_buy_now(payload.buy_now, payload.conversion_id)
+                                            })
+                                    })
+                                })
+                            }
                             (Post, Some(Route::OrderFromCartRevert)) => {
                                 return serialize_future({
                                     parse_body::<ConvertCartRevertPayload>(payload).and_then(move |payload| {
