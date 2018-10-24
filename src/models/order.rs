@@ -23,7 +23,6 @@ const QUANTITY_COLUMN: &str = "quantity";
 const RECEIVER_NAME_COLUMN: &str = "receiver_name";
 const RECEIVER_PHONE_COLUMN: &str = "receiver_phone";
 
-const LOCATION_COLUMN: &str = "location";
 const ADMINISTRATIVE_AREA_LEVEL_1_COLUMN: &str = "administrative_area_level_1";
 const ADMINISTRATIVE_AREA_LEVEL_2_COLUMN: &str = "administrative_area_level_2";
 const COUNTRY_COLUMN: &str = "country";
@@ -45,9 +44,6 @@ const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
-    if let Some(v) = addr.location {
-        b = b.with_arg(LOCATION_COLUMN, v);
-    }
     if let Some(v) = addr.administrative_area_level_1 {
         b = b.with_arg(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN, v);
     }
@@ -84,7 +80,6 @@ pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> I
 
 pub fn address_from_row(row: &Row) -> AddressFull {
     AddressFull {
-        location: row.get(LOCATION_COLUMN),
         administrative_area_level_1: row.get(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN),
         administrative_area_level_2: row.get(ADMINISTRATIVE_AREA_LEVEL_2_COLUMN),
         country: row.get(COUNTRY_COLUMN),
