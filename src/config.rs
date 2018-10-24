@@ -25,7 +25,17 @@ pub struct Config {
     pub db: Database,
     /// GrayLog settings
     pub graylog: Option<stq_logging::GrayLogConfig>,
+    /// Sentry settings
     pub sentry: Option<SentryConfig>,
+    /// Delivered Orders settings
+    pub delivered_orders: Option<DeliveredOrders>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeliveredOrders {
+    ///
+    pub interval_s: u64,
+    pub delivery_state_duration_days: i64,
 }
 
 static ENV_PREFIX: &'static str = "STQ_ORDERS";

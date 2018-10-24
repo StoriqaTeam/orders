@@ -7,6 +7,7 @@ extern crate env_logger;
 #[macro_use]
 extern crate failure;
 extern crate futures;
+extern crate futures_cpupool;
 extern crate futures_state_stream;
 extern crate geo;
 extern crate hyper;
@@ -28,12 +29,15 @@ extern crate stq_roles;
 extern crate stq_router;
 extern crate stq_static_resources;
 extern crate stq_types;
+extern crate tokio;
 extern crate tokio_core;
 extern crate tokio_postgres;
 extern crate uuid;
 extern crate validator;
 #[macro_use]
 extern crate sentry;
+
+use std::sync::Arc;
 
 use bb8_postgres::PostgresConnectionManager;
 use futures::future;
@@ -46,9 +50,10 @@ use tokio_postgres::TlsMode;
 
 use stq_http::controller::Application;
 
-mod config;
+pub mod config;
 pub mod controller;
 pub mod errors;
+mod loaders;
 pub mod models;
 pub mod repos;
 pub mod sentry_integration;
@@ -119,4 +124,40 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
         future::ok(())
     });
     core.run(future::empty::<(), ()>()).unwrap();
+}
+
+pub fn start_delivered_orders_loader(config: Config) {
+    let mut core = Core::new().expect("Unexpected error creating event loop core");
+    let handle = Arc::new(core.handle());
+
+    let db_pool = {
+        let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
+        let remote = core.remote();
+        DbPool::from(
+            core.run(
+                bb8::Pool::builder()
+                    .min_idle(Some(1))
+                    .build(manager, remote)
+                    .map_err(|e| format_err!("{}", e)),
+            ).expect("Failed to create connection pool"),
+        )
+    };
+    let env = loaders::DeliveredOrdersEnvironment {
+        db_pool,
+        config: Arc::new(config),
+    };
+    handle.spawn(create_delivered_orders_loader(env));
+
+    core.run(future::empty::<(), ()>()).unwrap();
+}
+
+fn create_delivered_orders_loader(env: loaders::DeliveredOrdersEnvironment) -> impl Future<Item = (), Error = ()> {
+    let loader = loaders::DeliveredOrdersLoader::new(env);
+
+    let stream = loader.start();
+    stream
+        .or_else(|e| {
+            error!("Error in delivered orders loader: {:?}.", e);
+            futures::future::ok(())
+        }).for_each(|_| futures::future::ok(()))
 }

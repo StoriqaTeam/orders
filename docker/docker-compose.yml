@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.orders
     container_name: orders
     working_dir: /app
-    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run"]
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin orders"]
     volumes:
       - ..:/app
       - stq_cargo_cache:/usr/local/cargo
@@ -31,6 +31,28 @@ services:
       - POSTGRES_PASSWORD=orders
     ports:
       - "5433:5432"
+
+  delivered-orders:
+    image: orders
+    build:
+      context: .
+      dockerfile: Dockerfile.orders
+    container_name: delivered-orders
+    working_dir: /app
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin delivered_orders"]
+    volumes:
+    - ..:/app
+    - stq_cargo_cache:/usr/local/cargo
+    environment:
+    - DATABASE_URL=postgresql://orders:orders@orders-pg/orders
+    - "RUST_LOG=orders_lib=debug"
+    expose:
+    - 8000
+    stdin_open: true
+    depends_on:
+    - orders-pg
+    links:
+    - orders-pg
 
 volumes:
   stq_cargo_cache:

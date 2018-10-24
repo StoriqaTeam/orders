@@ -6,6 +6,14 @@ version = "0.1.0"
 name = "orders_lib"
 path = "src/lib.rs"
 
+[[bin]]
+name = "delivered_orders"
+path = "src/bin/delivered_orders.rs"
+
+[[bin]]
+name = "orders"
+path = "src/main.rs"
+
 [dependencies]
 bb8 = { git = "https://github.com/StoriqaTeam/bb8" }
 bb8-postgres = { git = "https://github.com/StoriqaTeam/bb8" }
@@ -16,6 +24,7 @@ either = "1.5"
 env_logger = "0.5"
 failure = "0.1"
 futures = "0.1"
+futures-cpupool = "0.1.7"
 futures-state-stream = "0.2"
 geo = { version = "0.10", features = ["serde"] }
 geo-types = { version = "0.2", features = ["serde"] }
