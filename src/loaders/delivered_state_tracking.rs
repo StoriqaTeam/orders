@@ -72,26 +72,20 @@ impl DeliveredStateTracking {
             *busy = true;
         }
         let busy = self.busy.clone();
-
+        let now = ::chrono::offset::Utc::now();
+        let max_delivered_state_duration = ChronoDuration::days(config.delivery_state_duration_days);
         let search_delivered_orders = OrderSearchTerms {
-            slug: None,
-            created_from: None,
-            created_to: None,
-            payment_status: None,
-            customer: None,
-            store: None,
+            updated_to: Some(now - max_delivered_state_duration),
             state: Some(OrderState::Delivered),
+            ..OrderSearchTerms::default()
         };
         let self_clone = self.clone();
         let service = OrderServiceImpl::new(self_clone.db_pool.clone(), super_user());
         service
             .search(search_delivered_orders)
             .map(move |delivered_orders| {
-                let now = ::chrono::offset::Utc::now();
-                let max_delivered_state_duration = ChronoDuration::days(config.delivery_state_duration_days);
                 delivered_orders
                     .into_iter()
-                    .filter(move |order| (now - order.updated_at) >= max_delivered_state_duration)
                     .map(move |old_delivered_order| {
                         info!("Updating order state for order {}", old_delivered_order.id);
                         service.set_order_state(OrderIdentifier::Id(old_delivered_order.id), OrderState::Complete, None, None)

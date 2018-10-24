@@ -233,30 +233,8 @@ impl OrderFilter {
 
         mask.slug = terms.slug.map(From::from);
 
-        mask.created_at = if let (Some(from), Some(to)) = (terms.created_from, terms.created_to) {
-            Some(
-                Range::Between((
-                    {
-                        RangeLimit {
-                            value: from,
-                            inclusive: true,
-                        }
-                    },
-                    {
-                        RangeLimit {
-                            value: to,
-                            inclusive: true,
-                        }
-                    },
-                )).into(),
-            )
-        } else if let Some(value) = terms.created_from {
-            Some(Range::From({ RangeLimit { value, inclusive: true } }).into())
-        } else if let Some(value) = terms.created_to {
-            Some(Range::To({ RangeLimit { value, inclusive: true } }).into())
-        } else {
-            None
-        };
+        mask.created_at = into_range(terms.created_from, terms.created_to);
+        mask.updated_at = into_range(terms.updated_from, terms.updated_to);
 
         mask.payment_status = terms.payment_status.map(From::from);
         mask.customer = terms.customer.map(From::from);
@@ -301,6 +279,10 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.created_at {
             b = b.with_filter::<DateTime<Utc>, _>(CREATED_AT_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.updated_at {
+            b = b.with_filter::<DateTime<Utc>, _>(UPDATED_AT_COLUMN, v.value);
         }
 
         if let Some(v) = self.state {
@@ -360,5 +342,32 @@ impl Updater for OrderUpdater {
         }
 
         b
+    }
+}
+
+fn into_range(from: Option<DateTime<Utc>>, to: Option<DateTime<Utc>>) -> Option<ValueContainer<Range<DateTime<Utc>>>> {
+    if let (Some(from), Some(to)) = (from, to) {
+        Some(
+            Range::Between((
+                {
+                    RangeLimit {
+                        value: from,
+                        inclusive: true,
+                    }
+                },
+                {
+                    RangeLimit {
+                        value: to,
+                        inclusive: true,
+                    }
+                },
+            )).into(),
+        )
+    } else if let Some(value) = from {
+        Some(Range::From({ RangeLimit { value, inclusive: true } }).into())
+    } else if let Some(value) = to {
+        Some(Range::To({ RangeLimit { value, inclusive: true } }).into())
+    } else {
+        None
     }
 }
