@@ -10,5 +10,5 @@ fn main() {
     // Prepare logger
     stq_logging::init(config.graylog.as_ref());
 
-    orders_lib::start_delivered_orders_loader(config);
+    orders_lib::start_delivered_state_tracking(config);
 }

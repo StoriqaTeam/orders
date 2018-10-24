@@ -21,57 +21,54 @@ use stq_static_resources::OrderState;
 use stq_types::{OrderIdentifier, RoleEntryId, UserId};
 
 #[derive(Clone)]
-pub struct DeliveredOrdersLoader {
+pub struct DeliveredStateTracking {
     busy: Arc<Mutex<bool>>,
     db_pool: DbPool,
     config: Option<config::DeliveredOrders>,
     duration: Duration,
-    delivery_state_duration: ChronoDuration,
 }
 
 #[derive(Clone)]
-pub struct DeliveredOrdersEnvironment {
+pub struct DeliveredStateTrackingEnvironment {
     pub db_pool: DbPool,
     pub config: Arc<Config>,
 }
 
-impl DeliveredOrdersLoader {
-    const DEFAULT_DURATION: u64 = 60 * 60 * 24;
-    const DEFAULT_DELIVERY_STATE_DURATION_DAYS: i64 = 1;
+impl DeliveredStateTracking {
+    const DEFAULT_DURATION: u64 = 60 * 60;
 
-    pub fn new(env: DeliveredOrdersEnvironment) -> DeliveredOrdersLoader {
-        DeliveredOrdersLoader {
+    pub fn new(env: DeliveredStateTrackingEnvironment) -> DeliveredStateTracking {
+        DeliveredStateTracking {
             busy: Arc::new(Mutex::new(false)),
             duration: Self::duration(env.config.delivered_orders.as_ref()),
             config: env.config.delivered_orders.clone(),
             db_pool: env.db_pool.clone(),
-            delivery_state_duration: Self::delivery_state_duration(env.config.delivered_orders.as_ref()),
         }
     }
 
     pub fn start(self) -> impl Stream<Item = (), Error = FailureError> {
-        info!("DeliveredOrdersLoader started with config {:?}.", self.config.as_ref());
+        info!("DeliveredStateTracking started with config {:?}.", self.config.as_ref());
         let interval = Interval::new_interval(self.duration).map_err(|e| e.context("timer creation error").into());
 
         interval.and_then(move |_| {
-            if self.config.as_ref().is_some() {
-                let busy = *self.busy.lock().expect("DeliveredOrdersLoader: poisoned mutex at fetch step");
+            if let Some(config) = self.config.clone() {
+                let busy = *self.busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 if busy {
-                    warn!("DeliveredOrdersLoader: tried to ping DeliveredOrdersLoader, but it was busy");
+                    warn!("DeliveredStateTracking: tried to ping DeliveredStateTracking, but it was busy");
                     Either::A(future::ok(()))
                 } else {
-                    Either::B(self.clone().make_step())
+                    Either::B(self.clone().make_step(config))
                 }
             } else {
-                error!("DeliveredOrdersLoader: disabled. Config section [delivered_orders] not set.");
+                error!("DeliveredStateTracking: disabled. Config section [delivered_orders] not set.");
                 Either::A(future::ok(()))
             }
         })
     }
 
-    fn make_step(self) -> impl Future<Item = (), Error = FailureError> {
+    fn make_step(self, config: config::DeliveredOrders) -> impl Future<Item = (), Error = FailureError> {
         {
-            let mut busy = self.busy.lock().expect("DeliveredOrdersLoader: poisoned mutex at fetch step");
+            let mut busy = self.busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
             *busy = true;
         }
         let busy = self.busy.clone();
@@ -91,32 +88,26 @@ impl DeliveredOrdersLoader {
             .search(search_delivered_orders)
             .map(move |delivered_orders| {
                 let now = ::chrono::offset::Utc::now();
+                let max_delivered_state_duration = ChronoDuration::days(config.delivery_state_duration_days);
                 delivered_orders
                     .into_iter()
-                    .filter(move |order| (now - order.updated_at) >= self.delivery_state_duration)
+                    .filter(move |order| (now - order.updated_at) >= max_delivered_state_duration)
                     .map(move |old_delivered_order| {
                         info!("Updating order state for order {}", old_delivered_order.id);
                         service.set_order_state(OrderIdentifier::Id(old_delivered_order.id), OrderState::Complete, None, None)
                     })
             }).and_then(::futures::future::join_all)
             .then(move |res| {
-                let mut busy = busy.lock().expect("DeliveredOrdersLoader: poisoned mutex at fetch step");
+                let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 *busy = false;
                 res
             }).and_then(|_| ::future::ok(()))
     }
 
-    fn duration(delivered_orderes: Option<&config::DeliveredOrders>) -> Duration {
-        match delivered_orderes {
+    fn duration(delivered_orders: Option<&config::DeliveredOrders>) -> Duration {
+        match delivered_orders {
             Some(config) => Duration::from_secs(config.interval_s),
-            None => Duration::from_secs(DeliveredOrdersLoader::DEFAULT_DURATION),
-        }
-    }
-
-    fn delivery_state_duration(delivered_orderes: Option<&config::DeliveredOrders>) -> ChronoDuration {
-        match delivered_orderes {
-            Some(config) => ChronoDuration::days(config.delivery_state_duration_days),
-            None => ChronoDuration::days(DeliveredOrdersLoader::DEFAULT_DELIVERY_STATE_DURATION_DAYS),
+            None => Duration::from_secs(DeliveredStateTracking::DEFAULT_DURATION),
         }
     }
 }

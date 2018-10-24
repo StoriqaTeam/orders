@@ -126,7 +126,7 @@ pub fn start_server<F: FnOnce() + 'static>(config: config::Config, port: Option<
     core.run(future::empty::<(), ()>()).unwrap();
 }
 
-pub fn start_delivered_orders_loader(config: Config) {
+pub fn start_delivered_state_tracking(config: Config) {
     let mut core = Core::new().expect("Unexpected error creating event loop core");
     let handle = Arc::new(core.handle());
 
@@ -142,22 +142,22 @@ pub fn start_delivered_orders_loader(config: Config) {
             ).expect("Failed to create connection pool"),
         )
     };
-    let env = loaders::DeliveredOrdersEnvironment {
+    let env = loaders::DeliveredStateTrackingEnvironment {
         db_pool,
         config: Arc::new(config),
     };
-    handle.spawn(create_delivered_orders_loader(env));
+    handle.spawn(create_delivered_state_tracking_loader(env));
 
     core.run(future::empty::<(), ()>()).unwrap();
 }
 
-fn create_delivered_orders_loader(env: loaders::DeliveredOrdersEnvironment) -> impl Future<Item = (), Error = ()> {
-    let loader = loaders::DeliveredOrdersLoader::new(env);
+fn create_delivered_state_tracking_loader(env: loaders::DeliveredStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
+    let loader = loaders::DeliveredStateTracking::new(env);
 
     let stream = loader.start();
     stream
         .or_else(|e| {
-            error!("Error in delivered orders loader: {:?}.", e);
+            error!("Error in delivered state tracking loader: {:?}.", e);
             futures::future::ok(())
         }).for_each(|_| futures::future::ok(()))
 }

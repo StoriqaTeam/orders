@@ -33,8 +33,9 @@ pub struct Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeliveredOrders {
-    ///
+    /// State check interval in seconds
     pub interval_s: u64,
+    /// How long in days order has to be in delivered state to be considered completed
     pub delivery_state_duration_days: i64,
 }
 
