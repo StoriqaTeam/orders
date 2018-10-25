@@ -84,12 +84,10 @@ impl DeliveredStateTracking {
         service
             .search(search_delivered_orders)
             .map(move |delivered_orders| {
-                delivered_orders
-                    .into_iter()
-                    .map(move |old_delivered_order| {
-                        info!("Updating order state for order {}", old_delivered_order.id);
-                        service.set_order_state(OrderIdentifier::Id(old_delivered_order.id), OrderState::Complete, None, None)
-                    })
+                delivered_orders.into_iter().map(move |old_delivered_order| {
+                    info!("Updating order state for order {}", old_delivered_order.id);
+                    service.set_order_state(OrderIdentifier::Id(old_delivered_order.id), OrderState::Complete, None, None)
+                })
             }).and_then(::futures::future::join_all)
             .then(move |res| {
                 let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
