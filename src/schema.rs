@@ -47,7 +47,6 @@ table! {
         price -> Float8,
         quantity -> Int4,
         receiver_name -> Varchar,
-        location -> Nullable<Point>,
         administrative_area_level_1 -> Nullable<Varchar>,
         administrative_area_level_2 -> Nullable<Varchar>,
         country -> Nullable<Varchar>,

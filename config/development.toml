@@ -5,3 +5,6 @@ port = 8000
 dsn = "postgresql://orders:orders@orders-pg/orders"
 [graylog]
 addr = "udplog.stq.cloud:32303"
+[delivered_orders]
+interval_s = 86400
+delivery_state_duration_days = 15
