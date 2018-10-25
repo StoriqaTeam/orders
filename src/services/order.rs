@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use chrono::prelude::*;
+use chrono::Duration as ChronoDuration;
 use futures::future;
 use futures::prelude::*;
 
@@ -49,6 +50,7 @@ pub trait OrderService {
     ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
+    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<()>;
 }
 
 pub struct OrderServiceImpl {
@@ -102,72 +104,72 @@ impl OrderService for OrderServiceImpl {
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
-                    .delete(conn, CartItemFilter { customer: Some(customer_id.into()), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
-                    // Create orders from cart items
-                    .and_then(move |(cart, conn)| {
-                        let mut order_items = Vec::new();
-                        for cart_item in cart {
-                            if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
-                                let ProductSellerPrice { price, currency } = seller_price;
-                                order_items.push((OrderInserter {
-                                    id: None,
-                                    created_from: Some(cart_item.id),
-                                    conversion_id,
-                                    customer: customer_id,
-                                    store: cart_item.store_id,
-                                    product: cart_item.product_id,
-                                    quantity: cart_item.quantity,
-                                    price,
-                                    currency,
-                                    address: address.clone(),
-                                    receiver_name: receiver_name.clone(),
-                                    receiver_phone: receiver_phone.clone(),
-                                    state: OrderState::New,
-                                    delivery_company: None,
-                                    track_id: None,
-                                    pre_order: cart_item.pre_order,
-                                    pre_order_days: cart_item.pre_order_days,
-                                }, cart_item.comment))
-                            } else {
-                                return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
-                            }
+                .delete(conn, CartItemFilter { customer: Some(customer_id.into()), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
+                // Create orders from cart items
+                .and_then(move |(cart, conn)| {
+                    let mut order_items = Vec::new();
+                    for cart_item in cart {
+                        if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
+                            let ProductSellerPrice { price, currency } = seller_price;
+                            order_items.push((OrderInserter {
+                                id: None,
+                                created_from: Some(cart_item.id),
+                                conversion_id,
+                                customer: customer_id,
+                                store: cart_item.store_id,
+                                product: cart_item.product_id,
+                                quantity: cart_item.quantity,
+                                price,
+                                currency,
+                                address: address.clone(),
+                                receiver_name: receiver_name.clone(),
+                                receiver_phone: receiver_phone.clone(),
+                                state: OrderState::New,
+                                delivery_company: None,
+                                track_id: None,
+                                pre_order: cart_item.pre_order,
+                                pre_order_days: cart_item.pre_order_days,
+                            }, cart_item.comment))
+                        } else {
+                            return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
                         }
-                        Ok((order_items, conn))
-                    })
-                    // Insert new orders into database
-                    .and_then({
-                        move |(new_orders, conn)| {
-                            let mut out: RepoConnectionFuture<Vec<Order>>;
-                            out = Box::new(future::ok((Default::default(), conn)));
+                    }
+                    Ok((order_items, conn))
+                })
+                // Insert new orders into database
+                .and_then({
+                    move |(new_orders, conn)| {
+                        let mut out: RepoConnectionFuture<Vec<Order>>;
+                        out = Box::new(future::ok((Default::default(), conn)));
 
-                            for (new_order, comment) in new_orders {
-                                out = Box::new(out.and_then({
-                                    let comment = comment.clone();
-                                    let order_repo_factory = order_repo_factory.clone();
-                                    let order_diffs_repo_factory = order_diffs_repo_factory.clone();
-                                    move |(mut out_data, conn)| {
-                                        // Insert new order along with the record in history
-                                        (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
-                                            (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                                parent: inserted_order.0.id,
-                                                committer: calling_user,
-                                                committed_at: Utc::now(),
-                                                state: OrderState::New,
-                                                comment: Some(comment),
-                                            }).map(|(_, conn)| (inserted_order, conn))
-                                        }).map({
-                                            move |(order, conn): (DbOrder, RepoConnection)| {
-                                                out_data.push(order.0);
-                                                (out_data, conn)
-                                            }
-                                        })
-                                    }
-                                }));
-                            }
-
-                            out
+                        for (new_order, comment) in new_orders {
+                            out = Box::new(out.and_then({
+                                let comment = comment.clone();
+                                let order_repo_factory = order_repo_factory.clone();
+                                let order_diffs_repo_factory = order_diffs_repo_factory.clone();
+                                move |(mut out_data, conn)| {
+                                    // Insert new order along with the record in history
+                                    (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
+                                        (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
+                                            parent: inserted_order.0.id,
+                                            committer: calling_user,
+                                            committed_at: Utc::now(),
+                                            state: OrderState::New,
+                                            comment: Some(comment),
+                                        }).map(|(_, conn)| (inserted_order, conn))
+                                    }).map({
+                                        move |(order, conn): (DbOrder, RepoConnection)| {
+                                            out_data.push(order.0);
+                                            (out_data, conn)
+                                        }
+                                    })
+                                }
+                            }));
                         }
-                    })
+
+                        out
+                    }
+                })
         }))
     }
 
@@ -435,37 +437,121 @@ impl OrderService for OrderServiceImpl {
             User { caller_id, .. } => caller_id,
             _ => UserId(-1),
         };
-        Box::new(
-            db_pool
-                .run(move |conn| {
-                    (order_repo_factory)()
-                        .update(
-                            conn,
-                            OrderUpdater {
-                                mask: order_id.into(),
-                                data: OrderUpdateData { state: Some(state), track_id },
-                            },
-                        )
-                })
-                .map(|mut out_data| out_data.pop() )
-                // Insert new order diff into database
-                .and_then(move |updated_order| {
-                    db_pool.run(move |conn| {
-                        if let Some(order) = updated_order {
-                            Box::new(
-                                (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                parent: order.0.id,
-                                committer: calling_user,
-                                committed_at: Utc::now(),
-                                state: order.0.state,
-                                comment,
-                            }).map(move |(_, c)| (Some(order.0), c))
-                            )
-                        } else {
-                            Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>
-                        }
-                    })
-                }),
+
+        set_order_state(
+            order_id,
+            state,
+            comment,
+            track_id,
+            order_repo_factory,
+            order_diff_repo_factory,
+            db_pool,
+            calling_user,
         )
     }
+
+    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<()> {
+        use self::RepoLogin::User;
+        let now = ::chrono::offset::Utc::now();
+        let old_order_date = now - max_delivered_state_duration;
+        let search_old_delivered_diffs = move |order_id: OrderId| -> OrderDiffFilter {
+            OrderDiffFilter {
+                parent: Some(order_id).map(From::from),
+                committed_at_range: ::models::common::into_range(None, Some(old_order_date)),
+                ..OrderDiffFilter::default()
+            }
+        };
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+
+        let search_delivered_orders = OrderSearchTerms {
+            state: Some(OrderState::Delivered),
+            ..OrderSearchTerms::default()
+        };
+
+        let calling_user = match self.login_data.clone() {
+            User { caller_id, .. } => caller_id,
+            _ => UserId(-1),
+        };
+
+        let order_repo_factory = self.order_repo_factory.clone();
+        let order_diff_repo_factory2 = self.order_diff_repo_factory.clone();
+        let db_pool2 = self.db_pool.clone();
+
+        let result = self
+            .search(search_delivered_orders)
+            .map(move |delivered_orders| {
+                delivered_orders
+                    .into_iter()
+                    .map(move |delivered_order| search_old_delivered_diffs(delivered_order.id))
+                    .map(move |diff_filter| {
+                        let db_pool = db_pool.clone();
+                        let order_diff_repo_factory = order_diff_repo_factory.clone();
+                        db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, diff_filter))
+                    })
+            }).and_then(::futures::future::join_all)
+            .map(move |order_diffs| order_diffs.into_iter().flatten().map(|diff| diff.0.parent).collect::<Vec<_>>())
+            .map(move |old_delivered_orders_ids| {
+                old_delivered_orders_ids.into_iter().map(move |old_delivered_order_id| {
+                    info!("Updating order state for order {}", old_delivered_order_id);
+                    set_order_state(
+                        OrderIdentifier::Id(old_delivered_order_id),
+                        OrderState::Complete,
+                        None,
+                        None,
+                        order_repo_factory.clone(),
+                        order_diff_repo_factory2.clone(),
+                        db_pool2.clone(),
+                        calling_user,
+                    )
+                })
+            }).and_then(::futures::future::join_all)
+            .and_then(|_| ::future::ok(()));
+
+        Box::new(result)
+    }
+}
+
+fn set_order_state(
+    order_id: OrderIdentifier,
+    state: OrderState,
+    comment: Option<String>,
+    track_id: Option<String>,
+    order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
+    order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
+    db_pool: DbPool,
+    calling_user: UserId,
+) -> ServiceFuture<Option<Order>> {
+    let result = db_pool
+        .run(move |conn| {
+            (order_repo_factory)()
+                .update(
+                    conn,
+                    OrderUpdater {
+                        mask: order_id.into(),
+                        data: OrderUpdateData { state: Some(state), track_id },
+                    },
+                )
+        })
+        .map(|mut out_data| out_data.pop())
+        // Insert new order diff into database
+        .and_then(move |updated_order| {
+            db_pool.run(move |conn| {
+                if let Some(order) = updated_order {
+                    Box::new(
+                        (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
+                            parent: order.0.id,
+                            committer: calling_user,
+                            committed_at: Utc::now(),
+                            state: order.0.state,
+                            comment,
+                        }).map(move |(_, c)| (Some(order.0), c))
+                    )
+                } else {
+                    Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>
+                }
+            })
+        });
+
+    Box::new(result)
 }

@@ -14,11 +14,9 @@ use config::{self, Config};
 use models::{UserLogin, UserRole};
 use services::{OrderService, OrderServiceImpl};
 
-use stq_api::orders::OrderSearchTerms;
 use stq_db::pool::Pool as DbPool;
 use stq_roles::models::{RepoLogin, RoleEntry};
-use stq_static_resources::OrderState;
-use stq_types::{OrderIdentifier, RoleEntryId, UserId};
+use stq_types::{RoleEntryId, UserId};
 
 #[derive(Clone)]
 pub struct DeliveredStateTracking {
@@ -35,6 +33,7 @@ pub struct DeliveredStateTrackingEnvironment {
 }
 
 impl DeliveredStateTracking {
+    /// One hour
     const DEFAULT_DURATION: u64 = 60 * 60;
 
     pub fn new(env: DeliveredStateTrackingEnvironment) -> DeliveredStateTracking {
@@ -72,23 +71,11 @@ impl DeliveredStateTracking {
             *busy = true;
         }
         let busy = self.busy.clone();
-        let now = ::chrono::offset::Utc::now();
         let max_delivered_state_duration = ChronoDuration::days(config.delivery_state_duration_days);
-        let search_delivered_orders = OrderSearchTerms {
-            updated_to: Some(now - max_delivered_state_duration),
-            state: Some(OrderState::Delivered),
-            ..OrderSearchTerms::default()
-        };
         let self_clone = self.clone();
         let service = OrderServiceImpl::new(self_clone.db_pool.clone(), super_user());
         service
-            .search(search_delivered_orders)
-            .map(move |delivered_orders| {
-                delivered_orders.into_iter().map(move |old_delivered_order| {
-                    info!("Updating order state for order {}", old_delivered_order.id);
-                    service.set_order_state(OrderIdentifier::Id(old_delivered_order.id), OrderState::Complete, None, None)
-                })
-            }).and_then(::futures::future::join_all)
+            .track_delivered_orders(max_delivered_state_duration)
             .then(move |res| {
                 let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 *busy = false;

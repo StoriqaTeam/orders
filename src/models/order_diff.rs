@@ -57,6 +57,7 @@ pub struct OrderDiffFilter {
     pub parent: Option<ValueContainer<OrderId>>,
     pub committer: Option<ValueContainer<UserId>>,
     pub committed_at: Option<ValueContainer<DateTime<Utc>>>,
+    pub committed_at_range: Option<ValueContainer<Range<DateTime<Utc>>>>,
     pub state: Option<ValueContainer<OrderState>>,
     pub comment: Option<ValueContainer<Option<String>>>,
 }
@@ -86,6 +87,10 @@ impl Filter for OrderDiffFilter {
 
         if let Some(v) = self.committed_at {
             b = b.with_filter(COMMITTED_AT_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.committed_at_range {
+            b = b.with_filter::<DateTime<Utc>, _>(COMMITTED_AT_COLUMN, v.value);
         }
 
         if let Some(v) = self.state {
