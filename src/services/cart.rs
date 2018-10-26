@@ -32,6 +32,12 @@ pub trait CartService {
     fn list(&self, customer: CartCustomer, from: ProductId, count: i32) -> ServiceFuture<Cart>;
     /// Merge carts
     fn merge(&self, from: CartCustomer, to: CartCustomer) -> ServiceFuture<Cart>;
+    /// Add coupon
+    fn add_coupon(&self, customer: CartCustomer, product_id: ProductId, coupon_id: CouponId) -> ServiceFuture<Cart>;
+    /// Delete coupon
+    fn delete_coupon(&self, customer: CartCustomer, product_id: CouponId) -> ServiceFuture<Cart>;
+    // Delete coupon by product_id
+    fn delete_coupon_by_product(&self, customer: CartCustomer, product_id: ProductId) -> ServiceFuture<Cart>;
 }
 
 pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
@@ -99,6 +105,7 @@ impl CartService for CartServiceImpl {
                                                 comment: String::new(),
                                                 pre_order: payload.pre_order,
                                                 pre_order_days: payload.pre_order_days,
+                                                coupon_id: None,
                                             },
                                         },
                                     )
@@ -365,6 +372,121 @@ impl CartService for CartServiceImpl {
                                         ..Default::default()
                                     },
                                 ))
+                            }
+                        })
+                }).map(|c| c.into_iter().collect()),
+        )
+    }
+
+    fn add_coupon(&self, customer: CartCustomer, product_id: ProductId, coupon_id: CouponId) -> ServiceFuture<Cart> {
+        debug!("Add coupon {} for product {} for customer {}", coupon_id, product_id, customer);
+        let repo_factory = self.repo_factory.clone();
+
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)()
+                        .update(
+                            conn,
+                            CartItemUpdater {
+                                filter: CartItemFilter {
+                                    customer: Some(customer),
+                                    meta_filter: CartItemMetaFilter {
+                                        product_id: Some(product_id.into()),
+                                        ..Default::default()
+                                    },
+                                },
+                                data: CartItemUpdateData {
+                                    coupon_id: Some(Some(coupon_id)),
+                                    ..Default::default()
+                                },
+                            },
+                        ).and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| {
+                                (repo_factory)().select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        ..Default::default()
+                                    },
+                                )
+                            }
+                        })
+                }).map(|c| c.into_iter().collect()),
+        )
+    }
+
+    fn delete_coupon_by_product(&self, customer: CartCustomer, product_id: ProductId) -> ServiceFuture<Cart> {
+        debug!("Delete coupon for product {} from customer {}", product_id, customer);
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)()
+                        .update(
+                            conn,
+                            CartItemUpdater {
+                                filter: CartItemFilter {
+                                    customer: Some(customer),
+                                    meta_filter: CartItemMetaFilter {
+                                        product_id: Some(product_id.into()),
+                                        ..Default::default()
+                                    },
+                                },
+                                data: CartItemUpdateData {
+                                    coupon_id: Some(None),
+                                    ..Default::default()
+                                },
+                            },
+                        ).and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| {
+                                (repo_factory)().select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        ..Default::default()
+                                    },
+                                )
+                            }
+                        })
+                }).map(|c| c.into_iter().collect()),
+        )
+    }
+
+    fn delete_coupon(&self, customer: CartCustomer, coupon_id: CouponId) -> ServiceFuture<Cart> {
+        debug!("Delete coupon {} from customer {}", coupon_id, customer);
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)()
+                        .update(
+                            conn,
+                            CartItemUpdater {
+                                filter: CartItemFilter {
+                                    customer: Some(customer),
+                                    meta_filter: CartItemMetaFilter {
+                                        coupon_id: Some(coupon_id.into()),
+                                        ..Default::default()
+                                    },
+                                },
+                                data: CartItemUpdateData {
+                                    coupon_id: Some(None),
+                                    ..Default::default()
+                                },
+                            },
+                        ).and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| {
+                                (repo_factory)().select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        ..Default::default()
+                                    },
+                                )
                             }
                         })
                 }).map(|c| c.into_iter().collect()),
