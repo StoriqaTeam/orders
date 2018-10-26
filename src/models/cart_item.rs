@@ -310,6 +310,7 @@ pub struct CartItemMetaFilter {
     pub selected: Option<bool>,
     pub comment: Option<String>,
     pub store_id: Option<Range<StoreId>>,
+    pub coupon_id: Option<Range<CouponId>>,
 }
 
 impl CartItemMetaFilter {
@@ -332,6 +333,10 @@ impl CartItemMetaFilter {
 
         if let Some(v) = self.store_id {
             b = b.with_filter::<i32, _>(STORE_ID_COLUMN, v.convert());
+        }
+
+        if let Some(v) = self.coupon_id {
+            b = b.with_filter::<i32, _>(COUPON_ID_COLUMN, v.convert());
         }
 
         b

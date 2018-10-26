@@ -139,6 +139,7 @@ fn test_services() {
                 hashset![product_1.clone()]
             );
 
+            // Coupons
             product_1.coupon_id = Some(coupon_id);
             assert_eq!(
                 rpc.inner.add_coupon(user_1, product_id_1, coupon_id).wait().unwrap(),
@@ -147,7 +148,19 @@ fn test_services() {
 
             product_1.coupon_id = None;
             assert_eq!(
-                rpc.inner.delete_coupon(user_1, product_id_1).wait().unwrap(),
+                rpc.inner.delete_coupon(user_1, coupon_id).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
+
+            product_1.coupon_id = Some(coupon_id);
+            assert_eq!(
+                rpc.inner.add_coupon(user_1, product_id_1, coupon_id).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
+
+            product_1.coupon_id = None;
+            assert_eq!(
+                rpc.inner.delete_coupon_by_product(user_1, product_id_1).wait().unwrap(),
                 hashset![product_1.clone()]
             );
 
