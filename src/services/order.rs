@@ -129,6 +129,7 @@ impl OrderService for OrderServiceImpl {
                                 track_id: None,
                                 pre_order: cart_item.pre_order,
                                 pre_order_days: cart_item.pre_order_days,
+                                coupon_id: cart_item.coupon_id,
                             }, cart_item.comment))
                         } else {
                             return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
@@ -235,7 +236,7 @@ impl OrderService for OrderServiceImpl {
                             store_id: order.0.store,
                             pre_order: false,  // TODO get from order fields
                             pre_order_days: 0, // TODO get from order fields
-                            coupon_id: None,
+                            coupon_id: order.0.coupon_id,
                         };
                         for diff in diffs {
                             if diff.0.state == OrderState::New {
@@ -295,6 +296,7 @@ impl OrderService for OrderServiceImpl {
                     track_id: None,
                     pre_order: payload.pre_order,
                     pre_order_days: payload.pre_order_days,
+                    coupon_id: None,
                 },
                 "Buy now".to_string(),
             );

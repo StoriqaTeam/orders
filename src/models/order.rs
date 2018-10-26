@@ -42,6 +42,7 @@ const PAYMENT_STATUS_COLUMN: &str = "payment_status";
 const DELIVERY_COMPANY_COLUMN: &str = "delivery_company";
 const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
+const COUPON_ID_COLUMN: &str = "coupon_id";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.administrative_area_level_1 {
@@ -120,6 +121,7 @@ impl From<Row> for DbOrder {
             state: row.get(STATE_COLUMN),
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
+            coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
         })
     }
 }
@@ -143,6 +145,7 @@ pub struct OrderInserter {
     pub track_id: Option<String>,
     pub pre_order: bool,
     pub pre_order_days: i32,
+    pub coupon_id: Option<CouponId>,
 }
 
 impl Inserter for OrderInserter {
