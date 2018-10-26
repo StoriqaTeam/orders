@@ -9,6 +9,7 @@ table! {
         selected -> Bool,
         pre_order -> Bool,
         pre_order_days -> Int4,
+        coupon_id -> Nullable<Int4>,
     }
 }
 
@@ -23,6 +24,7 @@ table! {
         id -> Uuid,
         pre_order -> Bool,
         pre_order_days -> Int4,
+        coupon_id -> Nullable<Int4>,
     }
 }
 

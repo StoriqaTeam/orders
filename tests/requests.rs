@@ -84,6 +84,7 @@ impl RpcClient {
                 store_id,
                 pre_order: false,
                 pre_order_days: 0,
+                coupon_id: None,
             },
         );
 
@@ -103,6 +104,7 @@ fn test_services() {
             let u = UserId(777);
             let user_1 = u.into();
             let anon_1 = SessionId(613415346).into();
+            let coupon_id = CouponId(255);
 
             let rpc = RpcClient::new(&base_url, u);
 
@@ -134,6 +136,18 @@ fn test_services() {
             product_1.comment = "MyComment".into();
             assert_eq!(
                 rpc.inner.set_comment(user_1, product_id_1, "MyComment".into()).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
+
+            product_1.coupon_id = Some(coupon_id);
+            assert_eq!(
+                rpc.inner.add_coupon(user_1, product_id_1, coupon_id).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
+
+            product_1.coupon_id = None;
+            assert_eq!(
+                rpc.inner.delete_coupon(user_1, product_id_1).wait().unwrap(),
                 hashset![product_1.clone()]
             );
 
@@ -233,6 +247,7 @@ fn test_services() {
                     store_id: StoreId(1001),
                     pre_order: false,
                     pre_order_days: 0,
+                    coupon_id: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -244,6 +259,7 @@ fn test_services() {
                     store_id: StoreId(1001),
                     pre_order: false,
                     pre_order_days: 0,
+                    coupon_id: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -255,6 +271,7 @@ fn test_services() {
                     store_id: StoreId(1001),
                     pre_order: false,
                     pre_order_days: 0,
+                    coupon_id: None,
                 },
             ]);
 

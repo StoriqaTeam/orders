@@ -15,6 +15,7 @@ const USER_ID_COLUMN: &str = "user_id";
 const SESSION_ID_COLUMN: &str = "session_id";
 const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
+const COUPON_ID_COLUMN: &str = "coupon_id";
 
 #[derive(Clone, Debug)]
 pub struct CartItemUser {
@@ -27,6 +28,7 @@ pub struct CartItemUser {
     pub store_id: StoreId,
     pub pre_order: bool,
     pub pre_order_days: i32,
+    pub coupon_id: Option<CouponId>,
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +42,7 @@ pub struct CartItemSession {
     pub store_id: StoreId,
     pub pre_order: bool,
     pub pre_order_days: i32,
+    pub coupon_id: Option<CouponId>,
 }
 
 impl From<CartItemUser> for CartItem {
@@ -54,6 +57,7 @@ impl From<CartItemUser> for CartItem {
             store_id: v.store_id,
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
+            coupon_id: v.coupon_id,
         }
     }
 }
@@ -70,6 +74,7 @@ impl From<CartItemSession> for CartItem {
             store_id: v.store_id,
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
+            coupon_id: v.coupon_id,
         }
     }
 }
@@ -117,6 +122,7 @@ impl CartItemUser {
             comment: String::new(),
             pre_order,
             pre_order_days,
+            coupon_id: None,
         }
     }
 }
@@ -134,6 +140,7 @@ impl CartItemSession {
             comment: String::new(),
             pre_order,
             pre_order_days,
+            coupon_id: None,
         }
     }
 }
@@ -166,6 +173,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             store_id: v.store_id,
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
+            coupon_id: v.coupon_id,
         }),
         Anonymous(session_id) => Either::Right(CartItemSession {
             session_id,
@@ -177,6 +185,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             store_id: v.store_id,
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
+            coupon_id: v.coupon_id,
         }),
     }
 }
@@ -192,6 +201,7 @@ pub struct CartItemUpdateData {
     pub quantity: Option<Quantity>,
     pub selected: Option<bool>,
     pub comment: Option<String>,
+    pub coupon_id: Option<Option<CouponId>>,
 }
 
 #[derive(Clone, Debug)]
@@ -270,6 +280,7 @@ impl From<Row> for CartItemUser {
             store_id: StoreId(row.get(STORE_ID_COLUMN)),
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
+            coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
         }
     }
 }
@@ -286,6 +297,7 @@ impl From<Row> for CartItemSession {
             store_id: StoreId(row.get(STORE_ID_COLUMN)),
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
+            coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
         }
     }
 }
@@ -442,6 +454,10 @@ where
 
         if let Some(v) = data.comment {
             b = b.with_value(COMMENT_COLUMN, v);
+        }
+
+        if let Some(v) = data.coupon_id {
+            b = b.with_value(COUPON_ID_COLUMN, v.map(|id| id.0));
         }
 
         b
