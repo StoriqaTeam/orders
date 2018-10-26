@@ -361,6 +361,7 @@ fn test_services() {
                             updated_at: db_data.updated_at.clone(),
                             pre_order: false,
                             pre_order_days: 0,
+                            coupon_id: None,
                         }
                     }).collect::<Vec<_>>();
 
