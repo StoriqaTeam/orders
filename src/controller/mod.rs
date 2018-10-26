@@ -132,7 +132,14 @@ impl Controller for ControllerImpl {
                                     (service_factory.cart)(login_data).delete_item(customer, product_id)
                                 })
                             }
-                            (Post, Some(Route::AddCartCoupon { customer, product_id, coupon_id })) => {
+                            (
+                                Post,
+                                Some(Route::AddCartCoupon {
+                                    customer,
+                                    product_id,
+                                    coupon_id,
+                                }),
+                            ) => {
                                 return serialize_future({
                                     debug!(
                                         "Received request to add coupon {} for product {} to cart for customer {}",
