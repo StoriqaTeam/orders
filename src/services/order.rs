@@ -33,6 +33,7 @@ pub trait OrderService {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
     fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
@@ -91,6 +92,7 @@ impl OrderService for OrderServiceImpl {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::*;
 
@@ -110,7 +112,16 @@ impl OrderService for OrderServiceImpl {
                     let mut order_items = Vec::new();
                     for cart_item in cart {
                         if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
-                            let ProductSellerPrice { price, currency } = seller_price;
+                            let ProductSellerPrice { price, currency, discount } = seller_price;
+                            let coupon_percent = cart_item.coupon_id
+                                .and_then(|coupon_id| coupons.get(&coupon_id))
+                                .map(|coupon| coupon.percent);
+                            let TotalAmount { total_amount, coupon_discount, product_discount } = calculate_total_amount(
+                                cart_item.quantity,
+                                price,
+                                discount,
+                                coupon_percent
+                            );
                             order_items.push((OrderInserter {
                                 id: None,
                                 created_from: Some(cart_item.id),
@@ -130,6 +141,10 @@ impl OrderService for OrderServiceImpl {
                                 pre_order: cart_item.pre_order,
                                 pre_order_days: cart_item.pre_order_days,
                                 coupon_id: cart_item.coupon_id,
+                                coupon_percent,
+                                coupon_discount,
+                                product_discount,
+                                total_amount,
                             }, cart_item.comment))
                         } else {
                             return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
@@ -277,6 +292,11 @@ impl OrderService for OrderServiceImpl {
         };
 
         Box::new(self.db_pool.run(move |conn| {
+            let TotalAmount {
+                total_amount,
+                coupon_discount,
+                product_discount,
+            } = calculate_total_amount(payload.quantity, payload.price.price, payload.price.discount, None);
             let order_item = (
                 OrderInserter {
                     id: None,
@@ -297,6 +317,10 @@ impl OrderService for OrderServiceImpl {
                     pre_order: payload.pre_order,
                     pre_order_days: payload.pre_order_days,
                     coupon_id: None,
+                    coupon_percent: None,
+                    coupon_discount,
+                    product_discount,
+                    total_amount,
                 },
                 "Buy now".to_string(),
             );
@@ -515,6 +539,33 @@ impl OrderService for OrderServiceImpl {
     }
 }
 
+struct TotalAmount {
+    coupon_discount: Option<ProductPrice>,
+    product_discount: Option<ProductPrice>,
+    total_amount: ProductPrice,
+}
+
+fn calculate_total_amount(
+    quantity: Quantity,
+    product_price: ProductPrice,
+    product_discount_percent: Option<f64>,
+    coupon_discount_percent: Option<i32>,
+) -> TotalAmount {
+    let product_discount = product_discount_percent.map(|p| p * product_price.0);
+    let coupon_discount = coupon_discount_percent.map(|p| p as f64 / 100.0 * (product_price.0 - product_discount.unwrap_or(0.0)));
+    let total_amount = if quantity.0 > 0 {
+        product_price.0 - product_discount.unwrap_or(0.0) - coupon_discount.unwrap_or(0.0)
+            + (product_price.0 - product_discount.unwrap_or(0.0)) * (quantity.0 - 1) as f64
+    } else {
+        0.0
+    };
+    TotalAmount {
+        coupon_discount: coupon_discount.map(ProductPrice),
+        product_discount: product_discount.map(ProductPrice),
+        total_amount: ProductPrice(total_amount),
+    }
+}
+
 fn set_order_state(
     order_id: OrderIdentifier,
     state: OrderState,
@@ -557,4 +608,32 @@ fn set_order_state(
         });
 
     Box::new(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn correctly_calculates_total_amount() {
+        let no_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None);
+        assert_eq!(no_discount.total_amount, ProductPrice(200.0));
+        assert_eq!(no_discount.product_discount, None);
+        assert_eq!(no_discount.coupon_discount, None);
+
+        let product_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), None);
+        assert_eq!(product_discount.total_amount, ProductPrice(160.0));
+        assert_eq!(product_discount.product_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_discount.coupon_discount, None);
+
+        let coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, Some(30));
+        assert_eq!(coupon_discount.total_amount, ProductPrice(170.0));
+        assert_eq!(coupon_discount.product_discount, None);
+        assert_eq!(coupon_discount.coupon_discount, Some(ProductPrice(30.0)));
+
+        let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25));
+        assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(140.0));
+        assert_eq!(product_and_coupon_discount.product_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_and_coupon_discount.coupon_discount, Some(ProductPrice(20.0)));
+    }
 }
