@@ -72,6 +72,10 @@ table! {
         pre_order -> Bool,
         pre_order_days -> Int4,
         coupon_id -> Nullable<Int4>,
+        product_discount -> Nullable<Float8>,
+        coupon_percent -> Nullable<Int4>,
+        coupon_discount -> Nullable<Float8>,
+        total_amount -> Float8,
     }
 }
 

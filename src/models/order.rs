@@ -43,6 +43,10 @@ const DELIVERY_COMPANY_COLUMN: &str = "delivery_company";
 const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 const COUPON_ID_COLUMN: &str = "coupon_id";
+const PRODUCT_DISCOUNT_COLUMN: &str = "product_discount";
+const COUPON_PERCENT_COLUMN: &str = "coupon_percent";
+const COUPON_DISCOUNT_COLUMN: &str = "coupon_discount";
+const TOTAL_AMOUNT_COLUMN: &str = "total_amount";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.administrative_area_level_1 {
@@ -122,6 +126,10 @@ impl From<Row> for DbOrder {
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
             coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
+            coupon_percent: row.get(COUPON_PERCENT_COLUMN),
+            coupon_discount: row.get::<Option<f64>, _>(COUPON_DISCOUNT_COLUMN).map(ProductPrice),
+            product_discount: row.get::<Option<f64>, _>(PRODUCT_DISCOUNT_COLUMN).map(ProductPrice),
+            total_amount: ProductPrice(row.get(TOTAL_AMOUNT_COLUMN)),
         })
     }
 }
@@ -146,6 +154,10 @@ pub struct OrderInserter {
     pub pre_order: bool,
     pub pre_order_days: i32,
     pub coupon_id: Option<CouponId>,
+    pub coupon_percent: Option<i32>,
+    pub coupon_discount: Option<ProductPrice>,
+    pub product_discount: Option<ProductPrice>,
+    pub total_amount: ProductPrice,
 }
 
 impl Inserter for OrderInserter {
@@ -161,7 +173,8 @@ impl Inserter for OrderInserter {
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
             .with_arg(STATE_COLUMN, self.state)
             .with_arg(PRE_ORDER_COLUMN, self.pre_order)
-            .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days);
+            .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
+            .with_arg(TOTAL_AMOUNT_COLUMN, self.total_amount.0);
 
         b = write_address_into_inserter(self.address, b);
 
@@ -179,6 +192,22 @@ impl Inserter for OrderInserter {
 
         if let Some(v) = self.track_id {
             b = b.with_arg(TRACK_ID_COLUMN, v);
+        }
+
+        if let Some(v) = self.coupon_id {
+            b = b.with_arg(COUPON_ID_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.coupon_percent {
+            b = b.with_arg(COUPON_PERCENT_COLUMN, v);
+        }
+
+        if let Some(v) = self.coupon_discount {
+            b = b.with_arg(COUPON_DISCOUNT_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.product_discount {
+            b = b.with_arg(PRODUCT_DISCOUNT_COLUMN, v.0);
         }
 
         b

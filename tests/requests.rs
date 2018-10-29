@@ -295,6 +295,7 @@ fn test_services() {
                     ProductSellerPrice {
                         price: ProductPrice(41213.0),
                         currency: Currency::RUB,
+                        discount: None,
                     },
                 ),
                 (
@@ -302,6 +303,7 @@ fn test_services() {
                     ProductSellerPrice {
                         price: ProductPrice(84301.0),
                         currency: Currency::EUR,
+                        discount: None,
                     },
                 ),
             ].into_iter()
@@ -324,6 +326,7 @@ fn test_services() {
                         address.clone(),
                         receiver_name.clone(),
                         receiver_phone.clone(),
+                        HashMap::new(),
                     ).wait()
                     .unwrap();
 
@@ -338,7 +341,11 @@ fn test_services() {
                             .cloned()
                             .next()
                             .unwrap();
-                        let ProductSellerPrice { price, currency } = prices[&cart_item.product_id].clone();
+                        let ProductSellerPrice {
+                            price,
+                            currency,
+                            discount: _,
+                        } = prices[&cart_item.product_id].clone();
                         Order {
                             id: db_data.id.clone(),
                             created_from: db_data.created_from.clone(),
@@ -362,6 +369,10 @@ fn test_services() {
                             pre_order: false,
                             pre_order_days: 0,
                             coupon_id: None,
+                            coupon_percent: None,
+                            coupon_discount: None,
+                            product_discount: None,
+                            total_amount: ProductPrice(price.0 * cart_item.quantity.0 as f64),
                         }
                     }).collect::<Vec<_>>();
 
