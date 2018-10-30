@@ -96,35 +96,23 @@ impl SentStateTracking {
         let ups_client = self.ups_client.clone();
         service
             .get_orders_with_state(OrderState::Sent, ChronoDuration::days(config.sent_state_duration_days))
-            .map(move |orders| {
-                orders
-                    .into_iter()
-                    .flat_map(|order| match order.track_id {
-                        Some(track_id) => Some((order.id, track_id)),
-                        None => None,
-                    }).map(move |(order_id, track_id)| {
-                        let service = self.create_service();
-                        Self::delivery_state(ups_client.clone(), order_id, track_id.clone())
-                            .and_then(move |(order_id, delivery_state)| {
-                                if delivery_state == DeliveryState::Delivered {
-                                    info!("change state for order {} to {}", order_id, delivery_state);
-                                    Either::A(
-                                        service
-                                            .set_order_state(OrderIdentifier::Id(order_id), OrderState::Delivered, None, None)
-                                            .map(|_| ()),
-                                    )
-                                } else {
-                                    Either::B(future::ok(()))
-                                }
-                            }).then(|result| match result {
-                                Ok(_) => ::future::ok(()),
-                                Err(error) => {
-                                    warn!("{:?}", error);
-                                    ::future::ok(())
-                                }
-                            })
-                    })
-            }).and_then(::futures::future::join_all)
+            .map(::futures::stream::iter_ok)
+            .flatten_stream()
+            .filter_map(|order| match order.track_id {
+                Some(track_id) => Some((order.id, track_id)),
+                None => None,
+            }).and_then(move |(order_id, track_id)| Self::delivery_state(ups_client.clone(), order_id, track_id))
+            .filter(|(_order_id, state)| state == &DeliveryState::Delivered)
+            .and_then(move |(order_id, _state)| {
+                let service = self.create_service();
+                service.set_order_state(OrderIdentifier::Id(order_id), OrderState::Delivered, None, None)
+            }).then(|result| match result {
+                Ok(_) => ::future::ok(()),
+                Err(error) => {
+                    warn!("{:?}", error);
+                    ::future::ok(())
+                }
+            }).fold((), fold_ok)
             .then(move |res| {
                 let mut busy = busy.lock().expect("SentStateTracking: poisoned mutex at fetch step");
                 *busy = false;
@@ -153,6 +141,10 @@ impl SentStateTracking {
             None => Duration::from_secs(Self::DEFAULT_DURATION),
         }
     }
+}
+
+fn fold_ok(_acc: (), _next: ()) -> impl Future<Item = (), Error = FailureError> {
+    ::future::ok(())
 }
 
 fn super_user() -> UserLogin {
