@@ -11,6 +11,10 @@ name = "delivered_orders"
 path = "src/bin/delivered_orders.rs"
 
 [[bin]]
+name = "sent_orders"
+path = "src/bin/sent_orders.rs"
+
+[[bin]]
 name = "orders"
 path = "src/main.rs"
 

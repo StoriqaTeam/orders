@@ -151,6 +151,32 @@ pub fn start_delivered_state_tracking(config: Config) {
     core.run(future::empty::<(), ()>()).unwrap();
 }
 
+pub fn start_sent_state_tracking(config: Config) {
+    let mut core = Core::new().expect("Unexpected error creating event loop core");
+    let handle = Arc::new(core.handle());
+
+    let db_pool = {
+        let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
+        let remote = core.remote();
+        DbPool::from(
+            core.run(
+                bb8::Pool::builder()
+                    .min_idle(Some(1))
+                    .build(manager, remote)
+                    .map_err(|e| format_err!("{}", e)),
+            ).expect("Failed to create connection pool"),
+        )
+    };
+    let env = loaders::SentStateTrackingEnvironment {
+        db_pool,
+        config: Arc::new(config),
+        handle: handle.clone(),
+    };
+    handle.spawn(create_sent_state_tracking_loader(env));
+
+    core.run(future::empty::<(), ()>()).unwrap();
+}
+
 fn create_delivered_state_tracking_loader(env: loaders::DeliveredStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
     let loader = loaders::DeliveredStateTracking::new(env);
 
@@ -158,6 +184,17 @@ fn create_delivered_state_tracking_loader(env: loaders::DeliveredStateTrackingEn
     stream
         .or_else(|e| {
             error!("Error in delivered state tracking loader: {:?}.", e);
+            futures::future::ok(())
+        }).for_each(|_| futures::future::ok(()))
+}
+
+fn create_sent_state_tracking_loader(env: loaders::SentStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
+    let loader = loaders::SentStateTracking::new(env);
+
+    let stream = loader.start();
+    stream
+        .or_else(|e| {
+            error!("Error in sent state tracking loader: {:?}.", e);
             futures::future::ok(())
         }).for_each(|_| futures::future::ok(()))
 }

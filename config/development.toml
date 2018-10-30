@@ -7,4 +7,9 @@ dsn = "postgresql://orders:orders@orders-pg/orders"
 addr = "udplog.stq.cloud:32303"
 [delivered_orders]
 interval_s = 86400
-delivery_state_duration_days = 15
+delivery_state_duration_days = 14
+[sent_orders]
+interval_s = 86400
+sent_state_duration_days = 14
+ups_api_access_license_number = "Your licence number goes here"
+ups_api_url = "https://wwwcie.ups.com/rest/Track"
