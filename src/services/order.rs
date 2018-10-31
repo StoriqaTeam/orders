@@ -33,6 +33,7 @@ pub trait OrderService {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
@@ -93,6 +94,7 @@ impl OrderService for OrderServiceImpl {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::*;
@@ -146,6 +148,7 @@ impl OrderService for OrderServiceImpl {
                                     address: address.clone(),
                                     receiver_name: receiver_name.clone(),
                                     receiver_phone: receiver_phone.clone(),
+                                    receiver_email: receiver_email.clone(),
                                     state: OrderState::New,
                                     delivery_company: None,
                                     track_id: None,
@@ -338,13 +341,14 @@ impl OrderService for OrderServiceImpl {
                     address: payload.address,
                     receiver_name: payload.receiver_name,
                     receiver_phone: payload.receiver_phone,
+                    receiver_email: payload.receiver_email,
                     state: OrderState::New,
                     delivery_company: None,
                     track_id: None,
                     pre_order: payload.pre_order,
                     pre_order_days: payload.pre_order_days,
                     coupon_id,
-                    coupon_percent: coupon_percent,
+                    coupon_percent,
                     coupon_discount,
                     product_discount,
                     total_amount,
