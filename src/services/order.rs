@@ -18,6 +18,8 @@ use stq_db::repo::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
 
+pub const ZERO_DISCOUNT: f64 = 0.0001;
+
 #[derive(Clone, Debug)]
 pub enum RoleRemoveFilter {
     Id(RoleId),
@@ -614,6 +616,7 @@ fn calculate_total_amount(
     product_discount_percent: Option<f64>,
     coupon_discount_percent: Option<i32>,
 ) -> TotalAmount {
+    let product_discount_percent = product_discount_percent.filter(|p| *p > ZERO_DISCOUNT);
     match (product_discount_percent, coupon_discount_percent) {
         (Some(product_discount_percent), _) => {
             let product_discount = product_discount_percent * product_price.0;
