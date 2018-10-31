@@ -29,6 +29,20 @@ pub struct Config {
     pub sentry: Option<SentryConfig>,
     /// Delivered Orders settings
     pub delivered_orders: Option<DeliveredOrders>,
+    /// Sent Orders settings
+    pub sent_orders: Option<SentOrders>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SentOrders {
+    /// State check interval in seconds
+    pub interval_s: u64,
+    /// UPS api access licence number
+    pub ups_api_access_license_number: String,
+    /// UPS api url
+    pub ups_api_url: String,
+    /// How long in days order can be in sent state to be processed
+    pub sent_state_duration_days: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

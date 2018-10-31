@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use chrono::prelude::*;
@@ -41,6 +41,7 @@ pub trait OrderService {
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
+    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
     fn set_order_state(
         &self,
@@ -561,6 +562,42 @@ impl OrderService for OrderServiceImpl {
             }).and_then(::futures::future::join_all)
             .and_then(|_| ::future::ok(()));
 
+        Box::new(result)
+    }
+
+    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>> {
+        let search_orders_in_state = OrderSearchTerms {
+            state: Some(state),
+            ..OrderSearchTerms::default()
+        };
+        let orders_in_state = self.search(search_orders_in_state);
+
+        let search_diffs = {
+            let now = ::chrono::offset::Utc::now();
+            let old_order_date = now - max_state_duration;
+            OrderDiffFilter {
+                state: Some(state).map(From::from),
+                committed_at_range: ::models::common::into_range(Some(old_order_date), None),
+                ..OrderDiffFilter::default()
+            }
+        };
+
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+
+        let diffs_in_max_state_duration = db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, search_diffs));
+
+        let result = orders_in_state
+            .join(diffs_in_max_state_duration)
+            .map(|(orders_in_state, recent_diffs)| {
+                let orders_in_state_ids: HashSet<OrderId> = orders_in_state.iter().map(|order| order.id).collect();
+                let recent_diffs_ids: HashSet<OrderId> = recent_diffs.iter().map(|diff| diff.0.parent).collect();
+                let mut by_id: HashMap<OrderId, Order> = orders_in_state.into_iter().map(|order| (order.id, order)).collect();
+                orders_in_state_ids
+                    .intersection(&recent_diffs_ids)
+                    .filter_map(|order_id| by_id.remove(&order_id))
+                    .collect()
+            });
         Box::new(result)
     }
 }
