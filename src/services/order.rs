@@ -577,18 +577,38 @@ fn calculate_total_amount(
     product_discount_percent: Option<f64>,
     coupon_discount_percent: Option<i32>,
 ) -> TotalAmount {
-    let product_discount = product_discount_percent.map(|p| p * product_price.0);
-    let coupon_discount = coupon_discount_percent.map(|p| p as f64 / 100.0 * (product_price.0 - product_discount.unwrap_or(0.0)));
-    let total_amount = if quantity.0 > 0 {
-        product_price.0 - product_discount.unwrap_or(0.0) - coupon_discount.unwrap_or(0.0)
-            + (product_price.0 - product_discount.unwrap_or(0.0)) * (quantity.0 - 1) as f64
-    } else {
-        0.0
-    };
-    TotalAmount {
-        coupon_discount: coupon_discount.map(ProductPrice),
-        product_discount: product_discount.map(ProductPrice),
-        total_amount: ProductPrice(total_amount),
+    match (product_discount_percent, coupon_discount_percent) {
+        (Some(product_discount_percent), _) => {
+            let product_discount = product_discount_percent * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                (product_price.0 - product_discount) * quantity.0 as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
+                coupon_discount: None,
+                product_discount: Some(ProductPrice(product_discount)),
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, Some(coupon_discount_percent)) => {
+            let coupon_discount = coupon_discount_percent as f64 / 100.0 * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                product_price.0 - coupon_discount + product_price.0 * (quantity.0 - 1) as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
+                coupon_discount: Some(ProductPrice(coupon_discount)),
+                product_discount: None,
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, None) => TotalAmount {
+            coupon_discount: None,
+            product_discount: None,
+            total_amount: ProductPrice(quantity.0 as f64 * product_price.0),
+        },
     }
 }
 
@@ -663,8 +683,8 @@ mod tests {
         assert_eq!(coupon_discount.coupon_discount, Some(ProductPrice(30.0)));
 
         let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25));
-        assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(140.0));
+        assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_and_coupon_discount.product_discount, Some(ProductPrice(20.0)));
-        assert_eq!(product_and_coupon_discount.coupon_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_and_coupon_discount.coupon_discount, None);
     }
 }
