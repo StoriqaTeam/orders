@@ -11,6 +11,7 @@ use futures::prelude::*;
 use tokio::timer::Interval;
 use tokio_core::reactor::Handle;
 
+use sentry_integration::log_and_capture_error;
 use config::{self, Config};
 use loaders::ups::{DeliveryState, UpsClient};
 use models::{UserLogin, UserRole};
@@ -109,7 +110,7 @@ impl SentStateTracking {
             }).then(|result| match result {
                 Ok(_) => ::future::ok(()),
                 Err(error) => {
-                    warn!("{:?}", error);
+                    log_and_capture_error(error);
                     ::future::ok(())
                 }
             }).fold((), fold_ok)
