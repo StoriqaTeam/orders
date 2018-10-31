@@ -1,4 +1,5 @@
 use either::Either;
+use serde_json;
 use stq_db::statement::*;
 use stq_types::*;
 use tokio_postgres::rows::Row;
@@ -16,6 +17,7 @@ const SESSION_ID_COLUMN: &str = "session_id";
 const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 const COUPON_ID_COLUMN: &str = "coupon_id";
+const DELIVERY_METHOD_ID_COLUMN: &str = "delivery_method_id";
 
 #[derive(Clone, Debug)]
 pub struct CartItemUser {
@@ -29,6 +31,7 @@ pub struct CartItemUser {
     pub pre_order: bool,
     pub pre_order_days: i32,
     pub coupon_id: Option<CouponId>,
+    pub delivery_method_id: Option<DeliveryMethodId>,
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +46,7 @@ pub struct CartItemSession {
     pub pre_order: bool,
     pub pre_order_days: i32,
     pub coupon_id: Option<CouponId>,
+    pub delivery_method_id: Option<DeliveryMethodId>,
 }
 
 impl From<CartItemUser> for CartItem {
@@ -58,6 +62,7 @@ impl From<CartItemUser> for CartItem {
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
+            delivery_method_id: v.delivery_method_id,
         }
     }
 }
@@ -75,6 +80,7 @@ impl From<CartItemSession> for CartItem {
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
+            delivery_method_id: v.delivery_method_id,
         }
     }
 }
@@ -123,6 +129,7 @@ impl CartItemUser {
             pre_order,
             pre_order_days,
             coupon_id: None,
+            delivery_method_id: None,
         }
     }
 }
@@ -141,6 +148,7 @@ impl CartItemSession {
             pre_order,
             pre_order_days,
             coupon_id: None,
+            delivery_method_id: None,
         }
     }
 }
@@ -174,6 +182,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
+            delivery_method_id: v.delivery_method_id,
         }),
         Anonymous(session_id) => Either::Right(CartItemSession {
             session_id,
@@ -186,6 +195,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             pre_order: v.pre_order,
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
+            delivery_method_id: v.delivery_method_id,
         }),
     }
 }
@@ -202,6 +212,7 @@ pub struct CartItemUpdateData {
     pub selected: Option<bool>,
     pub comment: Option<String>,
     pub coupon_id: Option<Option<CouponId>>,
+    pub delivery_method_id: Option<Option<DeliveryMethodId>>,
 }
 
 #[derive(Clone, Debug)]
@@ -233,6 +244,10 @@ impl Inserter for CartItemUserInserter {
                  quantity = EXCLUDED.quantity, \
                  selected = EXCLUDED.selected, \
                  store_id = EXCLUDED.store_id, \
+                 pre_order = EXCLUDED.pre_order, \
+                 pre_order_days = EXCLUDED.pre_order_days, \
+                 coupon_id = EXCLUDED.coupon_id \
+                 delivery_method_id = EXCLUDED.delivery_method_id \
                  user_id = EXCLUDED.user_id\
                  ",
             ),
@@ -259,6 +274,10 @@ impl Inserter for CartItemSessionInserter {
                  quantity = EXCLUDED.quantity, \
                  selected = EXCLUDED.selected, \
                  store_id = EXCLUDED.store_id, \
+                 pre_order = EXCLUDED.pre_order, \
+                 pre_order_days = EXCLUDED.pre_order_days, \
+                 coupon_id = EXCLUDED.coupon_id \
+                 delivery_method_id = EXCLUDED.delivery_method_id \
                  session_id = EXCLUDED.session_id\
                  ",
             ),
@@ -281,6 +300,8 @@ impl From<Row> for CartItemUser {
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
             coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
+            delivery_method_id: row.get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
+                .and_then(|v| serde_json::from_value(v).ok()),
         }
     }
 }
@@ -298,6 +319,8 @@ impl From<Row> for CartItemSession {
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
             coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
+            delivery_method_id: row.get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
+                .and_then(|v| serde_json::from_value(v).ok()),
         }
     }
 }
@@ -311,6 +334,7 @@ pub struct CartItemMetaFilter {
     pub comment: Option<String>,
     pub store_id: Option<Range<StoreId>>,
     pub coupon_id: Option<Range<CouponId>>,
+    pub delivery_method_id: Option<String>,
 }
 
 impl CartItemMetaFilter {
@@ -337,6 +361,10 @@ impl CartItemMetaFilter {
 
         if let Some(v) = self.coupon_id {
             b = b.with_filter::<i32, _>(COUPON_ID_COLUMN, v.convert());
+        }
+
+        if let Some(v) = self.delivery_method_id {
+            b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, v);
         }
 
         b
@@ -463,6 +491,10 @@ where
 
         if let Some(v) = data.coupon_id {
             b = b.with_value(COUPON_ID_COLUMN, v.map(|id| id.0));
+        }
+
+        if let Some(v) = data.delivery_method_id {
+            b = b.with_value(DELIVERY_METHOD_ID_COLUMN, v.map(|v| serde_json::to_value(v).unwrap()));
         }
 
         b

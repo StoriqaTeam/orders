@@ -252,6 +252,7 @@ impl OrderService for OrderServiceImpl {
                             pre_order: false,  // TODO get from order fields
                             pre_order_days: 0, // TODO get from order fields
                             coupon_id: order.0.coupon_id,
+                            delivery_method_id: None, // TODO get from order fields
                         };
                         for diff in diffs {
                             if diff.0.state == OrderState::New {

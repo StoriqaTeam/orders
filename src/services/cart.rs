@@ -36,8 +36,15 @@ pub trait CartService {
     fn add_coupon(&self, customer: CartCustomer, product_id: ProductId, coupon_id: CouponId) -> ServiceFuture<Cart>;
     /// Delete coupon
     fn delete_coupon(&self, customer: CartCustomer, product_id: CouponId) -> ServiceFuture<Cart>;
-    // Delete coupon by product_id
+    /// Delete coupon by product_id
     fn delete_coupon_by_product(&self, customer: CartCustomer, product_id: ProductId) -> ServiceFuture<Cart>;
+    /// Set delivery company
+    fn set_delivery_method(
+        &self,
+        customer: CartCustomer,
+        product_id: ProductId,
+        delivery_method_id: Option<DeliveryMethodId>,
+    ) -> ServiceFuture<Cart>;
 }
 
 pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
@@ -106,6 +113,7 @@ impl CartService for CartServiceImpl {
                                                 pre_order: payload.pre_order,
                                                 pre_order_days: payload.pre_order_days,
                                                 coupon_id: None,
+                                                delivery_method_id: None,
                                             },
                                         },
                                     )
@@ -474,6 +482,53 @@ impl CartService for CartServiceImpl {
                                 },
                                 data: CartItemUpdateData {
                                     coupon_id: Some(None),
+                                    ..Default::default()
+                                },
+                            },
+                        ).and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |(_, conn)| {
+                                (repo_factory)().select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        ..Default::default()
+                                    },
+                                )
+                            }
+                        })
+                }).map(|c| c.into_iter().collect()),
+        )
+    }
+
+    fn set_delivery_method(
+        &self,
+        customer: CartCustomer,
+        product_id: ProductId,
+        delivery_method_id: Option<DeliveryMethodId>,
+    ) -> ServiceFuture<Cart> {
+        debug!(
+            "Set delivery method {:?} for product {} for customer {}",
+            delivery_method_id, product_id, customer
+        );
+        let repo_factory = self.repo_factory.clone();
+
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)()
+                        .update(
+                            conn,
+                            CartItemUpdater {
+                                filter: CartItemFilter {
+                                    customer: Some(customer),
+                                    meta_filter: CartItemMetaFilter {
+                                        product_id: Some(product_id.into()),
+                                        ..Default::default()
+                                    },
+                                },
+                                data: CartItemUpdateData {
+                                    delivery_method_id: Some(delivery_method_id),
                                     ..Default::default()
                                 },
                             },
