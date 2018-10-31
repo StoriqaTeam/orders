@@ -11,10 +11,10 @@ use futures::prelude::*;
 use tokio::timer::Interval;
 use tokio_core::reactor::Handle;
 
-use sentry_integration::log_and_capture_error;
 use config::{self, Config};
 use loaders::ups::{DeliveryState, UpsClient};
 use models::{UserLogin, UserRole};
+use sentry_integration::log_and_capture_error;
 use services::{OrderService, OrderServiceImpl};
 
 use stq_db::pool::Pool as DbPool;
@@ -99,18 +99,21 @@ impl SentStateTracking {
             .get_orders_with_state(OrderState::Sent, ChronoDuration::days(config.sent_state_duration_days))
             .map(::futures::stream::iter_ok)
             .flatten_stream()
-            .filter_map(|order| match order.track_id {
+            .inspect(|order| {
+                info!("Process order {} with track_id {:?}", order.id, order.track_id);
+            }).filter_map(|order| match order.track_id {
                 Some(track_id) => Some((order.id, track_id)),
                 None => None,
             }).and_then(move |(order_id, track_id)| Self::delivery_state(ups_client.clone(), order_id, track_id))
             .filter(|(_order_id, state)| state == &DeliveryState::Delivered)
-            .and_then(move |(order_id, _state)| {
+            .and_then(move |(order_id, state)| {
+                info!("Change order {} with state {}", order_id, state);
                 let service = self.create_service();
                 service.set_order_state(OrderIdentifier::Id(order_id), OrderState::Delivered, None, None)
             }).then(|result| match result {
                 Ok(_) => ::future::ok(()),
                 Err(error) => {
-                    log_and_capture_error(error);
+                    log_and_capture_error(&error);
                     ::future::ok(())
                 }
             }).fold((), fold_ok)

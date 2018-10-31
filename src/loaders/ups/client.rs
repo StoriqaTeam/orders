@@ -29,6 +29,12 @@ pub enum DeliveryState {
     Delivered,
 }
 
+#[derive(Debug, Clone)]
+pub struct Error {
+    track_id: String,
+    fault: Fault,
+}
+
 impl UpsClient {
     pub fn new(handle: &Handle, access_license_number: String, url: String) -> UpsClient {
         let client = HttpClient::new(
@@ -65,7 +71,7 @@ impl UpsClient {
 impl DeliveryState {
     fn try_from_response(track_id: String, response: UpsResponse) -> Result<Self, FailureError> {
         if let Some(fault) = response.Fault {
-            return Err(format_err!("Error in {} - {}", track_id, fault));
+            bail!(Error { track_id, fault });
         }
         match response
             .TrackResponse
@@ -132,5 +138,11 @@ impl fmt::Display for DeliveryState {
             DeliveryState::NotDelivered => write!(f, "not delivered"),
             DeliveryState::Delivered => write!(f, "delivered"),
         }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "Api error for {}: {}", self.track_id, self.fault)
     }
 }
