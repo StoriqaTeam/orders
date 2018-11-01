@@ -85,6 +85,7 @@ impl RpcClient {
                 pre_order: false,
                 pre_order_days: 0,
                 coupon_id: None,
+                delivery_method_id: None,
             },
         );
 
@@ -261,6 +262,7 @@ fn test_services() {
                     pre_order: false,
                     pre_order_days: 0,
                     coupon_id: None,
+                    delivery_method_id: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -273,6 +275,7 @@ fn test_services() {
                     pre_order: false,
                     pre_order_days: 0,
                     coupon_id: None,
+                    delivery_method_id: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -285,6 +288,7 @@ fn test_services() {
                     pre_order: false,
                     pre_order_days: 0,
                     coupon_id: None,
+                    delivery_method_id: None,
                 },
             ]);
 
