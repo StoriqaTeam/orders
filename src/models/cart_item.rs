@@ -98,7 +98,10 @@ impl Inserter for CartItemUser {
             .with_arg(PRE_ORDER_COLUMN, self.pre_order)
             .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
             .with_arg(COUPON_ID_COLUMN, self.coupon_id.map(|id| id.0))
-            .with_arg(DELIVERY_METHOD_ID_COLUMN, self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()))
+            .with_arg(
+                DELIVERY_METHOD_ID_COLUMN,
+                self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
+            )
     }
 }
 
@@ -115,7 +118,10 @@ impl Inserter for CartItemSession {
             .with_arg(PRE_ORDER_COLUMN, self.pre_order)
             .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
             .with_arg(COUPON_ID_COLUMN, self.coupon_id.map(|id| id.0))
-            .with_arg(DELIVERY_METHOD_ID_COLUMN, self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()))
+            .with_arg(
+                DELIVERY_METHOD_ID_COLUMN,
+                self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
+            )
     }
 }
 
