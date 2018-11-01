@@ -300,7 +300,8 @@ impl From<Row> for CartItemUser {
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
             coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
-            delivery_method_id: row.get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
+            delivery_method_id: row
+                .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
         }
     }
@@ -319,7 +320,8 @@ impl From<Row> for CartItemSession {
             pre_order: row.get(PRE_ORDER_COLUMN),
             pre_order_days: row.get(PRE_ORDER_DAYS_COLUMN),
             coupon_id: row.get::<Option<i32>, _>(COUPON_ID_COLUMN).map(CouponId),
-            delivery_method_id: row.get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
+            delivery_method_id: row
+                .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
         }
     }

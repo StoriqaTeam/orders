@@ -166,25 +166,15 @@ impl Controller for ControllerImpl {
                                     (service_factory.cart)(login_data).delete_coupon_by_product(customer, product_id)
                                 })
                             }
-                            (
-                                Post,
-                                Some(Route::CartProductDeliveryMethod {
-                                    customer,
-                                    product_id,
-                                }),
-                            ) => {
-                                return serialize_future(
-                                    parse_body::<CartProductDeliveryMethodIdPayload>(payload)
-                                        .and_then(move |params| {
-                                            debug!(
-                                                "Received request to set delivery method in cart to {:?} for product {} for customer {}",
-                                                params.value, product_id, customer
-                                            );
+                            (Post, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
+                                return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(move |params| {
+                                    debug!(
+                                        "Received request to set delivery method in cart to {:?} for product {} for customer {}",
+                                        params.value, product_id, customer
+                                    );
 
-                                            (service_factory.cart)(login_data)
-                                                .set_delivery_method(customer, product_id, Some(params.value))
-                                        }),
-                                )
+                                    (service_factory.cart)(login_data).set_delivery_method(customer, product_id, Some(params.value))
+                                }))
                             }
                             (Delete, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future({
@@ -306,6 +296,7 @@ impl Controller for ControllerImpl {
                                                     payload.address,
                                                     payload.receiver_name,
                                                     payload.receiver_phone,
+                                                    payload.receiver_email,
                                                     payload.coupons,
                                                 )
                                             })

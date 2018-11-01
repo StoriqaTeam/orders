@@ -78,6 +78,7 @@ table! {
         coupon_percent -> Nullable<Int4>,
         coupon_discount -> Nullable<Float8>,
         total_amount -> Float8,
+        receiver_email -> Nullable<Varchar>,
     }
 }
 

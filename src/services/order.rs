@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use chrono::prelude::*;
@@ -18,6 +18,8 @@ use stq_db::repo::*;
 use stq_static_resources::OrderState;
 use stq_types::*;
 
+pub const ZERO_DISCOUNT: f64 = 0.0001;
+
 #[derive(Clone, Debug)]
 pub enum RoleRemoveFilter {
     Id(RoleId),
@@ -33,6 +35,7 @@ pub trait OrderService {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
@@ -41,6 +44,7 @@ pub trait OrderService {
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
+    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
     fn set_order_state(
         &self,
@@ -92,6 +96,7 @@ impl OrderService for OrderServiceImpl {
         address: AddressFull,
         receiver_name: String,
         receiver_phone: String,
+        receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
     ) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::*;
@@ -106,48 +111,66 @@ impl OrderService for OrderServiceImpl {
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
-                .delete(conn, CartItemFilter { customer: Some(customer_id.into()), meta_filter: CartItemMetaFilter { selected: Some(true), ..Default::default() } })
+                .delete(
+                    conn,
+                    CartItemFilter {
+                        customer: Some(customer_id.into()),
+                        meta_filter: CartItemMetaFilter {
+                            selected: Some(true),
+                            ..Default::default()
+                        },
+                    },
+                )
                 // Create orders from cart items
                 .and_then(move |(cart, conn)| {
                     let mut order_items = Vec::new();
                     for cart_item in cart {
                         if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
                             let ProductSellerPrice { price, currency, discount } = seller_price;
-                            let coupon_percent = cart_item.coupon_id
+                            let coupon_percent = cart_item
+                                .coupon_id
                                 .and_then(|coupon_id| coupons.get(&coupon_id))
                                 .map(|coupon| coupon.percent);
-                            let TotalAmount { total_amount, coupon_discount, product_discount } = calculate_total_amount(
-                                cart_item.quantity,
-                                price,
-                                discount,
-                                coupon_percent
-                            );
-                            order_items.push((OrderInserter {
-                                id: None,
-                                created_from: Some(cart_item.id),
-                                conversion_id,
-                                customer: customer_id,
-                                store: cart_item.store_id,
-                                product: cart_item.product_id,
-                                quantity: cart_item.quantity,
-                                price,
-                                currency,
-                                address: address.clone(),
-                                receiver_name: receiver_name.clone(),
-                                receiver_phone: receiver_phone.clone(),
-                                state: OrderState::New,
-                                delivery_company: None,
-                                track_id: None,
-                                pre_order: cart_item.pre_order,
-                                pre_order_days: cart_item.pre_order_days,
-                                coupon_id: cart_item.coupon_id,
-                                coupon_percent,
+                            let TotalAmount {
+                                total_amount,
                                 coupon_discount,
                                 product_discount,
-                                total_amount,
-                            }, cart_item.comment))
+                            } = calculate_total_amount(cart_item.quantity, price, discount, coupon_percent);
+                            order_items.push((
+                                OrderInserter {
+                                    id: None,
+                                    created_from: Some(cart_item.id),
+                                    conversion_id,
+                                    customer: customer_id,
+                                    store: cart_item.store_id,
+                                    product: cart_item.product_id,
+                                    quantity: cart_item.quantity,
+                                    price,
+                                    currency,
+                                    address: address.clone(),
+                                    receiver_name: receiver_name.clone(),
+                                    receiver_phone: receiver_phone.clone(),
+                                    receiver_email: receiver_email.clone(),
+                                    state: OrderState::New,
+                                    delivery_company: None,
+                                    track_id: None,
+                                    pre_order: cart_item.pre_order,
+                                    pre_order_days: cart_item.pre_order_days,
+                                    coupon_id: cart_item.coupon_id,
+                                    coupon_percent,
+                                    coupon_discount,
+                                    product_discount,
+                                    total_amount,
+                                },
+                                cart_item.comment,
+                            ))
                         } else {
-                            return Err((format_err!("Missing price information for product {}", cart_item.product_id).context(Error::MissingPrice).into(), conn));
+                            return Err((
+                                format_err!("Missing price information for product {}", cart_item.product_id)
+                                    .context(Error::MissingPrice)
+                                    .into(),
+                                conn,
+                            ));
                         }
                     }
                     Ok((order_items, conn))
@@ -165,20 +188,26 @@ impl OrderService for OrderServiceImpl {
                                 let order_diffs_repo_factory = order_diffs_repo_factory.clone();
                                 move |(mut out_data, conn)| {
                                     // Insert new order along with the record in history
-                                    (order_repo_factory)().insert_exactly_one(conn, new_order).and_then(move |(inserted_order, conn)| {
-                                        (order_diffs_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                                            parent: inserted_order.0.id,
-                                            committer: calling_user,
-                                            committed_at: Utc::now(),
-                                            state: OrderState::New,
-                                            comment: Some(comment),
-                                        }).map(|(_, conn)| (inserted_order, conn))
-                                    }).map({
-                                        move |(order, conn): (DbOrder, RepoConnection)| {
-                                            out_data.push(order.0);
-                                            (out_data, conn)
-                                        }
-                                    })
+                                    (order_repo_factory)()
+                                        .insert_exactly_one(conn, new_order)
+                                        .and_then(move |(inserted_order, conn)| {
+                                            (order_diffs_repo_factory)()
+                                                .insert_exactly_one(
+                                                    conn,
+                                                    OrderDiffInserter {
+                                                        parent: inserted_order.0.id,
+                                                        committer: calling_user,
+                                                        committed_at: Utc::now(),
+                                                        state: OrderState::New,
+                                                        comment: Some(comment),
+                                                    },
+                                                ).map(|(_, conn)| (inserted_order, conn))
+                                        }).map({
+                                            move |(order, conn): (DbOrder, RepoConnection)| {
+                                                out_data.push(order.0);
+                                                (out_data, conn)
+                                            }
+                                        })
                                 }
                             }));
                         }
@@ -293,11 +322,14 @@ impl OrderService for OrderServiceImpl {
         };
 
         Box::new(self.db_pool.run(move |conn| {
+            let coupon_percent = payload.coupon.as_ref().map(|c| c.percent);
+            let coupon_id = payload.coupon.as_ref().map(|c| c.id);
+
             let TotalAmount {
                 total_amount,
                 coupon_discount,
                 product_discount,
-            } = calculate_total_amount(payload.quantity, payload.price.price, payload.price.discount, None);
+            } = calculate_total_amount(payload.quantity, payload.price.price, payload.price.discount, coupon_percent);
             let order_item = (
                 OrderInserter {
                     id: None,
@@ -312,13 +344,14 @@ impl OrderService for OrderServiceImpl {
                     address: payload.address,
                     receiver_name: payload.receiver_name,
                     receiver_phone: payload.receiver_phone,
+                    receiver_email: payload.receiver_email,
                     state: OrderState::New,
                     delivery_company: None,
                     track_id: None,
                     pre_order: payload.pre_order,
                     pre_order_days: payload.pre_order_days,
-                    coupon_id: None,
-                    coupon_percent: None,
+                    coupon_id,
+                    coupon_percent,
                     coupon_discount,
                     product_discount,
                     total_amount,
@@ -538,6 +571,42 @@ impl OrderService for OrderServiceImpl {
 
         Box::new(result)
     }
+
+    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>> {
+        let search_orders_in_state = OrderSearchTerms {
+            state: Some(state),
+            ..OrderSearchTerms::default()
+        };
+        let orders_in_state = self.search(search_orders_in_state);
+
+        let search_diffs = {
+            let now = ::chrono::offset::Utc::now();
+            let old_order_date = now - max_state_duration;
+            OrderDiffFilter {
+                state: Some(state).map(From::from),
+                committed_at_range: ::models::common::into_range(Some(old_order_date), None),
+                ..OrderDiffFilter::default()
+            }
+        };
+
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool = self.db_pool.clone();
+
+        let diffs_in_max_state_duration = db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, search_diffs));
+
+        let result = orders_in_state
+            .join(diffs_in_max_state_duration)
+            .map(|(orders_in_state, recent_diffs)| {
+                let orders_in_state_ids: HashSet<OrderId> = orders_in_state.iter().map(|order| order.id).collect();
+                let recent_diffs_ids: HashSet<OrderId> = recent_diffs.iter().map(|diff| diff.0.parent).collect();
+                let mut by_id: HashMap<OrderId, Order> = orders_in_state.into_iter().map(|order| (order.id, order)).collect();
+                orders_in_state_ids
+                    .intersection(&recent_diffs_ids)
+                    .filter_map(|order_id| by_id.remove(&order_id))
+                    .collect()
+            });
+        Box::new(result)
+    }
 }
 
 struct TotalAmount {
@@ -552,18 +621,39 @@ fn calculate_total_amount(
     product_discount_percent: Option<f64>,
     coupon_discount_percent: Option<i32>,
 ) -> TotalAmount {
-    let product_discount = product_discount_percent.map(|p| p * product_price.0);
-    let coupon_discount = coupon_discount_percent.map(|p| p as f64 / 100.0 * (product_price.0 - product_discount.unwrap_or(0.0)));
-    let total_amount = if quantity.0 > 0 {
-        product_price.0 - product_discount.unwrap_or(0.0) - coupon_discount.unwrap_or(0.0)
-            + (product_price.0 - product_discount.unwrap_or(0.0)) * (quantity.0 - 1) as f64
-    } else {
-        0.0
-    };
-    TotalAmount {
-        coupon_discount: coupon_discount.map(ProductPrice),
-        product_discount: product_discount.map(ProductPrice),
-        total_amount: ProductPrice(total_amount),
+    let product_discount_percent = product_discount_percent.filter(|p| *p > ZERO_DISCOUNT);
+    match (product_discount_percent, coupon_discount_percent) {
+        (Some(product_discount_percent), _) => {
+            let product_discount = product_discount_percent * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                (product_price.0 - product_discount) * quantity.0 as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
+                coupon_discount: None,
+                product_discount: Some(ProductPrice(product_discount)),
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, Some(coupon_discount_percent)) => {
+            let coupon_discount = coupon_discount_percent as f64 / 100.0 * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                product_price.0 - coupon_discount + product_price.0 * (quantity.0 - 1) as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
+                coupon_discount: Some(ProductPrice(coupon_discount)),
+                product_discount: None,
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, None) => TotalAmount {
+            coupon_discount: None,
+            product_discount: None,
+            total_amount: ProductPrice(quantity.0 as f64 * product_price.0),
+        },
     }
 }
 
@@ -579,28 +669,33 @@ fn set_order_state(
 ) -> ServiceFuture<Option<Order>> {
     let result = db_pool
         .run(move |conn| {
-            (order_repo_factory)()
-                .update(
-                    conn,
-                    OrderUpdater {
-                        mask: order_id.into(),
-                        data: OrderUpdateData { state: Some(state), track_id },
+            (order_repo_factory)().update(
+                conn,
+                OrderUpdater {
+                    mask: order_id.into(),
+                    data: OrderUpdateData {
+                        state: Some(state),
+                        track_id,
                     },
-                )
-        })
-        .map(|mut out_data| out_data.pop())
+                },
+            )
+        }).map(|mut out_data| out_data.pop())
         // Insert new order diff into database
         .and_then(move |updated_order| {
             db_pool.run(move |conn| {
                 if let Some(order) = updated_order {
                     Box::new(
-                        (order_diff_repo_factory)().insert_exactly_one(conn, OrderDiffInserter {
-                            parent: order.0.id,
-                            committer: calling_user,
-                            committed_at: Utc::now(),
-                            state: order.0.state,
-                            comment,
-                        }).map(move |(_, c)| (Some(order.0), c))
+                        (order_diff_repo_factory)()
+                            .insert_exactly_one(
+                                conn,
+                                OrderDiffInserter {
+                                    parent: order.0.id,
+                                    committer: calling_user,
+                                    committed_at: Utc::now(),
+                                    state: order.0.state,
+                                    comment,
+                                },
+                            ).map(move |(_, c)| (Some(order.0), c)),
                     )
                 } else {
                     Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>
@@ -633,8 +728,8 @@ mod tests {
         assert_eq!(coupon_discount.coupon_discount, Some(ProductPrice(30.0)));
 
         let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25));
-        assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(140.0));
+        assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_and_coupon_discount.product_discount, Some(ProductPrice(20.0)));
-        assert_eq!(product_and_coupon_discount.coupon_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_and_coupon_discount.coupon_discount, None);
     }
 }

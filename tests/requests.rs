@@ -315,6 +315,7 @@ fn test_services() {
             };
             let receiver_name = "Mr. Anderson".to_string();
             let receiver_phone = "+14441234567".to_string();
+            let receiver_email = "arch@itect.com".to_string();
 
             {
                 let new_orders = rpc
@@ -326,6 +327,7 @@ fn test_services() {
                         address.clone(),
                         receiver_name.clone(),
                         receiver_phone.clone(),
+                        receiver_email.clone(),
                         HashMap::new(),
                     ).wait()
                     .unwrap();
@@ -360,6 +362,7 @@ fn test_services() {
                             address: address.clone(),
                             receiver_name: receiver_name.clone(),
                             receiver_phone: receiver_phone.clone(),
+                            receiver_email: receiver_email.clone(),
                             state: OrderState::New,
                             payment_status: false,
                             delivery_company: None,
