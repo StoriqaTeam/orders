@@ -22,6 +22,7 @@ const CURRENCY_COLUMN: &str = "currency";
 const QUANTITY_COLUMN: &str = "quantity";
 const RECEIVER_NAME_COLUMN: &str = "receiver_name";
 const RECEIVER_PHONE_COLUMN: &str = "receiver_phone";
+const RECEIVER_EMAIL_COLUMN: &str = "receiver_email";
 
 const ADMINISTRATIVE_AREA_LEVEL_1_COLUMN: &str = "administrative_area_level_1";
 const ADMINISTRATIVE_AREA_LEVEL_2_COLUMN: &str = "administrative_area_level_2";
@@ -117,6 +118,7 @@ impl From<Row> for DbOrder {
             address: address_from_row(&row),
             receiver_name: row.get(RECEIVER_NAME_COLUMN),
             receiver_phone: row.get(RECEIVER_PHONE_COLUMN),
+            receiver_email: row.get(RECEIVER_EMAIL_COLUMN),
             payment_status: row.get(PAYMENT_STATUS_COLUMN),
             delivery_company: row.get(DELIVERY_COMPANY_COLUMN),
             created_at: row.get(CREATED_AT_COLUMN),
@@ -148,6 +150,7 @@ pub struct OrderInserter {
     pub address: AddressFull,
     pub receiver_name: String,
     pub receiver_phone: String,
+    pub receiver_email: String,
     pub delivery_company: Option<String>,
     pub state: OrderState,
     pub track_id: Option<String>,
@@ -168,6 +171,7 @@ impl Inserter for OrderInserter {
             .with_arg(PRODUCT_COLUMN, self.product.0)
             .with_arg(RECEIVER_NAME_COLUMN, self.receiver_name)
             .with_arg(RECEIVER_PHONE_COLUMN, self.receiver_phone)
+            .with_arg(RECEIVER_EMAIL_COLUMN, self.receiver_email)
             .with_arg(PRICE_COLUMN, self.price.0)
             .with_arg(CURRENCY_COLUMN, self.currency.to_string())
             .with_arg(QUANTITY_COLUMN, self.quantity.0)
