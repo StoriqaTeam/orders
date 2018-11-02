@@ -337,12 +337,12 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             let coupon_percent = payload.coupon.as_ref().map(|c| c.percent);
             let coupon_id = payload.coupon.as_ref().map(|c| c.id);
-            let (company_package_id, delivery_name, delivery_price) =  match payload.delivery_info.clone() {
+            let (company_package_id, delivery_name, delivery_price) = match payload.delivery_info.clone() {
                 None => (None, None, 0.0),
                 Some(delivery_info) => (
                     Some(delivery_info.company_package_id.clone()),
                     Some(delivery_info.name.clone()),
-                    delivery_info.price
+                    delivery_info.price,
                 ),
             };
 
@@ -350,7 +350,13 @@ impl OrderService for OrderServiceImpl {
                 total_amount,
                 coupon_discount,
                 product_discount,
-            } = calculate_total_amount(payload.quantity, payload.price.price, payload.price.discount, coupon_percent, delivery_price);
+            } = calculate_total_amount(
+                payload.quantity,
+                payload.price.price,
+                payload.price.discount,
+                coupon_percent,
+                delivery_price,
+            );
             let order_item = (
                 OrderInserter {
                     id: None,
@@ -646,40 +652,43 @@ fn calculate_total_amount(
     delivery_price_per_product: f64,
 ) -> TotalAmount {
     let product_discount_percent = product_discount_percent.filter(|p| *p > ZERO_DISCOUNT);
-    let TotalAmount { coupon_discount, product_discount, total_amount } =
-        match (product_discount_percent, coupon_discount_percent) {
-            (Some(product_discount_percent), _) => {
-                let product_discount = product_discount_percent * product_price.0;
-                let total_amount = if quantity.0 > 0 {
-                    (product_price.0 - product_discount) * quantity.0 as f64
-                } else {
-                    0.0
-                };
-                TotalAmount {
-                    coupon_discount: None,
-                    product_discount: Some(ProductPrice(product_discount)),
-                    total_amount: ProductPrice(total_amount),
-                }
-            }
-            (None, Some(coupon_discount_percent)) => {
-                let coupon_discount = coupon_discount_percent as f64 / 100.0 * product_price.0;
-                let total_amount = if quantity.0 > 0 {
-                    product_price.0 - coupon_discount + product_price.0 * (quantity.0 - 1) as f64
-                } else {
-                    0.0
-                };
-                TotalAmount {
-                    coupon_discount: Some(ProductPrice(coupon_discount)),
-                    product_discount: None,
-                    total_amount: ProductPrice(total_amount),
-                }
-            }
-            (None, None) => TotalAmount {
+    let TotalAmount {
+        coupon_discount,
+        product_discount,
+        total_amount,
+    } = match (product_discount_percent, coupon_discount_percent) {
+        (Some(product_discount_percent), _) => {
+            let product_discount = product_discount_percent * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                (product_price.0 - product_discount) * quantity.0 as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
                 coupon_discount: None,
+                product_discount: Some(ProductPrice(product_discount)),
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, Some(coupon_discount_percent)) => {
+            let coupon_discount = coupon_discount_percent as f64 / 100.0 * product_price.0;
+            let total_amount = if quantity.0 > 0 {
+                product_price.0 - coupon_discount + product_price.0 * (quantity.0 - 1) as f64
+            } else {
+                0.0
+            };
+            TotalAmount {
+                coupon_discount: Some(ProductPrice(coupon_discount)),
                 product_discount: None,
-                total_amount: ProductPrice(quantity.0 as f64 * product_price.0),
-            },
-        };
+                total_amount: ProductPrice(total_amount),
+            }
+        }
+        (None, None) => TotalAmount {
+            coupon_discount: None,
+            product_discount: None,
+            total_amount: ProductPrice(quantity.0 as f64 * product_price.0),
+        },
+    };
     TotalAmount {
         coupon_discount,
         product_discount,
