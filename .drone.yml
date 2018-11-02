@@ -62,16 +62,25 @@ pipeline:
     - CARGO_HOME=deps
     commands:
     - apt-get update && apt-get install -y clang
-    - cargo build --release --locked
+    - cargo build
     when:
       event:
       - push
+  build:
+    image: rust:1.30-stretch
+    environment:
+    - CARGO_HOME=deps
+    commands:
+    - apt-get update && apt-get install -y clang
+    - cargo build --release --locked
+    when:
+      event:
       - tag
   package:
     group: package
     image: plugins/docker
     repo: storiqateam/stq-orders
-    dockerfile: docker/Dockerfile.run
+    dockerfile: Dockerfile.orders
     tags:
     - ${DRONE_BRANCH//\//_}
     - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
@@ -83,7 +92,8 @@ pipeline:
   package:
     image: plugins/docker
     repo: storiqateam/stq-orders
-    dockerfile: docker/Dockerfile.run
+    dockerfile: Dockerfile.orders
+    build_args: env=release
     tags:
     - '${DRONE_TAG}'
     - latest
