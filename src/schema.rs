@@ -79,6 +79,8 @@ table! {
         coupon_discount -> Nullable<Float8>,
         total_amount -> Float8,
         receiver_email -> Nullable<Varchar>,
+        company_package_id -> Nullable<Int4>,
+        delivery_price -> Float8,
     }
 }
 
