@@ -76,6 +76,7 @@ pipeline:
     when:
       event:
       - tag
+# Regular branches
   package:
     group: package
     image: plugins/docker
@@ -89,11 +90,58 @@ pipeline:
     - docker_password
     when:
       event: push
+  package_delivered:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-delivered
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=delivered_orders
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: push
+  package_report:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-report
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=report_orders
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: push
+  package_sent:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-sent
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=sent_orders
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: push
+# Releases
   package:
     image: plugins/docker
     repo: storiqateam/stq-orders
     dockerfile: Dockerfile.orders
-    build_args: env=release
+    build_args:
+    - env=release
     tags:
     - '${DRONE_TAG}'
     - latest
@@ -102,6 +150,55 @@ pipeline:
     - docker_password
     when:
       event: tag
+  package_delivered:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-delivered
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=delivered_orders
+    - env=release
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: tag
+  package_report:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-report
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=report_orders
+    - env=release
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: tag
+  package_sent:
+    group: package
+    image: plugins/docker
+    repo: storiqateam/stq-orders-sent
+    dockerfile: Dockerfile.pollers
+    build_args:
+    - binary=sent_orders
+    - env=release
+    tags:
+    - ${DRONE_BRANCH//\//_}
+    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    secrets:
+    - docker_username
+    - docker_password
+    when:
+      event: tag
+# Deployment to nightly/stage
   deploy2nightly:
     image: jackthestripper/drone_setimage
     namespace: default
