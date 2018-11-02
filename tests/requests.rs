@@ -333,6 +333,7 @@ fn test_services() {
                         receiver_phone.clone(),
                         receiver_email.clone(),
                         HashMap::new(),
+                        HashMap::new(),
                     ).wait()
                     .unwrap();
 
@@ -380,6 +381,8 @@ fn test_services() {
                             coupon_discount: None,
                             product_discount: None,
                             total_amount: ProductPrice(price.0 * cart_item.quantity.0 as f64),
+                            company_package_id: None,
+                            delivery_price: 0.0,
                         }
                     }).collect::<Vec<_>>();
 

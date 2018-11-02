@@ -298,6 +298,7 @@ impl Controller for ControllerImpl {
                                                     payload.receiver_phone,
                                                     payload.receiver_email,
                                                     payload.coupons,
+                                                    payload.delivery_info,
                                                 )
                                             })
                                     })
