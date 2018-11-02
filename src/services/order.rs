@@ -751,24 +751,35 @@ mod tests {
 
     #[test]
     fn correctly_calculates_total_amount() {
-        let no_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None);
+        let no_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None, 0.0);
         assert_eq!(no_discount.total_amount, ProductPrice(200.0));
         assert_eq!(no_discount.product_discount, None);
         assert_eq!(no_discount.coupon_discount, None);
 
-        let product_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), None);
+        let no_discount_with_delivery = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None, 100.0);
+        assert_eq!(no_discount_with_delivery.total_amount, ProductPrice(400.0));
+        assert_eq!(no_discount_with_delivery.product_discount, None);
+        assert_eq!(no_discount_with_delivery.coupon_discount, None);
+
+        let product_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), None, 0.0);
         assert_eq!(product_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_discount.product_discount, Some(ProductPrice(20.0)));
         assert_eq!(product_discount.coupon_discount, None);
 
-        let coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, Some(30));
+        let coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, Some(30), 0.0);
         assert_eq!(coupon_discount.total_amount, ProductPrice(170.0));
         assert_eq!(coupon_discount.product_discount, None);
         assert_eq!(coupon_discount.coupon_discount, Some(ProductPrice(30.0)));
 
-        let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25));
+        let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25), 0.0);
         assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_and_coupon_discount.product_discount, Some(ProductPrice(20.0)));
         assert_eq!(product_and_coupon_discount.coupon_discount, None);
+
+        let product_and_coupon_discount_with_delivery =
+            calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25), 100.0);
+        assert_eq!(product_and_coupon_discount_with_delivery.total_amount, ProductPrice(360.0));
+        assert_eq!(product_and_coupon_discount_with_delivery.product_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_and_coupon_discount_with_delivery.coupon_discount, None);
     }
 }
