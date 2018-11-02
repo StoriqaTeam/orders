@@ -37,6 +37,7 @@ pub trait OrderService {
         receiver_phone: String,
         receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
+        delivery_info: HashMap<ProductId, DeliveryInfo>,
     ) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
     fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
@@ -99,6 +100,7 @@ impl OrderService for OrderServiceImpl {
         receiver_phone: String,
         receiver_email: String,
         coupons: HashMap<CouponId, CouponInfo>,
+        delivery_info: HashMap<ProductId, DeliveryInfo>,
     ) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::*;
 
@@ -128,6 +130,15 @@ impl OrderService for OrderServiceImpl {
                     for cart_item in cart {
                         if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
                             let ProductSellerPrice { price, currency, discount } = seller_price;
+                            let (company_package_id, delivery_name, delivery_price) =
+                                match delivery_info.get(&cart_item.product_id).cloned() {
+                                    None => (None, None, 0.0),
+                                    Some(delivery_info) => (
+                                        Some(delivery_info.company_package_id.clone()),
+                                        Some(delivery_info.name.clone()),
+                                        delivery_info.price,
+                                    ),
+                                };
                             let coupon_percent = cart_item
                                 .coupon_id
                                 .and_then(|coupon_id| coupons.get(&coupon_id))
@@ -136,7 +147,7 @@ impl OrderService for OrderServiceImpl {
                                 total_amount,
                                 coupon_discount,
                                 product_discount,
-                            } = calculate_total_amount(cart_item.quantity, price, discount, coupon_percent);
+                            } = calculate_total_amount(cart_item.quantity, price, discount, coupon_percent, delivery_price);
                             order_items.push((
                                 OrderInserter {
                                     id: None,
@@ -153,7 +164,7 @@ impl OrderService for OrderServiceImpl {
                                     receiver_phone: receiver_phone.clone(),
                                     receiver_email: receiver_email.clone(),
                                     state: OrderState::New,
-                                    delivery_company: None,
+                                    delivery_company: delivery_name,
                                     track_id: None,
                                     pre_order: cart_item.pre_order,
                                     pre_order_days: cart_item.pre_order_days,
@@ -162,6 +173,8 @@ impl OrderService for OrderServiceImpl {
                                     coupon_discount,
                                     product_discount,
                                     total_amount,
+                                    company_package_id,
+                                    delivery_price,
                                 },
                                 cart_item.comment,
                             ))
@@ -325,12 +338,26 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             let coupon_percent = payload.coupon.as_ref().map(|c| c.percent);
             let coupon_id = payload.coupon.as_ref().map(|c| c.id);
+            let (company_package_id, delivery_name, delivery_price) = match payload.delivery_info.clone() {
+                None => (None, None, 0.0),
+                Some(delivery_info) => (
+                    Some(delivery_info.company_package_id.clone()),
+                    Some(delivery_info.name.clone()),
+                    delivery_info.price,
+                ),
+            };
 
             let TotalAmount {
                 total_amount,
                 coupon_discount,
                 product_discount,
-            } = calculate_total_amount(payload.quantity, payload.price.price, payload.price.discount, coupon_percent);
+            } = calculate_total_amount(
+                payload.quantity,
+                payload.price.price,
+                payload.price.discount,
+                coupon_percent,
+                delivery_price,
+            );
             let order_item = (
                 OrderInserter {
                     id: None,
@@ -347,7 +374,7 @@ impl OrderService for OrderServiceImpl {
                     receiver_phone: payload.receiver_phone,
                     receiver_email: payload.receiver_email,
                     state: OrderState::New,
-                    delivery_company: None,
+                    delivery_company: delivery_name,
                     track_id: None,
                     pre_order: payload.pre_order,
                     pre_order_days: payload.pre_order_days,
@@ -356,6 +383,8 @@ impl OrderService for OrderServiceImpl {
                     coupon_discount,
                     product_discount,
                     total_amount,
+                    company_package_id,
+                    delivery_price,
                 },
                 "Buy now".to_string(),
             );
@@ -638,9 +667,14 @@ fn calculate_total_amount(
     product_price: ProductPrice,
     product_discount_percent: Option<f64>,
     coupon_discount_percent: Option<i32>,
+    delivery_price_per_product: f64,
 ) -> TotalAmount {
     let product_discount_percent = product_discount_percent.filter(|p| *p > ZERO_DISCOUNT);
-    match (product_discount_percent, coupon_discount_percent) {
+    let TotalAmount {
+        coupon_discount,
+        product_discount,
+        total_amount,
+    } = match (product_discount_percent, coupon_discount_percent) {
         (Some(product_discount_percent), _) => {
             let product_discount = product_discount_percent * product_price.0;
             let total_amount = if quantity.0 > 0 {
@@ -672,6 +706,11 @@ fn calculate_total_amount(
             product_discount: None,
             total_amount: ProductPrice(quantity.0 as f64 * product_price.0),
         },
+    };
+    TotalAmount {
+        coupon_discount,
+        product_discount,
+        total_amount: ProductPrice(total_amount.0 + quantity.0 as f64 * delivery_price_per_product),
     }
 }
 
@@ -730,24 +769,35 @@ mod tests {
 
     #[test]
     fn correctly_calculates_total_amount() {
-        let no_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None);
+        let no_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None, 0.0);
         assert_eq!(no_discount.total_amount, ProductPrice(200.0));
         assert_eq!(no_discount.product_discount, None);
         assert_eq!(no_discount.coupon_discount, None);
 
-        let product_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), None);
+        let no_discount_with_delivery = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, None, 100.0);
+        assert_eq!(no_discount_with_delivery.total_amount, ProductPrice(400.0));
+        assert_eq!(no_discount_with_delivery.product_discount, None);
+        assert_eq!(no_discount_with_delivery.coupon_discount, None);
+
+        let product_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), None, 0.0);
         assert_eq!(product_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_discount.product_discount, Some(ProductPrice(20.0)));
         assert_eq!(product_discount.coupon_discount, None);
 
-        let coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, Some(30));
+        let coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), None, Some(30), 0.0);
         assert_eq!(coupon_discount.total_amount, ProductPrice(170.0));
         assert_eq!(coupon_discount.product_discount, None);
         assert_eq!(coupon_discount.coupon_discount, Some(ProductPrice(30.0)));
 
-        let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25));
+        let product_and_coupon_discount = calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25), 0.0);
         assert_eq!(product_and_coupon_discount.total_amount, ProductPrice(160.0));
         assert_eq!(product_and_coupon_discount.product_discount, Some(ProductPrice(20.0)));
         assert_eq!(product_and_coupon_discount.coupon_discount, None);
+
+        let product_and_coupon_discount_with_delivery =
+            calculate_total_amount(Quantity(2), ProductPrice(100.0), Some(0.2), Some(25), 100.0);
+        assert_eq!(product_and_coupon_discount_with_delivery.total_amount, ProductPrice(360.0));
+        assert_eq!(product_and_coupon_discount_with_delivery.product_discount, Some(ProductPrice(20.0)));
+        assert_eq!(product_and_coupon_discount_with_delivery.coupon_discount, None);
     }
 }

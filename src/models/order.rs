@@ -49,6 +49,8 @@ const PRODUCT_DISCOUNT_COLUMN: &str = "product_discount";
 const COUPON_PERCENT_COLUMN: &str = "coupon_percent";
 const COUPON_DISCOUNT_COLUMN: &str = "coupon_discount";
 const TOTAL_AMOUNT_COLUMN: &str = "total_amount";
+const COMPANY_PACKAGE_ID_COLUMN: &str = "company_package_id";
+const DELIVERY_PRICE_COLUMN: &str = "delivery_price";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.administrative_area_level_1 {
@@ -133,6 +135,8 @@ impl From<Row> for DbOrder {
             coupon_discount: row.get::<Option<f64>, _>(COUPON_DISCOUNT_COLUMN).map(ProductPrice),
             product_discount: row.get::<Option<f64>, _>(PRODUCT_DISCOUNT_COLUMN).map(ProductPrice),
             total_amount: ProductPrice(row.get(TOTAL_AMOUNT_COLUMN)),
+            company_package_id: row.get::<Option<i32>, _>(COMPANY_PACKAGE_ID_COLUMN).map(CompanyPackageId),
+            delivery_price: row.get(DELIVERY_PRICE_COLUMN),
         })
     }
 }
@@ -162,6 +166,8 @@ pub struct OrderInserter {
     pub coupon_discount: Option<ProductPrice>,
     pub product_discount: Option<ProductPrice>,
     pub total_amount: ProductPrice,
+    pub company_package_id: Option<CompanyPackageId>,
+    pub delivery_price: f64,
 }
 
 impl Inserter for OrderInserter {
@@ -179,7 +185,8 @@ impl Inserter for OrderInserter {
             .with_arg(STATE_COLUMN, self.state)
             .with_arg(PRE_ORDER_COLUMN, self.pre_order)
             .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
-            .with_arg(TOTAL_AMOUNT_COLUMN, self.total_amount.0);
+            .with_arg(TOTAL_AMOUNT_COLUMN, self.total_amount.0)
+            .with_arg(DELIVERY_PRICE_COLUMN, self.delivery_price);
 
         b = write_address_into_inserter(self.address, b);
 
@@ -213,6 +220,10 @@ impl Inserter for OrderInserter {
 
         if let Some(v) = self.product_discount {
             b = b.with_arg(PRODUCT_DISCOUNT_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.company_package_id {
+            b = b.with_arg(COMPANY_PACKAGE_ID_COLUMN, v.0);
         }
 
         b
