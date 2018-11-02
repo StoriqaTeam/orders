@@ -24,6 +24,8 @@ enum S3Error {
     Access(String),
     #[fail(display = "Network Error: {}", _0)]
     Network(String),
+    #[fail(display = "Validation error: {}", _0)]
+    Validation(String),
     #[fail(display = "Unknown error: {}", _0)]
     Unknown(String),
 }
@@ -120,7 +122,7 @@ impl From<PutObjectError> for S3Error {
         match e {
             PutObjectError::HttpDispatch(err) => S3Error::Network(format!("{}", err)),
             PutObjectError::Credentials(err) => S3Error::Access(format!("{}", err)),
-            PutObjectError::Validation(err) => S3Error::Access(format!("{}", err)),
+            PutObjectError::Validation(err) => S3Error::Validation(format!("{}", err)),
             PutObjectError::Unknown(err) => S3Error::Unknown(format!("{}", err)),
         }
     }

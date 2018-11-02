@@ -93,9 +93,7 @@ pub fn start_paid_delivered_reporting(config: Config) {
         config: Arc::new(config),
         handle: handle.clone(),
     };
-    handle.spawn(create_paid_delivered_report(env));
-
-    core.run(future::empty::<(), ()>()).unwrap();
+    core.run(create_paid_delivered_report(env)).unwrap();
 }
 
 fn create_paid_delivered_report(env: PaidDeliveredReportEnvironment) -> impl Future<Item = (), Error = ()> {
