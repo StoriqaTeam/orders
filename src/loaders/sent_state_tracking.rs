@@ -95,8 +95,10 @@ impl SentStateTracking {
 
         let service = self.create_service();
         let ups_client = self.ups_client.clone();
+        let now = ::chrono::offset::Utc::now();
+        let from_date = now - ChronoDuration::days(config.sent_state_duration_days);
         service
-            .get_orders_with_state(OrderState::Sent, ChronoDuration::days(config.sent_state_duration_days))
+            .get_orders_with_state(OrderState::Sent, from_date)
             .map(::futures::stream::iter_ok)
             .flatten_stream()
             .inspect(|order| {

@@ -7,6 +7,7 @@ use stq_static_resources::Currency;
 use stq_static_resources::OrderState;
 use stq_types::*;
 use tokio_postgres::rows::Row;
+use uuid::Uuid;
 
 use super::*;
 
@@ -235,6 +236,7 @@ pub type AddressMask = AddressFull;
 pub struct OrderFilter {
     pub do_order: bool,
     pub id: Option<ValueContainer<OrderId>>,
+    pub ids: Option<ValueContainer<Vec<OrderId>>>,
     pub created_from: Option<ValueContainer<CartItemId>>,
     pub conversion_id: Option<ValueContainer<ConversionId>>,
     pub slug: Option<ValueContainer<OrderSlug>>,
@@ -298,6 +300,11 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.id {
             b = b.with_filter(ID_COLUMN, v.value.0);
+        }
+
+        if let Some(v) = self.ids {
+            let ids: Vec<Uuid> = v.value.into_iter().map(|id| id.0).collect();
+            b = b.with_filter::<Uuid, _>(ID_COLUMN, ids);
         }
 
         if let Some(v) = self.created_from {

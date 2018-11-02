@@ -36,6 +36,9 @@ extern crate uuid;
 extern crate validator;
 #[macro_use]
 extern crate sentry;
+extern crate csv;
+extern crate rusoto_core;
+extern crate rusoto_s3;
 
 use std::net::SocketAddr;
 use std::process::exit;
