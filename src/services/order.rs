@@ -44,7 +44,8 @@ pub trait OrderService {
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
     fn get_orders_for_store(&self, store_id: StoreId) -> ServiceFuture<Vec<Order>>;
-    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>>;
+    fn get_orders_with_state(&self, state: OrderState, from: DateTime<Utc>) -> ServiceFuture<Vec<Order>>;
+    fn search_by_diffs(&self, diff_filter: OrderDiffFilter) -> ServiceFuture<Vec<Order>>;
     fn delete_order(&self, id: OrderIdentifier) -> ServiceFuture<()>;
     fn set_order_state(
         &self,
@@ -572,7 +573,7 @@ impl OrderService for OrderServiceImpl {
         Box::new(result)
     }
 
-    fn get_orders_with_state(&self, state: OrderState, max_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>> {
+    fn get_orders_with_state(&self, state: OrderState, from: DateTime<Utc>) -> ServiceFuture<Vec<Order>> {
         let search_orders_in_state = OrderSearchTerms {
             state: Some(state),
             ..OrderSearchTerms::default()
@@ -580,11 +581,9 @@ impl OrderService for OrderServiceImpl {
         let orders_in_state = self.search(search_orders_in_state);
 
         let search_diffs = {
-            let now = ::chrono::offset::Utc::now();
-            let old_order_date = now - max_state_duration;
             OrderDiffFilter {
                 state: Some(state).map(From::from),
-                committed_at_range: ::models::common::into_range(Some(old_order_date), None),
+                committed_at_range: ::models::common::into_range(Some(from), None),
                 ..OrderDiffFilter::default()
             }
         };
@@ -605,6 +604,25 @@ impl OrderService for OrderServiceImpl {
                     .filter_map(|order_id| by_id.remove(&order_id))
                     .collect()
             });
+        Box::new(result)
+    }
+
+    fn search_by_diffs(&self, diff_filter: OrderDiffFilter) -> ServiceFuture<Vec<Order>> {
+        let order_diff_repo_factory = self.order_diff_repo_factory.clone();
+        let db_pool_diff = self.db_pool.clone();
+
+        let db_pool_order = self.db_pool.clone();
+        let order_repo_factory = self.order_repo_factory.clone();
+
+        let result = db_pool_diff
+            .run(move |conn| (order_diff_repo_factory)().select(conn, diff_filter))
+            .map(|diffs| diffs.into_iter().map(|diff| diff.0.parent).collect::<Vec<OrderId>>())
+            .map(|oder_ids| OrderFilter {
+                ids: Some(oder_ids.into()),
+                ..Default::default()
+            }).and_then(move |filter| db_pool_order.run(move |conn| (order_repo_factory)().select(conn, filter)))
+            .map(|db_orders| db_orders.into_iter().map(|db_order| db_order.0).collect());
+
         Box::new(result)
     }
 }

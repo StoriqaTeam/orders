@@ -31,6 +31,10 @@ pub struct Config {
     pub delivered_orders: Option<DeliveredOrders>,
     /// Sent Orders settings
     pub sent_orders: Option<SentOrders>,
+    /// S3 config
+    pub s3: Option<S3>,
+    /// Paid and delivered report settings
+    pub paid_delivered_report: Option<PaidDeliveredReports>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -51,6 +55,21 @@ pub struct DeliveredOrders {
     pub interval_s: u64,
     /// How long in days order has to be in delivered state to be considered completed
     pub delivery_state_duration_days: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaidDeliveredReports {
+    pub interval_s: u64,
+}
+
+/// AWS S3 credentials
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct S3 {
+    pub key: String,
+    pub secret: String,
+    pub region: String,
+    pub bucket: String,
+    pub acl: String,
 }
 
 static ENV_PREFIX: &'static str = "STQ_ORDERS";

@@ -15,6 +15,10 @@ name = "sent_orders"
 path = "src/bin/sent_orders.rs"
 
 [[bin]]
+name = "report_orders"
+path = "src/bin/report_orders.rs"
+
+[[bin]]
 name = "orders"
 path = "src/main.rs"
 
@@ -59,3 +63,6 @@ tokio-postgres = { git = "https://github.com/StoriqaTeam/rust-postgres", feature
 uuid = { version = "0.6", features = ["serde", "v4"] }
 validator = "0.8"
 validator_derive = "0.8"
+csv = "1.0.2"
+rusoto_core = "0.34"
+rusoto_s3 = "0.34"
