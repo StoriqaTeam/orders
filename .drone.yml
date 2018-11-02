@@ -144,6 +144,7 @@ pipeline:
       event: push
 # Releases
   package:
+    group: package
     image: plugins/docker
     repo: storiqateam/stq-orders
     dockerfile: Dockerfile.orders
@@ -212,6 +213,7 @@ pipeline:
 
 # nightly
   deploy2nightly_orders:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     kind: deployment
@@ -232,6 +234,7 @@ pipeline:
       branch: master
       event: push
   deploy2nightly_delivered:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     object: orders-delivered
@@ -252,6 +255,7 @@ pipeline:
       branch: master
       event: push
   deploy2nightly_report:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     object: orders-report
@@ -272,6 +276,7 @@ pipeline:
       branch: master
       event: push
   deploy2nightly_sent:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     object: orders-sent
@@ -293,6 +298,7 @@ pipeline:
       event: push
 # stable
   deploy2stable_orders:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     kind: deployment
@@ -312,15 +318,139 @@ pipeline:
     when:
       event: deployment
       environment: stable
+  deploy2stable_delivered:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-delivered
+    img_names: storiqateam/stq-orders-delivered
+    img_tags: ${DRONE_BRANCH//\//_}${DRONE_PARENT_BUILD_NUMBER}
+    img_cnts: orders-delivered
+    secrets:
+    - source: k8s_stable_ca
+      target: k8s_ca
+    - source: k8s_stable_user
+      target: k8s_user
+    - source: k8s_stable_token
+      target: k8s_token
+    - source: k8s_stable_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: stable
+  deploy2stable_report:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-report
+    img_names: storiqateam/stq-orders-report
+    img_tags: ${DRONE_BRANCH//\//_}${DRONE_PARENT_BUILD_NUMBER}
+    img_cnts: orders-report
+    secrets:
+    - source: k8s_stable_ca
+      target: k8s_ca
+    - source: k8s_stable_user
+      target: k8s_user
+    - source: k8s_stable_token
+      target: k8s_token
+    - source: k8s_stable_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: stable
+  deploy2stable_sent:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-sent
+    img_names: storiqateam/stq-orders-sent
+    img_tags: ${DRONE_BRANCH//\//_}${DRONE_PARENT_BUILD_NUMBER}
+    img_cnts: orders-sent
+    secrets:
+    - source: k8s_stable_ca
+      target: k8s_ca
+    - source: k8s_stable_user
+      target: k8s_user
+    - source: k8s_stable_token
+      target: k8s_token
+    - source: k8s_stable_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: stable
 # stage
   deploy2stage_orders:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     kind: deployment
     object: orders
     img_names: storiqateam/stq-orders
-    img_tags: '${DRONE_TAG}'
     img_cnts: orders
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_stage_ca
+      target: k8s_ca
+    - source: k8s_stage_user
+      target: k8s_user
+    - source: k8s_stage_token
+      target: k8s_token
+    - source: k8s_stage_addr
+      target: k8s_addr
+    when:
+      event: tag
+  deploy2stage_delivered:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-delivered
+    img_names: storiqateam/stq-orders-delivered
+    img_cnts: orders-delivered
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_stage_ca
+      target: k8s_ca
+    - source: k8s_stage_user
+      target: k8s_user
+    - source: k8s_stage_token
+      target: k8s_token
+    - source: k8s_stage_addr
+      target: k8s_addr
+    when:
+      event: tag
+  deploy2stage_report:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-report
+    img_names: storiqateam/stq-orders-report
+    img_cnts: orders-report
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_stage_ca
+      target: k8s_ca
+    - source: k8s_stage_user
+      target: k8s_user
+    - source: k8s_stage_token
+      target: k8s_token
+    - source: k8s_stage_addr
+      target: k8s_addr
+    when:
+      event: tag
+  deploy2stage_sent:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-sent
+    img_names: storiqateam/stq-orders-sent
+    img_cnts: orders-sent
+    img_tags: '${DRONE_TAG}'
     secrets:
     - source: k8s_stage_ca
       target: k8s_ca
@@ -334,13 +464,77 @@ pipeline:
       event: tag
 # production
   deploy2production_orders:
+    group: deploy
     image: jackthestripper/drone_setimage
     namespace: default
     kind: deployment
     object: orders
     img_names: storiqateam/stq-orders
-    img_tags: '${DRONE_TAG}'
     img_cnts: orders
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_prod_ca
+      target: k8s_ca
+    - source: k8s_prod_user
+      target: k8s_user
+    - source: k8s_prod_token
+      target: k8s_token
+    - source: k8s_prod_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: production
+  deploy2production_delivered:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-delivered
+    img_names: storiqateam/stq-orders-delivered
+    img_cnts: orders-delivered
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_prod_ca
+      target: k8s_ca
+    - source: k8s_prod_user
+      target: k8s_user
+    - source: k8s_prod_token
+      target: k8s_token
+    - source: k8s_prod_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: production
+  deploy2production_report:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-report
+    img_names: storiqateam/stq-orders-report
+    img_cnts: orders-report
+    img_tags: '${DRONE_TAG}'
+    secrets:
+    - source: k8s_prod_ca
+      target: k8s_ca
+    - source: k8s_prod_user
+      target: k8s_user
+    - source: k8s_prod_token
+      target: k8s_token
+    - source: k8s_prod_addr
+      target: k8s_addr
+    when:
+      event: deployment
+      environment: production
+  deploy2production_sent:
+    group: deploy
+    image: jackthestripper/drone_setimage
+    namespace: default
+    kind: deployment
+    object: orders-sent
+    img_names: storiqateam/stq-orders-sent
+    img_cnts: orders-sent
+    img_tags: '${DRONE_TAG}'
     secrets:
     - source: k8s_prod_ca
       target: k8s_ca
