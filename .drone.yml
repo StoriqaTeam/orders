@@ -167,8 +167,8 @@ pipeline:
     - binary=delivered_orders
     - env=release
     tags:
-    - ${DRONE_BRANCH//\//_}
-    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    - '${DRONE_TAG}'
+    - latest
     secrets:
     - docker_username
     - docker_password
@@ -183,8 +183,8 @@ pipeline:
     - binary=report_orders
     - env=release
     tags:
-    - ${DRONE_BRANCH//\//_}
-    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    - '${DRONE_TAG}'
+    - latest
     secrets:
     - docker_username
     - docker_password
@@ -199,8 +199,8 @@ pipeline:
     - binary=sent_orders
     - env=release
     tags:
-    - ${DRONE_BRANCH//\//_}
-    - ${DRONE_BRANCH//\//_}${DRONE_BUILD_NUMBER}
+    - '${DRONE_TAG}'
+    - latest
     secrets:
     - docker_username
     - docker_password
