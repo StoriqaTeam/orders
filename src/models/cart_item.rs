@@ -346,7 +346,7 @@ pub struct CartItemMetaFilter {
     pub comment: Option<String>,
     pub store_id: Option<Range<StoreId>>,
     pub coupon_id: Option<Range<CouponId>>,
-    pub delivery_method_id: Option<String>,
+    pub delivery_method_id: Option<DeliveryMethodId>,
 }
 
 impl CartItemMetaFilter {
@@ -376,7 +376,7 @@ impl CartItemMetaFilter {
         }
 
         if let Some(v) = self.delivery_method_id {
-            b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, v);
+            b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, serde_json::to_value(v).unwrap());
         }
 
         b
