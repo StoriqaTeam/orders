@@ -256,8 +256,8 @@ impl Inserter for CartItemUserInserter {
                  store_id = EXCLUDED.store_id, \
                  pre_order = EXCLUDED.pre_order, \
                  pre_order_days = EXCLUDED.pre_order_days, \
-                 coupon_id = EXCLUDED.coupon_id \
-                 delivery_method_id = EXCLUDED.delivery_method_id \
+                 coupon_id = EXCLUDED.coupon_id, \
+                 delivery_method_id = EXCLUDED.delivery_method_id, \
                  user_id = EXCLUDED.user_id\
                  ",
             ),
@@ -286,8 +286,8 @@ impl Inserter for CartItemSessionInserter {
                  store_id = EXCLUDED.store_id, \
                  pre_order = EXCLUDED.pre_order, \
                  pre_order_days = EXCLUDED.pre_order_days, \
-                 coupon_id = EXCLUDED.coupon_id \
-                 delivery_method_id = EXCLUDED.delivery_method_id \
+                 coupon_id = EXCLUDED.coupon_id, \
+                 delivery_method_id = EXCLUDED.delivery_method_id, \
                  session_id = EXCLUDED.session_id\
                  ",
             ),
@@ -346,7 +346,7 @@ pub struct CartItemMetaFilter {
     pub comment: Option<String>,
     pub store_id: Option<Range<StoreId>>,
     pub coupon_id: Option<Range<CouponId>>,
-    pub delivery_method_id: Option<String>,
+    pub delivery_method_id: Option<DeliveryMethodId>,
 }
 
 impl CartItemMetaFilter {
@@ -376,7 +376,7 @@ impl CartItemMetaFilter {
         }
 
         if let Some(v) = self.delivery_method_id {
-            b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, v);
+            b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, serde_json::to_value(v).unwrap());
         }
 
         b
