@@ -256,8 +256,8 @@ impl Inserter for CartItemUserInserter {
                  store_id = EXCLUDED.store_id, \
                  pre_order = EXCLUDED.pre_order, \
                  pre_order_days = EXCLUDED.pre_order_days, \
-                 coupon_id = EXCLUDED.coupon_id \
-                 delivery_method_id = EXCLUDED.delivery_method_id \
+                 coupon_id = EXCLUDED.coupon_id, \
+                 delivery_method_id = EXCLUDED.delivery_method_id, \
                  user_id = EXCLUDED.user_id\
                  ",
             ),
@@ -286,8 +286,8 @@ impl Inserter for CartItemSessionInserter {
                  store_id = EXCLUDED.store_id, \
                  pre_order = EXCLUDED.pre_order, \
                  pre_order_days = EXCLUDED.pre_order_days, \
-                 coupon_id = EXCLUDED.coupon_id \
-                 delivery_method_id = EXCLUDED.delivery_method_id \
+                 coupon_id = EXCLUDED.coupon_id, \
+                 delivery_method_id = EXCLUDED.delivery_method_id, \
                  session_id = EXCLUDED.session_id\
                  ",
             ),
