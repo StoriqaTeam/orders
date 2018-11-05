@@ -1,6 +1,6 @@
 use models::*;
 
-use stq_acl::*;
+use acl::OrdersAcl;
 use stq_db::repo::*;
 
 const TABLE: &str = "orders";
@@ -45,5 +45,5 @@ fn check_acl(login: UserLogin, (entry, action): &mut AclContext) -> bool {
 }
 
 pub fn make_repo(login: UserLogin) -> Repo {
-    make_su_repo().with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
+    make_su_repo().with_afterop_acl_engine(OrdersAcl(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
 }

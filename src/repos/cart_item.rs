@@ -4,10 +4,11 @@ use either;
 use futures::future;
 use futures::prelude::*;
 use std::rc::Rc;
-use stq_acl::*;
 use stq_db::repo::*;
 use stq_db::statement::*;
 use stq_types::*;
+
+use acl::OrdersAcl;
 
 const USER_TABLE: &str = "cart_items_user";
 const SESSION_TABLE: &str = "cart_items_session";
@@ -317,7 +318,7 @@ pub fn make_repo(login: UserLogin) -> CartItemRepoImpl {
     CartItemRepoImpl {
         user: match Rc::try_unwrap(user) {
             Ok(v) => v
-                .with_afterop_acl_engine(InfallibleSyncACLFn(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
+                .with_afterop_acl_engine(OrdersAcl(move |ctx: &mut AclContext| check_acl(login.clone(), ctx)))
                 .into(),
             Err(_) => unreachable!(),
         },

@@ -14,6 +14,8 @@ pub enum Error {
     MissingPrice,
     #[fail(display = "Invalid route")]
     InvalidRoute,
+    #[fail(display = "Server is refusing to fullfil the request")]
+    Forbidden,
 }
 
 impl Codeable for Error {
@@ -24,6 +26,7 @@ impl Codeable for Error {
             MissingUserId | UserIdParse | MissingPrice => StatusCode::BadRequest,
             ParseError => StatusCode::UnprocessableEntity,
             InvalidRoute => StatusCode::NotFound,
+            Forbidden => StatusCode::Forbidden,
         }
     }
 }
