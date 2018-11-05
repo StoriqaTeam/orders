@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::prelude::*;
 use csv::Writer;
@@ -109,7 +109,7 @@ impl PaidDeliveredReport {
 
     pub fn start(self) -> impl Stream<Item = (), Error = FailureError> {
         info!("PaidDeliveredReport started with config {:?}", self.config);
-        let interval = Interval::new_interval(self.interval).map_err(|e| e.context("timer creation error").into());
+        let interval = Interval::new(Instant::now(), self.interval).map_err(|e| e.context("timer creation error").into());
 
         interval.and_then(move |_| {
             if let Some(config) = self.config.clone() {

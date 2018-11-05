@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::Duration as ChronoDuration;
 use failure::Error as FailureError;
@@ -47,7 +47,7 @@ impl DeliveredStateTracking {
 
     pub fn start(self) -> impl Stream<Item = (), Error = FailureError> {
         info!("DeliveredStateTracking started with config {:?}.", self.config.as_ref());
-        let interval = Interval::new_interval(self.duration).map_err(|e| e.context("timer creation error").into());
+        let interval = Interval::new(Instant::now(), self.duration).map_err(|e| e.context("timer creation error").into());
 
         interval.and_then(move |_| {
             if let Some(config) = self.config.clone() {
