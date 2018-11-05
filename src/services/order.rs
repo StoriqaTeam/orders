@@ -340,16 +340,15 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             let coupon_percent = payload.coupon.as_ref().map(|c| c.percent);
             let coupon_id = payload.coupon.as_ref().map(|c| c.id);
-            let (company_package_id, shipping_id, delivery_name, delivery_price) =
-                match payload.delivery_info.clone() {
-                    None => (None, None, None, 0.0),
-                    Some(delivery_info) => (
-                        Some(delivery_info.company_package_id.clone()),
-                        Some(delivery_info.shipping_id.clone()),
-                        Some(delivery_info.name.clone()),
-                        delivery_info.price,
-                    ),
-                };
+            let (company_package_id, shipping_id, delivery_name, delivery_price) = match payload.delivery_info.clone() {
+                None => (None, None, None, 0.0),
+                Some(delivery_info) => (
+                    Some(delivery_info.company_package_id.clone()),
+                    Some(delivery_info.shipping_id.clone()),
+                    Some(delivery_info.name.clone()),
+                    delivery_info.price,
+                ),
+            };
 
             let TotalAmount {
                 total_amount,
