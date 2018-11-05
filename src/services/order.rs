@@ -130,11 +130,12 @@ impl OrderService for OrderServiceImpl {
                     for cart_item in cart {
                         if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
                             let ProductSellerPrice { price, currency, discount } = seller_price;
-                            let (company_package_id, delivery_name, delivery_price) =
+                            let (company_package_id, shipping_id, delivery_name, delivery_price) =
                                 match delivery_info.get(&cart_item.product_id).cloned() {
-                                    None => (None, None, 0.0),
+                                    None => (None, None, None, 0.0),
                                     Some(delivery_info) => (
                                         Some(delivery_info.company_package_id.clone()),
+                                        Some(delivery_info.shipping_id.clone()),
                                         Some(delivery_info.name.clone()),
                                         delivery_info.price,
                                     ),
@@ -175,6 +176,7 @@ impl OrderService for OrderServiceImpl {
                                     total_amount,
                                     company_package_id,
                                     delivery_price,
+                                    shipping_id,
                                 },
                                 cart_item.comment,
                             ))
@@ -338,14 +340,16 @@ impl OrderService for OrderServiceImpl {
         Box::new(self.db_pool.run(move |conn| {
             let coupon_percent = payload.coupon.as_ref().map(|c| c.percent);
             let coupon_id = payload.coupon.as_ref().map(|c| c.id);
-            let (company_package_id, delivery_name, delivery_price) = match payload.delivery_info.clone() {
-                None => (None, None, 0.0),
-                Some(delivery_info) => (
-                    Some(delivery_info.company_package_id.clone()),
-                    Some(delivery_info.name.clone()),
-                    delivery_info.price,
-                ),
-            };
+            let (company_package_id, shipping_id, delivery_name, delivery_price) =
+                match payload.delivery_info.clone() {
+                    None => (None, None, None, 0.0),
+                    Some(delivery_info) => (
+                        Some(delivery_info.company_package_id.clone()),
+                        Some(delivery_info.shipping_id.clone()),
+                        Some(delivery_info.name.clone()),
+                        delivery_info.price,
+                    ),
+                };
 
             let TotalAmount {
                 total_amount,
@@ -385,6 +389,7 @@ impl OrderService for OrderServiceImpl {
                     total_amount,
                     company_package_id,
                     delivery_price,
+                    shipping_id,
                 },
                 "Buy now".to_string(),
             );

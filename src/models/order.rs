@@ -51,6 +51,7 @@ const COUPON_DISCOUNT_COLUMN: &str = "coupon_discount";
 const TOTAL_AMOUNT_COLUMN: &str = "total_amount";
 const COMPANY_PACKAGE_ID_COLUMN: &str = "company_package_id";
 const DELIVERY_PRICE_COLUMN: &str = "delivery_price";
+const SHIPPING_ID_COLUMN: &str = "shipping_id";
 
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.administrative_area_level_1 {
@@ -137,6 +138,7 @@ impl From<Row> for DbOrder {
             total_amount: ProductPrice(row.get(TOTAL_AMOUNT_COLUMN)),
             company_package_id: row.get::<Option<i32>, _>(COMPANY_PACKAGE_ID_COLUMN).map(CompanyPackageId),
             delivery_price: row.get(DELIVERY_PRICE_COLUMN),
+            shipping_id: row.get::<Option<i32>, _>(SHIPPING_ID_COLUMN).map(ShippingId),
         })
     }
 }
@@ -168,6 +170,7 @@ pub struct OrderInserter {
     pub total_amount: ProductPrice,
     pub company_package_id: Option<CompanyPackageId>,
     pub delivery_price: f64,
+    pub shipping_id: Option<ShippingId>,
 }
 
 impl Inserter for OrderInserter {
@@ -224,6 +227,10 @@ impl Inserter for OrderInserter {
 
         if let Some(v) = self.company_package_id {
             b = b.with_arg(COMPANY_PACKAGE_ID_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.shipping_id {
+            b = b.with_arg(SHIPPING_ID_COLUMN, v.0);
         }
 
         b

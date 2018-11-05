@@ -383,6 +383,7 @@ fn test_services() {
                             total_amount: ProductPrice(price.0 * cart_item.quantity.0 as f64),
                             company_package_id: None,
                             delivery_price: 0.0,
+                            shipping_id: None,
                         }
                     }).collect::<Vec<_>>();
 
