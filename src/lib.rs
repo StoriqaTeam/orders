@@ -52,6 +52,7 @@ use tokio_postgres::TlsMode;
 
 use stq_http::controller::Application;
 
+pub mod acl;
 pub mod config;
 pub mod controller;
 pub mod errors;
