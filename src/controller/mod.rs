@@ -94,7 +94,7 @@ impl Controller for ControllerImpl {
                     let path = uri.path().to_string();
                     let method = method.clone();
                     move |caller_id| {
-                        debug!("User with id = '{:?}' is requesting {} {}", caller_id, method, path);
+                        debug!("Server received Request, method: {}, url: {}, user id: {:?}", method, path, caller_id);
                         get_login_data(&db_pool, caller_id)
                     }
                 }).and_then({
