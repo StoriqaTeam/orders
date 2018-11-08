@@ -59,6 +59,7 @@ stq_static_resources = { path = "vendor/libstqbackend/static_resources" }
 stq_types = { path = "vendor/libstqbackend/types" }
 tokio = "0.1"
 tokio-core = "0.1"
+tokio-signal = "0.2.6"
 tokio-postgres = { git = "https://github.com/StoriqaTeam/rust-postgres", features = ["with-serde_json-1", "with-chrono-0.4", "with-uuid-0.6", "with-geo-0.10"] }
 uuid = { version = "0.6", features = ["serde", "v4"] }
 validator = "0.8"
