@@ -43,7 +43,10 @@ pub fn start_delivered_state_tracking(config: Config) {
     };
     handle.spawn(create_delivered_state_tracking_loader(env));
 
-    core.run(future::empty::<(), ()>()).unwrap();
+    core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
+        info!("Ctrl+C received. Exit");
+        Ok(())
+    })).unwrap();
 }
 
 pub fn start_sent_state_tracking(config: Config) {
@@ -69,7 +72,10 @@ pub fn start_sent_state_tracking(config: Config) {
     };
     handle.spawn(create_sent_state_tracking_loader(env));
 
-    core.run(future::empty::<(), ()>()).unwrap();
+    core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
+        info!("Ctrl+C received. Exit");
+        Ok(())
+    })).unwrap();
 }
 
 pub fn start_paid_delivered_reporting(config: Config) {
@@ -93,7 +99,13 @@ pub fn start_paid_delivered_reporting(config: Config) {
         config: Arc::new(config),
         handle: handle.clone(),
     };
-    core.run(create_paid_delivered_report(env)).unwrap();
+
+    handle.spawn(create_paid_delivered_report(env));
+
+    core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
+        info!("Ctrl+C received. Exit");
+        Ok(())
+    })).unwrap();
 }
 
 fn create_paid_delivered_report(env: PaidDeliveredReportEnvironment) -> impl Future<Item = (), Error = ()> {
