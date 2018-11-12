@@ -80,7 +80,7 @@ impl SentStateTracking {
                     Either::B(self.clone().make_step(config))
                 }
             } else {
-                error!("SentStateTrackingEnvironment: disabled. Config section [sent_orders] not set.");
+                warn!("SentStateTrackingEnvironment: disabled. Config section [sent_orders] not set.");
                 Either::A(future::ok(()))
             }
         })
