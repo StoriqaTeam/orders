@@ -59,7 +59,7 @@ impl DeliveredStateTracking {
                     Either::B(self.clone().make_step(config))
                 }
             } else {
-                error!("DeliveredStateTracking: disabled. Config section [delivered_orders] not set.");
+                warn!("DeliveredStateTracking: disabled. Config section [delivered_orders] not set.");
                 Either::A(future::ok(()))
             }
         })

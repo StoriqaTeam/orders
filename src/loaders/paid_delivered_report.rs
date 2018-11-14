@@ -121,7 +121,7 @@ impl PaidDeliveredReport {
                     Either::B(self.clone().make_step(config))
                 }
             } else {
-                error!("PaidDeliveredReport: disabled. Config section [paid_delivered_report] not set.");
+                warn!("PaidDeliveredReport: disabled. Config section [paid_delivered_report] not set.");
                 Either::A(future::ok(()))
             }
         })
