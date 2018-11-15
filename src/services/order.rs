@@ -552,6 +552,7 @@ impl OrderService for OrderServiceImpl {
         let search_old_delivered_diffs = move |order_id: OrderId| -> OrderDiffFilter {
             OrderDiffFilter {
                 parent: Some(order_id).map(From::from),
+                state: Some(OrderState::Delivered.into()),
                 committed_at_range: ::models::common::into_range(None, Some(old_order_date)),
                 ..OrderDiffFilter::default()
             }
