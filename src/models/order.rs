@@ -53,6 +53,8 @@ const COMPANY_PACKAGE_ID_COLUMN: &str = "company_package_id";
 const DELIVERY_PRICE_COLUMN: &str = "delivery_price";
 const SHIPPING_ID_COLUMN: &str = "shipping_id";
 
+const UUID_COLUMN: &str = "uuid";
+
 pub fn write_address_into_inserter(addr: AddressFull, mut b: InsertBuilder) -> InsertBuilder {
     if let Some(v) = addr.administrative_area_level_1 {
         b = b.with_arg(ADMINISTRATIVE_AREA_LEVEL_1_COLUMN, v);
@@ -171,6 +173,7 @@ pub struct OrderInserter {
     pub company_package_id: Option<CompanyPackageId>,
     pub delivery_price: f64,
     pub shipping_id: Option<ShippingId>,
+    pub uuid: Uuid,
 }
 
 impl Inserter for OrderInserter {
@@ -189,7 +192,8 @@ impl Inserter for OrderInserter {
             .with_arg(PRE_ORDER_COLUMN, self.pre_order)
             .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
             .with_arg(TOTAL_AMOUNT_COLUMN, self.total_amount.0)
-            .with_arg(DELIVERY_PRICE_COLUMN, self.delivery_price);
+            .with_arg(DELIVERY_PRICE_COLUMN, self.delivery_price)
+            .with_arg(UUID_COLUMN, self.uuid);
 
         b = write_address_into_inserter(self.address, b);
 

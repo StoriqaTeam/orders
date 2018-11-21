@@ -297,20 +297,21 @@ impl Controller for ControllerImpl {
                                             .map_err(failure::Error::from)
                                             .into_future()
                                             .and_then(move |_| {
-                                                (service_factory.order)(login_data).convert_cart(
-                                                    payload.conversion_id,
-                                                    payload.user_id,
-                                                    payload.seller_prices,
-                                                    payload.address,
-                                                    payload.receiver_name,
-                                                    payload.receiver_phone,
-                                                    payload.receiver_email,
-                                                    payload.coupons,
-                                                    payload.delivery_info,
-                                                )
+                                                (service_factory.order)(login_data).convert_cart(payload)
+                                                //     payload.conversion_id,
+                                                //     payload.user_id,
+                                                //     payload.seller_prices,
+                                                //     payload.address,
+                                                //     payload.receiver_name,
+                                                //     payload.receiver_phone,
+                                                //     payload.receiver_email,
+                                                //     payload.coupons,
+                                                //     payload.delivery_info,
+                                                //     payload.uuid,
+                                                // )
                                             })
                                     })
-                                })
+                                });
                             }
                             (Post, Some(Route::OrderFromBuyNow)) => {
                                 return serialize_future({

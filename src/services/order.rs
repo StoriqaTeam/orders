@@ -27,18 +27,7 @@ pub enum RoleRemoveFilter {
 }
 
 pub trait OrderService {
-    fn convert_cart(
-        &self,
-        conversion_id: Option<ConversionId>,
-        user_id: UserId,
-        seller_prices: HashMap<ProductId, ProductSellerPrice>,
-        address: AddressFull,
-        receiver_name: String,
-        receiver_phone: String,
-        receiver_email: String,
-        coupons: HashMap<CouponId, CouponInfo>,
-        delivery_info: HashMap<ProductId, DeliveryInfo>,
-    ) -> ServiceFuture<Vec<Order>>;
+    fn convert_cart(&self, payload: ConvertCartPayload) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
     fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
@@ -90,19 +79,20 @@ impl OrderServiceImpl {
 }
 
 impl OrderService for OrderServiceImpl {
-    fn convert_cart(
-        &self,
-        conversion_id: Option<ConversionId>,
-        customer_id: UserId,
-        seller_prices: HashMap<ProductId, ProductSellerPrice>,
-        address: AddressFull,
-        receiver_name: String,
-        receiver_phone: String,
-        receiver_email: String,
-        coupons: HashMap<CouponId, CouponInfo>,
-        delivery_info: HashMap<ProductId, DeliveryInfo>,
-    ) -> ServiceFuture<Vec<Order>> {
+    fn convert_cart(&self, payload: ConvertCartPayload) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::*;
+        let ConvertCartPayload {
+            conversion_id,
+            user_id,
+            seller_prices,
+            address,
+            receiver_name,
+            receiver_phone,
+            receiver_email,
+            coupons,
+            delivery_info,
+            uuid,
+        } = payload;
 
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diffs_repo_factory = self.order_diff_repo_factory.clone();
@@ -111,13 +101,14 @@ impl OrderService for OrderServiceImpl {
             User { caller_id, .. } => caller_id,
             _ => UserId(-1),
         };
+        let mut transaction_id = TransactionId::new(uuid);
 
         Box::new(self.db_pool.run(move |conn| {
             (cart_repo_factory)()
                 .delete(
                     conn,
                     CartItemFilter {
-                        customer: Some(customer_id.into()),
+                        customer: Some(user_id.into()),
                         meta_filter: CartItemMetaFilter {
                             selected: Some(true),
                             ..Default::default()
@@ -129,6 +120,7 @@ impl OrderService for OrderServiceImpl {
                     let mut order_items = Vec::new();
                     for cart_item in cart {
                         if let Some(seller_price) = seller_prices.get(&cart_item.product_id).cloned() {
+                            transaction_id = transaction_id.next();
                             let ProductSellerPrice { price, currency, discount } = seller_price;
                             let (company_package_id, shipping_id, delivery_name, delivery_price) =
                                 match delivery_info.get(&cart_item.product_id).cloned() {
@@ -154,7 +146,7 @@ impl OrderService for OrderServiceImpl {
                                     id: None,
                                     created_from: Some(cart_item.id),
                                     conversion_id,
-                                    customer: customer_id,
+                                    customer: user_id,
                                     store: cart_item.store_id,
                                     product: cart_item.product_id,
                                     quantity: cart_item.quantity,
@@ -177,6 +169,7 @@ impl OrderService for OrderServiceImpl {
                                     company_package_id,
                                     delivery_price,
                                     shipping_id,
+                                    uuid: transaction_id.clone().into(),
                                 },
                                 cart_item.comment,
                             ))
@@ -389,6 +382,7 @@ impl OrderService for OrderServiceImpl {
                     company_package_id,
                     delivery_price,
                     shipping_id,
+                    uuid: payload.uuid,
                 },
                 "Buy now".to_string(),
             );

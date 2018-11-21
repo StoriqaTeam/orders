@@ -334,6 +334,7 @@ fn test_services() {
                         receiver_email.clone(),
                         HashMap::new(),
                         HashMap::new(),
+                        uuid::Uuid::new_v4(),
                     ).wait()
                     .unwrap();
 
