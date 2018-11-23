@@ -37,7 +37,7 @@ futures-state-stream = "0.2"
 geo = { version = "0.10", features = ["serde"] }
 geo-types = { version = "0.2", features = ["serde"] }
 hyper = "0.11"
-hyper-tls = "0.1"
+hyper-tls = { git = "https://github.com/storiqateam/hyper-tls", rev = "f71d7dc50dcc916f16e83b6b612b259c456b2646" }
 lazy_static = "1.1"
 log = "0.4"
 maplit = "1.0"
