@@ -52,6 +52,7 @@ const TOTAL_AMOUNT_COLUMN: &str = "total_amount";
 const COMPANY_PACKAGE_ID_COLUMN: &str = "company_package_id";
 const DELIVERY_PRICE_COLUMN: &str = "delivery_price";
 const SHIPPING_ID_COLUMN: &str = "shipping_id";
+const PRODUCT_CASHBACK_COLUMN: &str = "product_cashback";
 
 const UUID_COLUMN: &str = "uuid";
 
@@ -141,6 +142,7 @@ impl From<Row> for DbOrder {
             company_package_id: row.get::<Option<i32>, _>(COMPANY_PACKAGE_ID_COLUMN).map(CompanyPackageId),
             delivery_price: row.get(DELIVERY_PRICE_COLUMN),
             shipping_id: row.get::<Option<i32>, _>(SHIPPING_ID_COLUMN).map(ShippingId),
+            product_cashback: row.get::<Option<f64>, _>(PRODUCT_CASHBACK_COLUMN).map(CashbackPercent),
         })
     }
 }
@@ -173,6 +175,7 @@ pub struct OrderInserter {
     pub company_package_id: Option<CompanyPackageId>,
     pub delivery_price: f64,
     pub shipping_id: Option<ShippingId>,
+    pub product_cashback: Option<CashbackPercent>,
     pub uuid: Uuid,
 }
 
@@ -235,6 +238,10 @@ impl Inserter for OrderInserter {
 
         if let Some(v) = self.shipping_id {
             b = b.with_arg(SHIPPING_ID_COLUMN, v.0);
+        }
+
+        if let Some(v) = self.product_cashback {
+            b = b.with_arg(PRODUCT_CASHBACK_COLUMN, v.0)
         }
 
         b
