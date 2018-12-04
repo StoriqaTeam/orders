@@ -91,6 +91,7 @@ impl OrderService for OrderServiceImpl {
             receiver_email,
             coupons,
             delivery_info,
+            product_info,
             uuid,
         } = payload;
 
@@ -132,10 +133,14 @@ impl OrderService for OrderServiceImpl {
                                         delivery_info.price,
                                     ),
                                 };
+
                             let coupon_percent = cart_item
                                 .coupon_id
                                 .and_then(|coupon_id| coupons.get(&coupon_id))
                                 .map(|coupon| coupon.percent);
+
+                            let product_cashback = product_info.get(&cart_item.product_id).and_then(|product| product.cashback);
+
                             let TotalAmount {
                                 total_amount,
                                 coupon_discount,
@@ -170,6 +175,7 @@ impl OrderService for OrderServiceImpl {
                                     delivery_price,
                                     shipping_id,
                                     uuid: transaction_id.clone().into(),
+                                    product_cashback,
                                 },
                                 cart_item.comment,
                             ))
@@ -354,6 +360,7 @@ impl OrderService for OrderServiceImpl {
                 coupon_percent,
                 delivery_price,
             );
+
             let order_item = (
                 OrderInserter {
                     id: None,
@@ -383,6 +390,7 @@ impl OrderService for OrderServiceImpl {
                     delivery_price,
                     shipping_id,
                     uuid: payload.uuid,
+                    product_cashback: payload.product_info.cashback,
                 },
                 "Buy now".to_string(),
             );

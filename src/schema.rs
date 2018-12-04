@@ -81,6 +81,9 @@ table! {
         receiver_email -> Nullable<Varchar>,
         company_package_id -> Nullable<Int4>,
         delivery_price -> Float8,
+        shipping_id -> Nullable<Int4>,
+        uuid -> Uuid,
+        product_cashback -> Nullable<Float8>,
     }
 }
 
