@@ -334,6 +334,7 @@ fn test_services() {
                         receiver_email.clone(),
                         HashMap::new(),
                         HashMap::new(),
+                        HashMap::new(),
                         uuid::Uuid::new_v4(),
                     ).wait()
                     .unwrap();
@@ -385,6 +386,7 @@ fn test_services() {
                             company_package_id: None,
                             delivery_price: 0.0,
                             shipping_id: None,
+                            product_cashback: None,
                         }
                     }).collect::<Vec<_>>();
 
