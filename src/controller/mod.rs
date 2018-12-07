@@ -275,6 +275,7 @@ impl Controller for ControllerImpl {
                                             data.state,
                                             data.comment,
                                             data.track_id,
+                                            data.committer_role,
                                         )
                                     })
                                 })

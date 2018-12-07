@@ -38,6 +38,7 @@ table! {
         committed_at -> Timestamptz,
         state -> Varchar,
         comment -> Nullable<Varchar>,
+        committer_role -> Varchar,
     }
 }
 
