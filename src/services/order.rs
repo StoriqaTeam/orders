@@ -15,7 +15,7 @@ use types::*;
 
 use stq_api::orders::*;
 use stq_db::repo::*;
-use stq_static_resources::{OrderState, CommitterRole};
+use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::*;
 
 pub const ZERO_DISCOUNT: f64 = 0.0001;
@@ -548,7 +548,7 @@ impl OrderService for OrderServiceImpl {
             order_diff_repo_factory,
             db_pool,
             calling_user,
-            committer_role
+            committer_role,
         )
     }
 
@@ -765,7 +765,7 @@ fn set_order_state(
                                     committed_at: Utc::now(),
                                     state: order.0.state,
                                     comment,
-                                    committer_role
+                                    committer_role,
                                 },
                             ).map(move |(_, c)| (Some(order.0), c)),
                     )

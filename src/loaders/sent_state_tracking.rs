@@ -19,7 +19,7 @@ use services::{OrderService, OrderServiceImpl};
 
 use stq_db::pool::Pool as DbPool;
 use stq_roles::models::{RepoLogin, RoleEntry};
-use stq_static_resources::{OrderState, CommitterRole};
+use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::{OrderId, OrderIdentifier, RoleEntryId, UserId};
 
 #[derive(Clone)]
@@ -111,7 +111,13 @@ impl SentStateTracking {
             .and_then(move |(order_id, state)| {
                 info!("Change order {} with state {}", order_id, state);
                 let service = self.create_service();
-                service.set_order_state(OrderIdentifier::Id(order_id), OrderState::Delivered, None, None, CommitterRole::System)
+                service.set_order_state(
+                    OrderIdentifier::Id(order_id),
+                    OrderState::Delivered,
+                    None,
+                    None,
+                    CommitterRole::System,
+                )
             }).then(|result| match result {
                 Ok(_) => ::future::ok(()),
                 Err(error) => {

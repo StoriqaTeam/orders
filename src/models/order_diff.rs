@@ -3,7 +3,7 @@ use tokio_postgres::rows::Row;
 
 use stq_api::orders::*;
 use stq_db::statement::*;
-use stq_static_resources::{OrderState, CommitterRole};
+use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::*;
 
 use super::*;
@@ -105,7 +105,7 @@ impl Filter for OrderDiffFilter {
         if let Some(v) = self.comment {
             b = b.with_filter(COMMENT_COLUMN, v.value);
         }
-        
+
         if let Some(v) = self.committer_role {
             b = b.with_filter(COMMITTER_ROLE_COLUMN, v.value);
         }
