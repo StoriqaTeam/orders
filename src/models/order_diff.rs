@@ -3,7 +3,7 @@ use tokio_postgres::rows::Row;
 
 use stq_api::orders::*;
 use stq_db::statement::*;
-use stq_static_resources::OrderState;
+use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::*;
 
 use super::*;
@@ -14,6 +14,7 @@ const COMMITTER_COLUMN: &str = "committer";
 const COMMITTED_AT_COLUMN: &str = "committed_at";
 const STATE_COLUMN: &str = "state";
 const COMMENT_COLUMN: &str = "comment";
+const COMMITTER_ROLE_COLUMN: &str = "committer_role";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DbOrderDiff(pub OrderDiff);
@@ -27,6 +28,7 @@ impl From<Row> for DbOrderDiff {
             committed_at: row.get(COMMITTED_AT_COLUMN),
             state: row.get(STATE_COLUMN),
             comment: row.get(COMMENT_COLUMN),
+            committer_role: row.get(COMMITTER_ROLE_COLUMN),
         })
     }
 }
@@ -37,6 +39,7 @@ pub struct OrderDiffInserter {
     pub committed_at: DateTime<Utc>,
     pub state: OrderState,
     pub comment: Option<String>,
+    pub committer_role: CommitterRole,
 }
 
 impl Inserter for OrderDiffInserter {
@@ -47,6 +50,7 @@ impl Inserter for OrderDiffInserter {
             .with_arg(COMMITTED_AT_COLUMN, self.committed_at)
             .with_arg(STATE_COLUMN, self.state)
             .with_arg(COMMENT_COLUMN, self.comment)
+            .with_arg(COMMITTER_ROLE_COLUMN, self.committer_role)
     }
 }
 
@@ -60,6 +64,7 @@ pub struct OrderDiffFilter {
     pub committed_at_range: Option<ValueContainer<Range<DateTime<Utc>>>>,
     pub state: Option<ValueContainer<OrderState>>,
     pub comment: Option<ValueContainer<Option<String>>>,
+    pub committer_role: Option<ValueContainer<Option<CommitterRole>>>,
 }
 
 impl OrderDiffFilter {
@@ -99,6 +104,10 @@ impl Filter for OrderDiffFilter {
 
         if let Some(v) = self.comment {
             b = b.with_filter(COMMENT_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.committer_role {
+            b = b.with_filter(COMMITTER_ROLE_COLUMN, v.value);
         }
 
         if self.do_order {

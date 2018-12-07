@@ -15,7 +15,7 @@ use types::*;
 
 use stq_api::orders::*;
 use stq_db::repo::*;
-use stq_static_resources::OrderState;
+use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::*;
 
 pub const ZERO_DISCOUNT: f64 = 0.0001;
@@ -43,6 +43,7 @@ pub trait OrderService {
         state: OrderState,
         comment: Option<String>,
         track_id: Option<String>,
+        committer_role: CommitterRole,
     ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
@@ -215,6 +216,7 @@ impl OrderService for OrderServiceImpl {
                                                         committed_at: Utc::now(),
                                                         state: OrderState::New,
                                                         comment: Some(comment),
+                                                        committer_role: CommitterRole::Customer,
                                                     },
                                                 ).map(|(_, conn)| (inserted_order, conn))
                                         }).map({
@@ -415,6 +417,7 @@ impl OrderService for OrderServiceImpl {
                                     committed_at: Utc::now(),
                                     state: OrderState::New,
                                     comment: Some(comment),
+                                    committer_role: CommitterRole::Customer,
                                 };
 
                                 (order_diffs_repo_factory)()
@@ -524,6 +527,7 @@ impl OrderService for OrderServiceImpl {
         state: OrderState,
         comment: Option<String>,
         track_id: Option<String>,
+        committer_role: CommitterRole,
     ) -> ServiceFuture<Option<Order>> {
         use self::RepoLogin::*;
 
@@ -544,6 +548,7 @@ impl OrderService for OrderServiceImpl {
             order_diff_repo_factory,
             db_pool,
             calling_user,
+            committer_role,
         )
     }
 
@@ -601,6 +606,7 @@ impl OrderService for OrderServiceImpl {
                         order_diff_repo_factory2.clone(),
                         db_pool2.clone(),
                         calling_user,
+                        CommitterRole::System,
                     )
                 })
             }).and_then(::futures::future::join_all)
@@ -730,6 +736,7 @@ fn set_order_state(
     order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
     db_pool: DbPool,
     calling_user: UserId,
+    committer_role: CommitterRole,
 ) -> ServiceFuture<Option<Order>> {
     let result = db_pool
         .run(move |conn| {
@@ -758,6 +765,7 @@ fn set_order_state(
                                     committed_at: Utc::now(),
                                     state: order.0.state,
                                     comment,
+                                    committer_role,
                                 },
                             ).map(move |(_, c)| (Some(order.0), c)),
                     )
