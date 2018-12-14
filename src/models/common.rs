@@ -33,7 +33,8 @@ pub fn into_range(from: Option<DateTime<Utc>>, to: Option<DateTime<Utc>>) -> Opt
                         inclusive: true,
                     }
                 },
-            )).into(),
+            ))
+            .into(),
         )
     } else if let Some(value) = from {
         Some(Range::From({ RangeLimit { value, inclusive: true } }).into())

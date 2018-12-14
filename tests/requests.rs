@@ -45,7 +45,8 @@ impl RpcClient {
                     product.store_id,
                     product.pre_order,
                     product.pre_order_days,
-                ).wait()
+                )
+                .wait()
                 .unwrap();
             self.inner
                 .set_quantity(product.customer, product.product_id, product.quantity)
@@ -310,7 +311,8 @@ fn test_services() {
                         discount: None,
                     },
                 ),
-            ].into_iter()
+            ]
+            .into_iter()
             .collect::<HashMap<_, _>>();
             let address = AddressFull {
                 country: Some("Matrix".into()),
@@ -336,7 +338,8 @@ fn test_services() {
                         HashMap::new(),
                         HashMap::new(),
                         uuid::Uuid::new_v4(),
-                    ).wait()
+                    )
+                    .wait()
                     .unwrap();
 
                 let created_orders_fixture = cart_fixture
@@ -388,7 +391,8 @@ fn test_services() {
                             shipping_id: None,
                             product_cashback: None,
                         }
-                    }).collect::<Vec<_>>();
+                    })
+                    .collect::<Vec<_>>();
 
                 assert_eq!(
                     new_orders

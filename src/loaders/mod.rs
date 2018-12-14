@@ -34,7 +34,8 @@ pub fn start_delivered_state_tracking(config: Config) {
                     .min_idle(Some(1))
                     .build(manager, remote)
                     .map_err(|e| format_err!("{}", e)),
-            ).expect("Failed to create connection pool"),
+            )
+            .expect("Failed to create connection pool"),
         )
     };
     let env = DeliveredStateTrackingEnvironment {
@@ -46,7 +47,8 @@ pub fn start_delivered_state_tracking(config: Config) {
     core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
         info!("Ctrl+C received. Exit");
         Ok(())
-    })).unwrap();
+    }))
+    .unwrap();
 }
 
 pub fn start_sent_state_tracking(config: Config) {
@@ -62,7 +64,8 @@ pub fn start_sent_state_tracking(config: Config) {
                     .min_idle(Some(1))
                     .build(manager, remote)
                     .map_err(|e| format_err!("{}", e)),
-            ).expect("Failed to create connection pool"),
+            )
+            .expect("Failed to create connection pool"),
         )
     };
     let env = SentStateTrackingEnvironment {
@@ -75,7 +78,8 @@ pub fn start_sent_state_tracking(config: Config) {
     core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
         info!("Ctrl+C received. Exit");
         Ok(())
-    })).unwrap();
+    }))
+    .unwrap();
 }
 
 pub fn start_paid_delivered_reporting(config: Config) {
@@ -91,7 +95,8 @@ pub fn start_paid_delivered_reporting(config: Config) {
                     .min_idle(Some(1))
                     .build(manager, remote)
                     .map_err(|e| format_err!("{}", e)),
-            ).expect("Failed to create connection pool"),
+            )
+            .expect("Failed to create connection pool"),
         )
     };
     let env = PaidDeliveredReportEnvironment {
@@ -105,7 +110,8 @@ pub fn start_paid_delivered_reporting(config: Config) {
     core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
         info!("Ctrl+C received. Exit");
         Ok(())
-    })).unwrap();
+    }))
+    .unwrap();
 }
 
 fn create_paid_delivered_report(env: PaidDeliveredReportEnvironment) -> impl Future<Item = (), Error = ()> {
@@ -115,7 +121,8 @@ fn create_paid_delivered_report(env: PaidDeliveredReportEnvironment) -> impl Fut
         .or_else(|e| {
             error!("Error in paid delivered report: {:?}.", e);
             futures::future::ok(())
-        }).for_each(|_| futures::future::ok(()))
+        })
+        .for_each(|_| futures::future::ok(()))
 }
 
 fn create_delivered_state_tracking_loader(env: DeliveredStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
@@ -126,7 +133,8 @@ fn create_delivered_state_tracking_loader(env: DeliveredStateTrackingEnvironment
         .or_else(|e| {
             error!("Error in delivered state tracking loader: {:?}.", e);
             futures::future::ok(())
-        }).for_each(|_| futures::future::ok(()))
+        })
+        .for_each(|_| futures::future::ok(()))
 }
 
 fn create_sent_state_tracking_loader(env: SentStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
@@ -137,5 +145,6 @@ fn create_sent_state_tracking_loader(env: SentStateTrackingEnvironment) -> impl 
         .or_else(|e| {
             error!("Error in sent state tracking loader: {:?}.", e);
             futures::future::ok(())
-        }).for_each(|_| futures::future::ok(()))
+        })
+        .for_each(|_| futures::future::ok(()))
 }

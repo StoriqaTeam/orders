@@ -79,7 +79,8 @@ impl DbRepoSelect<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                             },
                             limit,
                             op,
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
                 User(user_id) => Box::new(
                     self.user
@@ -91,7 +92,8 @@ impl DbRepoSelect<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                             },
                             limit,
                             op,
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
@@ -111,7 +113,8 @@ impl DbRepoSelect<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                                     (out, conn)
                                 })
                             }
-                        }).and_then({
+                        })
+                        .and_then({
                             let meta_filter = meta_filter.clone();
                             move |(mut out, conn)| {
                                 session.select_full(conn, meta_filter.into(), limit, op).map(move |(v, conn)| {
@@ -148,7 +151,8 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                     meta_filter: filter.meta_filter,
                                 },
                             },
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
                 User(user_id) => Box::new(
                     self.user
@@ -161,7 +165,8 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                     meta_filter: filter.meta_filter,
                                 },
                             },
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
@@ -183,7 +188,8 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                             meta_filter,
                                         },
                                     },
-                                ).map(move |(v, conn)| {
+                                )
+                                .map(move |(v, conn)| {
                                     for item in v {
                                         out.push(item.into());
                                     }
@@ -191,7 +197,8 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                     (out, conn)
                                 })
                             }
-                        }).and_then({
+                        })
+                        .and_then({
                             let data = data.clone();
                             let meta_filter = filter.meta_filter.clone();
                             move |(mut out, conn)| {
@@ -205,7 +212,8 @@ impl DbRepoUpdate<CartItem, CartItemUpdater<CartItemFilter>, RepoError> for Cart
                                                 meta_filter,
                                             },
                                         },
-                                    ).map(move |(v, conn)| {
+                                    )
+                                    .map(move |(v, conn)| {
                                         for item in v {
                                             out.push(item.into());
                                         }
@@ -236,7 +244,8 @@ impl DbRepoDelete<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                                 meta_filter,
                                 session_id: Some(session_id),
                             },
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
                 User(user_id) => Box::new(
                     self.user
@@ -246,7 +255,8 @@ impl DbRepoDelete<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                                 meta_filter,
                                 user_id: Some(user_id),
                             },
-                        ).map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
+                        )
+                        .map(|(v, conn)| (v.into_iter().map(From::from).collect(), conn)),
                 ),
             },
             None => {
@@ -266,7 +276,8 @@ impl DbRepoDelete<CartItem, CartItemFilter, RepoError> for CartItemRepoImpl {
                                     (out, conn)
                                 })
                             }
-                        }).and_then({
+                        })
+                        .and_then({
                             let meta_filter = meta_filter.clone();
                             move |(mut out, conn)| {
                                 session.delete(conn, meta_filter.into()).map(move |(v, conn)| {
