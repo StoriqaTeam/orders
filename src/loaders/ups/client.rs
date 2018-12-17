@@ -63,7 +63,8 @@ impl UpsClient {
                     .handle
                     .request::<UpsResponse>(::hyper::Method::Post, self_clone.url.clone(), Some(body), Some(ups_headers()))
                     .map_err(From::from)
-            }).and_then(move |res| DeliveryState::try_from_response(track_id, res))
+            })
+            .and_then(move |res| DeliveryState::try_from_response(track_id, res))
             .map_err(From::from)
     }
 }

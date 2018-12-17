@@ -100,7 +100,8 @@ impl Controller for ControllerImpl {
                         );
                         get_login_data(&db_pool, caller_id)
                     }
-                }).and_then({
+                })
+                .and_then({
                     let service_factory = service_factory.clone();
                     move |login_data| {
                         match (method.clone(), route.clone()) {
@@ -174,6 +175,17 @@ impl Controller for ControllerImpl {
                                     (service_factory.cart)(login_data).delete_coupon_by_product(customer, product_id)
                                 })
                             }
+                            (Post, Some(Route::DeleteProductsFromCarts)) => {
+                                return serialize_future({
+                                    parse_body::<DeleteProductsFromCartsPayload>(payload)
+                                        .inspect(move |params| {
+                                            debug!("Received request to delete {} products from all carts", params.product_ids.len());
+                                        })
+                                        .and_then(move |params| {
+                                            (service_factory.cart)(login_data).delete_products_from_all_carts(params.product_ids)
+                                        })
+                                })
+                            }
                             (Post, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(move |params| {
                                     debug!(
@@ -201,7 +213,8 @@ impl Controller for ControllerImpl {
                                                 "Received request to set product {} in cart to quantity {} for customer {}",
                                                 product_id, params.value, customer
                                             );
-                                        }).and_then(move |params| {
+                                        })
+                                        .and_then(move |params| {
                                             (service_factory.cart)(login_data).set_quantity(customer, product_id, params.value)
                                         }),
                                 )
@@ -214,7 +227,8 @@ impl Controller for ControllerImpl {
                                                 "Received request to set product {}'s selection in cart to {} for customer {}",
                                                 product_id, params.value, customer
                                             )
-                                        }).and_then(move |params| {
+                                        })
+                                        .and_then(move |params| {
                                             (service_factory.cart)(login_data).set_selection(customer, product_id, params.value)
                                         }),
                                 )
@@ -227,7 +241,8 @@ impl Controller for ControllerImpl {
                                                 "Received request to set product {}'s comment in cart to {} for customer {}",
                                                 product_id, comment_payload.value, customer
                                             )
-                                        }).and_then(move |comment_payload| {
+                                        })
+                                        .and_then(move |comment_payload| {
                                             (service_factory.cart)(login_data).set_comment(customer, product_id, comment_payload.value)
                                         }),
                                 )
@@ -350,7 +365,8 @@ impl Controller for ControllerImpl {
                                 .into(),
                         ))
                     }
-                }).then(move |res| {
+                })
+                .then(move |res| {
                     let d = Local::now() - dt;
                     info!(
                         "Response error = {:?}, elapsed time = {}.{:03}",

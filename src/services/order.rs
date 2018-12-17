@@ -218,8 +218,10 @@ impl OrderService for OrderServiceImpl {
                                                         comment: Some(comment),
                                                         committer_role: CommitterRole::Customer,
                                                     },
-                                                ).map(|(_, conn)| (inserted_order, conn))
-                                        }).map({
+                                                )
+                                                .map(|(_, conn)| (inserted_order, conn))
+                                        })
+                                        .map({
                                             move |(order, conn): (DbOrder, RepoConnection)| {
                                                 out_data.push(order.0);
                                                 (out_data, conn)
@@ -247,7 +249,8 @@ impl OrderService for OrderServiceImpl {
                         conversion_id: Some(conversion_id.into()),
                         ..Default::default()
                     },
-                ).and_then({
+                )
+                .and_then({
                     let order_diff_repo_factory = order_diff_repo_factory.clone();
                     move |(orders, conn)| {
                         let mut out = Box::new(future::ok((Default::default(), conn))) as Box<Future<Item = _, Error = _>>;
@@ -263,7 +266,8 @@ impl OrderService for OrderServiceImpl {
                                                 parent: Some(order.0.id.into()),
                                                 ..Default::default()
                                             },
-                                        ).map(move |(order_diffs, conn)| {
+                                        )
+                                        .map(move |(order_diffs, conn)| {
                                             orders_with_diffs.push((order, order_diffs));
                                             (orders_with_diffs, conn)
                                         })
@@ -273,7 +277,8 @@ impl OrderService for OrderServiceImpl {
 
                         out
                     }
-                }).and_then({
+                })
+                .and_then({
                     let order_repo_factory = order_repo_factory.clone();
                     move |(orders_with_diffs, conn)| {
                         (order_repo_factory)()
@@ -283,9 +288,11 @@ impl OrderService for OrderServiceImpl {
                                     conversion_id: Some(conversion_id.into()),
                                     ..Default::default()
                                 },
-                            ).map(move |(_, conn)| (orders_with_diffs, conn))
+                            )
+                            .map(move |(_, conn)| (orders_with_diffs, conn))
                     }
-                }).and_then(move |(orders_with_diffs, conn)| {
+                })
+                .and_then(move |(orders_with_diffs, conn)| {
                     let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
                         let mut cart_item = CartItem {
                             id: order.0.created_from,
@@ -423,7 +430,8 @@ impl OrderService for OrderServiceImpl {
                                 (order_diffs_repo_factory)()
                                     .insert_exactly_one(conn, order_diff)
                                     .map(|(_, conn)| (inserted_order, conn))
-                            }).map({
+                            })
+                            .map({
                                 move |(order, conn): (DbOrder, RepoConnection)| {
                                     out_data.push(order.0);
                                     (out_data, conn)
@@ -458,7 +466,8 @@ impl OrderService for OrderServiceImpl {
                         .run(move |conn| (order_repo_factory)().select(conn, OrderFilter::from(order_id)))
                         .map(|mut orders| orders.pop().map(|order| order.0.id)),
                 ),
-            }.and_then(move |id| match id {
+            }
+            .and_then(move |id| match id {
                 None => Box::new(future::ok(vec![])) as ServiceFuture<Vec<OrderDiff>>,
                 Some(id) => Box::new(
                     db_pool
@@ -481,7 +490,8 @@ impl OrderService for OrderServiceImpl {
                             ..Default::default()
                         },
                     )
-                }).map(|v| v.into_iter().map(|v| v.0).collect()),
+                })
+                .map(|v| v.into_iter().map(|v| v.0).collect()),
         )
     }
 
@@ -497,7 +507,8 @@ impl OrderService for OrderServiceImpl {
                             ..Default::default()
                         },
                     )
-                }).map(|v| v.into_iter().map(|v| v.0).collect()),
+                })
+                .map(|v| v.into_iter().map(|v| v.0).collect()),
         )
     }
 
@@ -592,7 +603,8 @@ impl OrderService for OrderServiceImpl {
                         let order_diff_repo_factory = order_diff_repo_factory.clone();
                         db_pool.run(move |conn| (order_diff_repo_factory)().select(conn, diff_filter))
                     })
-            }).and_then(::futures::future::join_all)
+            })
+            .and_then(::futures::future::join_all)
             .map(move |order_diffs| order_diffs.into_iter().flatten().map(|diff| diff.0.parent).collect::<Vec<_>>())
             .map(move |old_delivered_orders_ids| {
                 old_delivered_orders_ids.into_iter().map(move |old_delivered_order_id| {
@@ -609,7 +621,8 @@ impl OrderService for OrderServiceImpl {
                         CommitterRole::System,
                     )
                 })
-            }).and_then(::futures::future::join_all)
+            })
+            .and_then(::futures::future::join_all)
             .and_then(|_| ::future::ok(()));
 
         Box::new(result)
@@ -662,7 +675,8 @@ impl OrderService for OrderServiceImpl {
             .map(|oder_ids| OrderFilter {
                 ids: Some(oder_ids.into()),
                 ..Default::default()
-            }).and_then(move |filter| db_pool_order.run(move |conn| (order_repo_factory)().select(conn, filter)))
+            })
+            .and_then(move |filter| db_pool_order.run(move |conn| (order_repo_factory)().select(conn, filter)))
             .map(|db_orders| db_orders.into_iter().map(|db_order| db_order.0).collect());
 
         Box::new(result)
@@ -750,7 +764,8 @@ fn set_order_state(
                     },
                 },
             )
-        }).map(|mut out_data| out_data.pop())
+        })
+        .map(|mut out_data| out_data.pop())
         // Insert new order diff into database
         .and_then(move |updated_order| {
             db_pool.run(move |conn| {
@@ -767,7 +782,8 @@ fn set_order_state(
                                     comment,
                                     committer_role,
                                 },
-                            ).map(move |(_, c)| (Some(order.0), c)),
+                            )
+                            .map(move |(_, c)| (Some(order.0), c)),
                     )
                 } else {
                     Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>

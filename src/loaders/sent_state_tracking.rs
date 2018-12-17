@@ -103,10 +103,12 @@ impl SentStateTracking {
             .flatten_stream()
             .inspect(|order| {
                 info!("Process order {} with track_id {:?}", order.id, order.track_id);
-            }).filter_map(|order| match order.track_id {
+            })
+            .filter_map(|order| match order.track_id {
                 Some(track_id) => Some((order.id, track_id)),
                 None => None,
-            }).and_then(move |(order_id, track_id)| Self::delivery_state(ups_client.clone(), order_id, track_id))
+            })
+            .and_then(move |(order_id, track_id)| Self::delivery_state(ups_client.clone(), order_id, track_id))
             .filter(|(_order_id, state)| state == &DeliveryState::Delivered)
             .and_then(move |(order_id, state)| {
                 info!("Change order {} with state {}", order_id, state);
@@ -124,12 +126,14 @@ impl SentStateTracking {
                     log_and_capture_error(&error);
                     ::future::ok(())
                 }
-            }).fold((), fold_ok)
+            })
+            .fold((), fold_ok)
             .then(move |res| {
                 let mut busy = busy.lock().expect("SentStateTracking: poisoned mutex at fetch step");
                 *busy = false;
                 res
-            }).and_then(|_| ::future::ok(()))
+            })
+            .and_then(|_| ::future::ok(()))
     }
 
     fn delivery_state(

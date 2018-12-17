@@ -80,7 +80,8 @@ impl DeliveredStateTracking {
                 let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 *busy = false;
                 res
-            }).and_then(|_| ::future::ok(()))
+            })
+            .and_then(|_| ::future::ok(()))
     }
 
     fn duration(delivered_orders: Option<&config::DeliveredOrders>) -> Duration {
