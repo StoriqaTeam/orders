@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.orders
     container_name: orders
     working_dir: /app
-    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin orders"]
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --locked --bin orders"]
     volumes:
       - ..:/app
       - stq_cargo_cache:/usr/local/cargo
@@ -41,7 +41,7 @@ services:
       dockerfile: Dockerfile.orders
     container_name: delivered-orders
     working_dir: /app
-    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin delivered_orders"]
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --locked --bin delivered_orders"]
     volumes:
     - ..:/app
     - stq_cargo_cache:/usr/local/cargo
@@ -61,7 +61,7 @@ services:
       dockerfile: Dockerfile.orders
     container_name: sent-orders
     working_dir: /app
-    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin sent_orders"]
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --locked --bin sent_orders"]
     volumes:
     - ..:/app
     - stq_cargo_cache:/usr/local/cargo
@@ -81,7 +81,7 @@ services:
       dockerfile: Dockerfile.orders
     container_name: report-orders
     working_dir: /app
-    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --bin report_orders"]
+    command: ["sh", "-c", "/utils/wait_for_it.sh orders-pg:5432 ; diesel migration run ; cargo run --locked --bin report_orders"]
     volumes:
     - ..:/app
     - stq_cargo_cache:/usr/local/cargo
