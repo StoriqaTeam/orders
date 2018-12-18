@@ -166,18 +166,21 @@ impl PaidDeliveredReport {
         stream::futures_unordered(vec![
             Box::new(paid_order_report) as ServiceFuture<()>,
             Box::new(delivered_order_report) as ServiceFuture<()>,
-        ]).then(|result| match result {
+        ])
+        .then(|result| match result {
             Ok(_) => ::future::ok(()),
             Err(error) => {
                 log_and_capture_error(&error);
                 ::future::ok(())
             }
-        }).fold((), fold_ok)
+        })
+        .fold((), fold_ok)
         .then(move |res| {
             let mut busy = busy.lock().expect("PaidDeliveredReport: poisoned mutex at fetch step");
             *busy = false;
             res
-        }).and_then(|_| ::future::ok(()))
+        })
+        .and_then(|_| ::future::ok(()))
     }
 
     fn upload(&self, upload: UploadData) -> impl Future<Item = (), Error = FailureError> {

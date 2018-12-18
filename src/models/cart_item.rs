@@ -404,11 +404,13 @@ impl Filter for CartItemFilter {
                 CartCustomer::User(user_id) => CartItemUserFilter {
                     meta_filter: self.meta_filter,
                     user_id: Some(user_id),
-                }.into_filtered_operation_builder(table),
+                }
+                .into_filtered_operation_builder(table),
                 CartCustomer::Anonymous(session_id) => CartItemSessionFilter {
                     meta_filter: self.meta_filter,
                     session_id: Some(session_id),
-                }.into_filtered_operation_builder(table),
+                }
+                .into_filtered_operation_builder(table),
             }
         } else {
             self.meta_filter.into_filtered_operation_builder(table)
