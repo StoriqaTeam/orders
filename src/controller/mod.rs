@@ -175,6 +175,17 @@ impl Controller for ControllerImpl {
                                     (service_factory.cart)(login_data).delete_coupon_by_product(customer, product_id)
                                 })
                             }
+                            (Post, Some(Route::DeleteProductsFromAllCarts)) => {
+                                return serialize_future({
+                                    parse_body::<DeleteProductsFromCartsPayload>(payload)
+                                        .inspect(move |params| {
+                                            debug!("Received request to delete {} products from all carts", params.product_ids.len());
+                                        })
+                                        .and_then(move |params| {
+                                            (service_factory.cart)(login_data).delete_products_from_all_carts(params.product_ids)
+                                        })
+                                })
+                            }
                             (Post, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(move |params| {
                                     debug!(

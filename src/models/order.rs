@@ -294,7 +294,7 @@ impl OrderFilter {
         self
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn from_search_terms(terms: OrderSearchTerms) -> Fallible<Self> {
         let mut mask = OrderFilter::default();
 

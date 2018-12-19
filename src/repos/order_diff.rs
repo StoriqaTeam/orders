@@ -23,7 +23,7 @@ pub fn make_su_repo() -> Repo {
     Repo::new(TABLE)
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 pub fn make_repo(_login_data: UserLogin) -> Repo {
     make_su_repo()
 }

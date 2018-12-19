@@ -45,6 +45,8 @@ pub trait CartService {
         product_id: ProductId,
         delivery_method_id: Option<DeliveryMethodId>,
     ) -> ServiceFuture<Cart>;
+    /// Delete products from all carts
+    fn delete_products_from_all_carts(&self, product_ids: Vec<ProductId>) -> ServiceFuture<()>;
 }
 
 pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
@@ -570,6 +572,27 @@ impl CartService for CartServiceImpl {
                         })
                 })
                 .map(|c| c.into_iter().collect()),
+        )
+    }
+
+    fn delete_products_from_all_carts(&self, product_ids: Vec<ProductId>) -> ServiceFuture<()> {
+        debug!("delete_products_from_all_carts {} products from all carts", product_ids.len());
+        let repo_factory = self.repo_factory.clone();
+        Box::new(
+            self.db_pool
+                .run(move |conn| {
+                    (repo_factory)().delete(
+                        conn,
+                        CartItemFilter {
+                            customer: None,
+                            meta_filter: CartItemMetaFilter {
+                                product_id: Some(Range::In(product_ids)),
+                                ..Default::default()
+                            },
+                        },
+                    )
+                })
+                .map(|_| ()),
         )
     }
 }
