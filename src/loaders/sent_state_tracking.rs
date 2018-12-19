@@ -120,7 +120,8 @@ impl SentStateTracking {
                     None,
                     CommitterRole::System,
                 )
-            }).then(|result| match result {
+            })
+            .then(|result| match result {
                 Ok(_) => ::future::ok(()),
                 Err(error) => {
                     log_and_capture_error(&error);
