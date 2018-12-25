@@ -232,6 +232,10 @@ impl Inserter for OrderInserter {
             b = b.with_arg(PRODUCT_DISCOUNT_COLUMN, v.0);
         }
 
+        if let Some(v) = self.delivery_company {
+            b = b.with_arg(DELIVERY_COMPANY_COLUMN, v);
+        }
+
         if let Some(v) = self.company_package_id {
             b = b.with_arg(COMPANY_PACKAGE_ID_COLUMN, v.0);
         }
