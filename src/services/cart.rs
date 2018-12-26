@@ -49,7 +49,7 @@ pub trait CartService {
     fn delete_products_from_all_carts(&self, product_ids: Vec<ProductId>) -> ServiceFuture<()>;
 
     /// Delete delivery method from all carts
-    fn delete_delivery_method_from_all_carts(&self, delivery_method_id: DeliveryMethodId) -> ServiceFuture<()>;
+    fn delete_delivery_method_from_all_carts(&self, product_ids: Vec<ProductId>) -> ServiceFuture<()>;
 }
 
 pub type ProductRepoFactory = Rc<Fn() -> Box<CartItemRepo>>;
@@ -599,22 +599,30 @@ impl CartService for CartServiceImpl {
         )
     }
 
-    fn delete_delivery_method_from_all_carts(&self, delivery_method_id: DeliveryMethodId) -> ServiceFuture<()> {
+    /// Delete delivery method from all carts
+    fn delete_delivery_method_from_all_carts(&self, product_ids: Vec<ProductId>) -> ServiceFuture<()> {
         debug!(
-            "delete_delivery_method_from_all_carts {:?} delivery methods from all carts",
-            delivery_method_id
+            "delete_delivery_method_from_all_carts {} clear delivery method from all carts",
+            product_ids.len()
         );
         let repo_factory = self.repo_factory.clone();
 
         Box::new(
             self.db_pool
                 .run(move |conn| {
-                    (repo_factory)().delete(
+                    (repo_factory)().update(
                         conn,
-                        CartItemFilter {
-                            customer: None,
-                            meta_filter: CartItemMetaFilter {
-                                delivery_method_id: Some(delivery_method_id),
+                        CartItemUpdater {
+                            filter: CartItemFilter {
+                                customer: None,
+                                meta_filter: CartItemMetaFilter {
+                                    product_id: Some(Range::In(product_ids)),
+                                    ..Default::default()
+                                },
+                            },
+                            data: CartItemUpdateData {
+                                delivery_method_id: Some(None),
+                                comment: Some("Selected delivery has changed/removed by store manager".to_string()),
                                 ..Default::default()
                             },
                         },

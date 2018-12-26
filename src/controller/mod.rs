@@ -188,16 +188,15 @@ impl Controller for ControllerImpl {
                             }
                             (Post, Some(Route::DeleteDeliveryMethodFromAllCarts)) => {
                                 return serialize_future({
-                                    parse_body::<DeleteDeliveryMethodsFromCartsPayload>(payload)
+                                    parse_body::<DeleteDeliveryMethodFromCartsPayload>(payload)
                                         .inspect(move |params| {
                                             debug!(
                                                 "Received request to delete {:?} delivery method from all carts",
-                                                params.delivery_method_id
+                                                params.product_ids.len()
                                             );
                                         })
                                         .and_then(move |params| {
-                                            (service_factory.cart)(login_data)
-                                                .delete_delivery_method_from_all_carts(params.delivery_method_id)
+                                            (service_factory.cart)(login_data).delete_delivery_method_from_all_carts(params.product_ids)
                                         })
                                 })
                             }
