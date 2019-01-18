@@ -1,6 +1,7 @@
 use either::Either;
 use serde_json;
 use stq_db::statement::*;
+use stq_static_resources::CurrencyType;
 use stq_types::*;
 use tokio_postgres::rows::Row;
 use uuid::Uuid;
@@ -18,6 +19,7 @@ const PRE_ORDER_COLUMN: &str = "pre_order";
 const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 const COUPON_ID_COLUMN: &str = "coupon_id";
 const DELIVERY_METHOD_ID_COLUMN: &str = "delivery_method_id";
+const CURRENCY_TYPE_COLUMN: &str = "currency_type";
 
 #[derive(Clone, Debug)]
 pub struct CartItemUser {
@@ -32,6 +34,7 @@ pub struct CartItemUser {
     pub pre_order_days: i32,
     pub coupon_id: Option<CouponId>,
     pub delivery_method_id: Option<DeliveryMethodId>,
+    pub currency_type: CurrencyType,
 }
 
 #[derive(Clone, Debug)]
@@ -47,6 +50,7 @@ pub struct CartItemSession {
     pub pre_order_days: i32,
     pub coupon_id: Option<CouponId>,
     pub delivery_method_id: Option<DeliveryMethodId>,
+    pub currency_type: CurrencyType,
 }
 
 impl From<CartItemUser> for CartItem {
@@ -63,6 +67,7 @@ impl From<CartItemUser> for CartItem {
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
+            currency_type: v.currency_type,
         }
     }
 }
@@ -81,6 +86,7 @@ impl From<CartItemSession> for CartItem {
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
+            currency_type: v.currency_type,
         }
     }
 }
@@ -102,6 +108,7 @@ impl Inserter for CartItemUser {
                 DELIVERY_METHOD_ID_COLUMN,
                 self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
             )
+            .with_arg(CURRENCY_TYPE_COLUMN, self.currency_type)
     }
 }
 
@@ -122,11 +129,19 @@ impl Inserter for CartItemSession {
                 DELIVERY_METHOD_ID_COLUMN,
                 self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
             )
+            .with_arg(CURRENCY_TYPE_COLUMN, self.currency_type)
     }
 }
 
 impl CartItemUser {
-    pub fn new(user_id: UserId, product_id: ProductId, store_id: StoreId, pre_order: bool, pre_order_days: i32) -> Self {
+    pub fn new(
+        user_id: UserId,
+        product_id: ProductId,
+        store_id: StoreId,
+        pre_order: bool,
+        pre_order_days: i32,
+        currency_type: CurrencyType,
+    ) -> Self {
         Self {
             user_id,
             product_id,
@@ -140,12 +155,20 @@ impl CartItemUser {
             pre_order_days,
             coupon_id: None,
             delivery_method_id: None,
+            currency_type,
         }
     }
 }
 
 impl CartItemSession {
-    pub fn new(session_id: SessionId, product_id: ProductId, store_id: StoreId, pre_order: bool, pre_order_days: i32) -> Self {
+    pub fn new(
+        session_id: SessionId,
+        product_id: ProductId,
+        store_id: StoreId,
+        pre_order: bool,
+        pre_order_days: i32,
+        currency_type: CurrencyType,
+    ) -> Self {
         Self {
             session_id,
             product_id,
@@ -159,6 +182,7 @@ impl CartItemSession {
             pre_order_days,
             coupon_id: None,
             delivery_method_id: None,
+            currency_type,
         }
     }
 }
@@ -193,6 +217,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
+            currency_type: v.currency_type,
         }),
         Anonymous(session_id) => Either::Right(CartItemSession {
             session_id,
@@ -206,6 +231,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             pre_order_days: v.pre_order_days,
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
+            currency_type: v.currency_type,
         }),
     }
 }
@@ -258,7 +284,8 @@ impl Inserter for CartItemUserInserter {
                  pre_order_days = EXCLUDED.pre_order_days, \
                  coupon_id = EXCLUDED.coupon_id, \
                  delivery_method_id = EXCLUDED.delivery_method_id, \
-                 user_id = EXCLUDED.user_id\
+                 user_id = EXCLUDED.user_id, \
+                 currency_type = EXCLUDED.currency_type\
                  ",
             ),
             Incrementer => b.with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items_user.quantity + 1"),
@@ -288,7 +315,8 @@ impl Inserter for CartItemSessionInserter {
                  pre_order_days = EXCLUDED.pre_order_days, \
                  coupon_id = EXCLUDED.coupon_id, \
                  delivery_method_id = EXCLUDED.delivery_method_id, \
-                 session_id = EXCLUDED.session_id\
+                 session_id = EXCLUDED.session_id, \
+                 currency_type = EXCLUDED.currency_type\
                  ",
             ),
             Incrementer => b.with_extra("ON CONFLICT (session_id, product_id) DO UPDATE SET quantity = cart_items_session.quantity + 1"),
@@ -313,6 +341,7 @@ impl From<Row> for CartItemUser {
             delivery_method_id: row
                 .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
+            currency_type: row.get(CURRENCY_TYPE_COLUMN),
         }
     }
 }
@@ -333,6 +362,7 @@ impl From<Row> for CartItemSession {
             delivery_method_id: row
                 .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
+            currency_type: row.get(CURRENCY_TYPE_COLUMN),
         }
     }
 }
@@ -347,6 +377,7 @@ pub struct CartItemMetaFilter {
     pub store_id: Option<Range<StoreId>>,
     pub coupon_id: Option<Range<CouponId>>,
     pub delivery_method_id: Option<DeliveryMethodId>,
+    pub currency_type: Option<CurrencyType>,
 }
 
 impl CartItemMetaFilter {
@@ -377,6 +408,10 @@ impl CartItemMetaFilter {
 
         if let Some(v) = self.delivery_method_id {
             b = b.with_filter(DELIVERY_METHOD_ID_COLUMN, serde_json::to_value(v).unwrap());
+        }
+
+        if let Some(v) = self.currency_type {
+            b = b.with_filter(CURRENCY_TYPE_COLUMN, v);
         }
 
         b

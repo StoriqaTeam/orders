@@ -4,6 +4,7 @@ use std::str::FromStr;
 use stq_api::orders::*;
 use stq_db::statement::*;
 use stq_static_resources::Currency;
+use stq_static_resources::CurrencyType;
 use stq_static_resources::OrderState;
 use stq_types::*;
 use tokio_postgres::rows::Row;
@@ -53,6 +54,7 @@ const COMPANY_PACKAGE_ID_COLUMN: &str = "company_package_id";
 const DELIVERY_PRICE_COLUMN: &str = "delivery_price";
 const SHIPPING_ID_COLUMN: &str = "shipping_id";
 const PRODUCT_CASHBACK_COLUMN: &str = "product_cashback";
+const CURRENCY_TYPE_COLUMN: &str = "currency_type";
 
 const UUID_COLUMN: &str = "uuid";
 
@@ -143,6 +145,7 @@ impl From<Row> for DbOrder {
             delivery_price: row.get(DELIVERY_PRICE_COLUMN),
             shipping_id: row.get::<Option<i32>, _>(SHIPPING_ID_COLUMN).map(ShippingId),
             product_cashback: row.get::<Option<f64>, _>(PRODUCT_CASHBACK_COLUMN).map(CashbackPercent),
+            currency_type: row.get(CURRENCY_TYPE_COLUMN),
         })
     }
 }
@@ -177,6 +180,7 @@ pub struct OrderInserter {
     pub shipping_id: Option<ShippingId>,
     pub product_cashback: Option<CashbackPercent>,
     pub uuid: Uuid,
+    pub currency_type: CurrencyType,
 }
 
 impl Inserter for OrderInserter {
@@ -196,7 +200,8 @@ impl Inserter for OrderInserter {
             .with_arg(PRE_ORDER_DAYS_COLUMN, self.pre_order_days)
             .with_arg(TOTAL_AMOUNT_COLUMN, self.total_amount.0)
             .with_arg(DELIVERY_PRICE_COLUMN, self.delivery_price)
-            .with_arg(UUID_COLUMN, self.uuid);
+            .with_arg(UUID_COLUMN, self.uuid)
+            .with_arg(CURRENCY_TYPE_COLUMN, self.currency_type);
 
         b = write_address_into_inserter(self.address, b);
 
@@ -273,6 +278,7 @@ pub struct OrderFilter {
     pub track_id: Option<ValueContainer<Option<String>>>,
     pub pre_order: Option<ValueContainer<bool>>,
     pub pre_order_days: Option<ValueContainer<i32>>,
+    pub currency_type: Option<ValueContainer<CurrencyType>>,
 }
 
 impl From<OrderIdentifier> for OrderFilter {
@@ -383,6 +389,10 @@ impl Filter for OrderFilter {
 
         if let Some(v) = self.pre_order_days {
             b = b.with_filter(PRE_ORDER_DAYS_COLUMN, v.value);
+        }
+
+        if let Some(v) = self.currency_type {
+            b = b.with_filter(CURRENCY_TYPE_COLUMN, v.value);
         }
 
         if self.do_order {

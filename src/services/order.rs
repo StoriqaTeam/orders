@@ -177,6 +177,7 @@ impl OrderService for OrderServiceImpl {
                                     shipping_id,
                                     uuid: transaction_id.clone().into(),
                                     product_cashback,
+                                    currency_type: cart_item.currency_type,
                                 },
                                 cart_item.comment,
                             ))
@@ -306,6 +307,7 @@ impl OrderService for OrderServiceImpl {
                             pre_order_days: 0, // TODO get from order fields
                             coupon_id: order.0.coupon_id,
                             delivery_method_id: None, // TODO get from order fields
+                            currency_type: order.0.currency_type,
                         };
                         for diff in diffs {
                             if diff.0.state == OrderState::New {
@@ -400,6 +402,7 @@ impl OrderService for OrderServiceImpl {
                     shipping_id,
                     uuid: payload.uuid,
                     product_cashback: payload.product_info.cashback,
+                    currency_type: payload.currency_type,
                 },
                 "Buy now".to_string(),
             );

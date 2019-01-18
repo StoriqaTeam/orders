@@ -13,6 +13,7 @@ use stq_roles::{
     routing::Controller as RoleController,
     service::{get_login_data, RoleService, RoleServiceImpl},
 };
+use stq_static_resources::CurrencyType;
 use stq_types::*;
 use validator::Validate;
 
@@ -121,10 +122,11 @@ impl Controller for ControllerImpl {
                                 }
                             }
                             (Get, Some(Route::CartProducts { customer })) => {
+                                let currency_type = parse_query!(uri.query().unwrap_or_default(), "currency_type" => CurrencyType);
                                 return serialize_future({
                                     debug!("Received request to get cart for customer {}", customer);
-                                    (service_factory.cart)(login_data).get_cart(customer)
-                                })
+                                    (service_factory.cart)(login_data).get_cart(customer, currency_type)
+                                });
                             }
                             (Post, Some(Route::CartClear { customer })) => {
                                 return serialize_future({
@@ -270,12 +272,13 @@ impl Controller for ControllerImpl {
                                 })
                             }
                             (Post, Some(Route::CartMerge)) => {
+                                let currency_type = parse_query!(uri.query().unwrap_or_default(), "currency_type" => CurrencyType);
                                 return serialize_future({
                                     parse_body::<CartMergePayload>(payload).and_then(move |data| {
                                         debug!("Received request to merge cart from customer {} to customer {}", data.from, data.to);
-                                        (service_factory.cart)(login_data).merge(data.from, data.to)
+                                        (service_factory.cart)(login_data).merge(data.from, data.to, currency_type)
                                     })
-                                })
+                                });
                             }
                             (Get, Some(Route::OrdersByUser { user })) => {
                                 return serialize_future({
