@@ -16,7 +16,7 @@ use futures::{future, prelude::*};
 use std::collections::HashMap;
 use stq_api::orders::*;
 use stq_api::rpc_client::*;
-use stq_static_resources::{Currency, OrderState};
+use stq_static_resources::{Currency, CurrencyType, OrderState};
 use stq_types::*;
 
 struct RpcClient {
@@ -45,6 +45,7 @@ impl RpcClient {
                     product.store_id,
                     product.pre_order,
                     product.pre_order_days,
+                    product.currency_type,
                 )
                 .wait()
                 .unwrap();
@@ -67,7 +68,11 @@ impl RpcClient {
     }
 
     pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
-        let rsp = self.inner.increment_item(customer, product_id, store_id, false, 0).wait().unwrap();
+        let rsp = self
+            .inner
+            .increment_item(customer, product_id, store_id, false, 0, CurrencyType::Crypto)
+            .wait()
+            .unwrap();
         let v = rsp
             .into_iter()
             .filter(|cart_item| cart_item.product_id == product_id)
@@ -87,6 +92,7 @@ impl RpcClient {
                 pre_order_days: 0,
                 coupon_id: None,
                 delivery_method_id: None,
+                currency_type: CurrencyType::Crypto,
             },
         );
 
@@ -121,7 +127,10 @@ fn test_services() {
             let product_id_1 = ProductId(12345);
             let mut product_1 = rpc.create_product(user_1, product_id_1, store_id);
 
-            assert_eq!(rpc.inner.get_cart(user_1).wait().unwrap(), hashset![product_1.clone()]);
+            assert_eq!(
+                rpc.inner.get_cart(user_1, Some(CurrencyType::Crypto)).wait().unwrap(),
+                hashset![product_1.clone()]
+            );
 
             product_1.quantity = Quantity(5);
             assert_eq!(
@@ -172,7 +181,10 @@ fn test_services() {
 
             product_2.quantity.0 += 1;
             assert_eq!(
-                rpc.inner.increment_item(user_1, product_id_2, store_id, false, 0).wait().unwrap(),
+                rpc.inner
+                    .increment_item(user_1, product_id_2, store_id, false, 0, CurrencyType::Crypto)
+                    .wait()
+                    .unwrap(),
                 hashset![product_1.clone(), product_2.clone()]
             );
 
@@ -189,7 +201,7 @@ fn test_services() {
             );
 
             assert_eq!(
-                rpc.inner.get_cart(user_1).wait().unwrap(),
+                rpc.inner.get_cart(user_1, Some(CurrencyType::Crypto)).wait().unwrap(),
                 hashset![product_1.clone(), product_2.clone()],
             );
 
@@ -226,7 +238,7 @@ fn test_services() {
                 from_new_product.customer = to_user;
 
                 assert_eq!(
-                    rpc.inner.merge(user_from, to_user).wait().unwrap(),
+                    rpc.inner.merge(user_from, to_user, Some(CurrencyType::Crypto)).wait().unwrap(),
                     hashset![product_1.clone(), product_2.clone(), from_new_product.clone()],
                 );
                 // End of merge testing
@@ -264,6 +276,7 @@ fn test_services() {
                     pre_order_days: 0,
                     coupon_id: None,
                     delivery_method_id: None,
+                    currency_type: CurrencyType::Fiat,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -277,6 +290,7 @@ fn test_services() {
                     pre_order_days: 0,
                     coupon_id: None,
                     delivery_method_id: None,
+                    currency_type: CurrencyType::Fiat,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -290,6 +304,7 @@ fn test_services() {
                     pre_order_days: 0,
                     coupon_id: None,
                     delivery_method_id: None,
+                    currency_type: CurrencyType::Fiat,
                 },
             ]);
 
@@ -338,6 +353,7 @@ fn test_services() {
                         HashMap::new(),
                         HashMap::new(),
                         uuid::Uuid::new_v4(),
+                        Some(CurrencyType::Fiat),
                     )
                     .wait()
                     .unwrap();
@@ -390,6 +406,7 @@ fn test_services() {
                             delivery_price: 0.0,
                             shipping_id: None,
                             product_cashback: None,
+                            currency_type: CurrencyType::Fiat,
                         }
                     })
                     .collect::<Vec<_>>();
@@ -407,7 +424,7 @@ fn test_services() {
                         .collect::<HashMap<_, _>>()
                 );
                 assert_eq!(
-                    rpc.inner.get_cart(user.into()).wait().unwrap(),
+                    rpc.inner.get_cart(user.into(), Some(CurrencyType::Fiat)).wait().unwrap(),
                     cart_fixture.clone().into_iter().filter(|item| !item.selected).collect::<Cart>()
                 );
 
@@ -418,7 +435,10 @@ fn test_services() {
                 for order in created_orders_fixture.iter() {
                     assert_eq!(rpc.inner.get_order(order.id.into()).wait().unwrap(), None);
                 }
-                assert_eq!(rpc.inner.get_cart(user.into()).wait().unwrap(), cart_fixture);
+                assert_eq!(
+                    rpc.inner.get_cart(user.into(), Some(CurrencyType::Fiat)).wait().unwrap(),
+                    cart_fixture
+                );
             }
 
             rpc.inner.clear_cart(user.into()).wait().unwrap();
