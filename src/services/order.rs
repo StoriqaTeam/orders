@@ -94,6 +94,7 @@ impl OrderService for OrderServiceImpl {
             delivery_info,
             product_info,
             uuid,
+            currency_type,
         } = payload;
 
         let order_repo_factory = self.order_repo_factory.clone();
@@ -113,6 +114,7 @@ impl OrderService for OrderServiceImpl {
                         customer: Some(user_id.into()),
                         meta_filter: CartItemMetaFilter {
                             selected: Some(true),
+                            currency_type,
                             ..Default::default()
                         },
                     },
@@ -402,7 +404,7 @@ impl OrderService for OrderServiceImpl {
                     shipping_id,
                     uuid: payload.uuid,
                     product_cashback: payload.product_info.cashback,
-                    currency_type: payload.currency_type,
+                    currency_type: payload.price.currency.currency_type(),
                 },
                 "Buy now".to_string(),
             );
