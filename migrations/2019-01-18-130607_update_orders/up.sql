@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN currency_type VARCHAR NOT NULL DEFAULT 'crypto';
