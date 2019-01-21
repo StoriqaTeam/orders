@@ -47,7 +47,7 @@ pub trait OrderService {
     ) -> ServiceFuture<Option<Order>>;
     /// Search using the terms provided.
     fn search(&self, terms: OrderSearchTerms) -> ServiceFuture<Vec<Order>>;
-    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<()>;
+    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>>;
 }
 
 pub struct OrderServiceImpl {
@@ -568,7 +568,7 @@ impl OrderService for OrderServiceImpl {
         )
     }
 
-    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<()> {
+    fn track_delivered_orders(&self, max_delivered_state_duration: ChronoDuration) -> ServiceFuture<Vec<Order>> {
         use self::RepoLogin::User;
         let now = ::chrono::offset::Utc::now();
         let old_order_date = now - max_delivered_state_duration;
@@ -628,7 +628,7 @@ impl OrderService for OrderServiceImpl {
                 })
             })
             .and_then(::futures::future::join_all)
-            .and_then(|_| ::future::ok(()));
+            .map(|orders| orders.into_iter().filter_map(|order| order).collect());
 
         Box::new(result)
     }

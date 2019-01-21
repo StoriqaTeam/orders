@@ -8,6 +8,7 @@ dsn = "postgresql://orders:orders@orders-pg/orders"
 [delivered_orders]
 interval_s = 86400 #24 hours
 delivery_state_duration_days = 14
+saga_url="http://saga:8000"
 
 [sent_orders]
 interval_s = 86400 #24 hours

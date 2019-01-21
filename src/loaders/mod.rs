@@ -6,6 +6,7 @@ use futures;
 use futures::future;
 use futures::prelude::*;
 use tokio_core::reactor::Core;
+use tokio_core::reactor::Handle;
 use tokio_postgres::TlsMode;
 
 use config::*;
@@ -14,16 +15,18 @@ use types::*;
 mod delivered_state_tracking;
 mod paid_delivered_report;
 mod s3;
+mod saga;
 mod sent_state_tracking;
 mod ups;
 
 use self::delivered_state_tracking::*;
 use self::paid_delivered_report::*;
+pub use self::saga::*;
 use self::sent_state_tracking::*;
 
 pub fn start_delivered_state_tracking(config: Config) {
     let mut core = Core::new().expect("Unexpected error creating event loop core");
-    let handle = Arc::new(core.handle());
+    let handle = core.handle();
 
     let db_pool = {
         let manager = PostgresConnectionManager::new(config.db.dsn.clone(), || TlsMode::None).unwrap();
@@ -42,7 +45,7 @@ pub fn start_delivered_state_tracking(config: Config) {
         db_pool,
         config: Arc::new(config),
     };
-    handle.spawn(create_delivered_state_tracking_loader(env));
+    handle.spawn(create_delivered_state_tracking_loader(env, handle.clone()));
 
     core.run(tokio_signal::ctrl_c().flatten_stream().take(1u64).for_each(|()| {
         info!("Ctrl+C received. Exit");
@@ -125,8 +128,8 @@ fn create_paid_delivered_report(env: PaidDeliveredReportEnvironment) -> impl Fut
         .for_each(|_| futures::future::ok(()))
 }
 
-fn create_delivered_state_tracking_loader(env: DeliveredStateTrackingEnvironment) -> impl Future<Item = (), Error = ()> {
-    let loader = DeliveredStateTracking::new(env);
+fn create_delivered_state_tracking_loader(env: DeliveredStateTrackingEnvironment, handle: Handle) -> impl Future<Item = (), Error = ()> {
+    let loader = DeliveredStateTracking::new(env, handle);
 
     let stream = loader.start();
     stream
