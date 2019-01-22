@@ -9,7 +9,9 @@ use futures::future;
 use futures::future::Either;
 use futures::prelude::*;
 use tokio::timer::Interval;
+use tokio_core::reactor::Handle;
 
+use super::{SagaClient, SagaService};
 use config::{self, Config};
 use models::{UserLogin, UserRole};
 use services::{OrderService, OrderServiceImpl};
@@ -24,6 +26,7 @@ pub struct DeliveredStateTracking {
     db_pool: DbPool,
     config: Option<config::DeliveredOrders>,
     duration: Duration,
+    saga: Arc<dyn SagaService>,
 }
 
 #[derive(Clone)]
@@ -36,12 +39,14 @@ impl DeliveredStateTracking {
     /// One hour
     const DEFAULT_DURATION: u64 = 60 * 60;
 
-    pub fn new(env: DeliveredStateTrackingEnvironment) -> DeliveredStateTracking {
+    pub fn new(env: DeliveredStateTrackingEnvironment, handle: Handle) -> DeliveredStateTracking {
+        let saga_url = env.config.delivered_orders.clone().map(|o| o.saga_url).unwrap_or_default();
         DeliveredStateTracking {
             busy: Arc::new(Mutex::new(false)),
             duration: Self::duration(env.config.delivered_orders.as_ref()),
             config: env.config.delivered_orders.clone(),
             db_pool: env.db_pool.clone(),
+            saga: Arc::new(SagaClient::new(&handle, saga_url)),
         }
     }
 
@@ -71,11 +76,13 @@ impl DeliveredStateTracking {
             *busy = true;
         }
         let busy = self.busy.clone();
+        let saga = self.saga.clone();
         let max_delivered_state_duration = ChronoDuration::days(config.delivery_state_duration_days);
         let self_clone = self.clone();
         let service = OrderServiceImpl::new(self_clone.db_pool.clone(), super_user());
         service
             .track_delivered_orders(max_delivered_state_duration)
+            .and_then(move |orders| saga.set_orders_completed(orders))
             .then(move |res| {
                 let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 *busy = false;

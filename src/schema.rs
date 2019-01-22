@@ -11,6 +11,7 @@ table! {
         pre_order_days -> Int4,
         coupon_id -> Nullable<Int4>,
         delivery_method_id -> Nullable<Jsonb>,
+        currency_type -> Varchar,
     }
 }
 
@@ -27,6 +28,7 @@ table! {
         pre_order_days -> Int4,
         coupon_id -> Nullable<Int4>,
         delivery_method_id -> Nullable<Jsonb>,
+        currency_type -> Varchar,
     }
 }
 
@@ -85,6 +87,7 @@ table! {
         shipping_id -> Nullable<Int4>,
         uuid -> Uuid,
         product_cashback -> Nullable<Float8>,
+        currency_type -> Varchar,
     }
 }
 

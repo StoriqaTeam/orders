@@ -55,6 +55,8 @@ pub struct DeliveredOrders {
     pub interval_s: u64,
     /// How long in days order has to be in delivered state to be considered completed
     pub delivery_state_duration_days: i64,
+    /// Saga url
+    pub saga_url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
