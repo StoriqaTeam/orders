@@ -3,6 +3,7 @@ use futures::prelude::*;
 use serde_json;
 use tokio_core::reactor::Handle;
 
+use super::*;
 use stq_api::orders::*;
 use stq_http::client::{Client as HttpClient, ClientHandle as HttpClientHandle, Config as HttpConfig};
 
@@ -13,7 +14,7 @@ pub struct SagaClient {
 }
 
 pub trait SagaService {
-    fn set_orders_completed(&self, orders: Vec<Order>) -> Box<Future<Item = (), Error = FailureError>>;
+    fn set_order_completed(&self, order: Order) -> Box<Future<Item = (), Error = FailureError>>;
 }
 
 impl SagaClient {
@@ -44,12 +45,15 @@ impl SagaClient {
 }
 
 impl SagaService for SagaClient {
-    fn set_orders_completed(&self, orders: Vec<Order>) -> Box<Future<Item = (), Error = FailureError>> {
-        let request_path = "orders/completed".to_string();
+    fn set_order_completed(&self, order: Order) -> Box<Future<Item = (), Error = FailureError>> {
+        let request_path = format!("orders/{}/set_payment_state", order.id);
         let url = self.request_url(&request_path);
+        let payload = OrderPaymentStateRequest {
+            state: PaymentState::PaymentToSellerNeeded,
+        };
         let self_clone = self.clone();
         Box::new(
-            serde_json::to_string(&orders)
+            serde_json::to_string(&payload)
                 .map_err(FailureError::from)
                 .into_future()
                 .and_then(move |body| {
