@@ -132,15 +132,12 @@ impl CartService for CartServiceImpl {
                             })
                             .and_then({
                                 let repo_factory = repo_factory.clone();
-                                move |(cart_item, conn)| {
+                                move |(_, conn)| {
                                     (repo_factory)().select(
                                         conn,
                                         CartItemFilter {
                                             customer: Some(customer),
-                                            meta_filter: CartItemMetaFilter {
-                                                currency_type: Some(cart_item.currency_type),
-                                                ..Default::default()
-                                            },
+                                            meta_filter: CartItemMetaFilter { ..Default::default() },
                                         },
                                     )
                                 }
@@ -192,15 +189,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
@@ -254,15 +248,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
@@ -313,15 +304,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
@@ -351,7 +339,7 @@ impl CartService for CartServiceImpl {
                         )
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)()
                                     .delete(
                                         conn,
@@ -370,10 +358,7 @@ impl CartService for CartServiceImpl {
                                                 conn,
                                                 CartItemFilter {
                                                     customer: Some(customer),
-                                                    meta_filter: CartItemMetaFilter {
-                                                        currency_type: Some(cart_item.currency_type),
-                                                        ..Default::default()
-                                                    },
+                                                    meta_filter: CartItemMetaFilter { ..Default::default() },
                                                 },
                                             )
                                         }
@@ -536,15 +521,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
@@ -594,15 +576,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
@@ -642,7 +621,7 @@ impl CartService for CartServiceImpl {
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        ..Default::default() // TODO: Maybe we need to filter cart by currency_type?
+                                        ..Default::default()
                                     },
                                 )
                             }
@@ -701,15 +680,12 @@ impl CartService for CartServiceImpl {
                         })
                         .and_then({
                             let repo_factory = repo_factory.clone();
-                            move |(cart_item, conn)| {
+                            move |(_, conn)| {
                                 (repo_factory)().select(
                                     conn,
                                     CartItemFilter {
                                         customer: Some(customer),
-                                        meta_filter: CartItemMetaFilter {
-                                            currency_type: Some(cart_item.currency_type),
-                                            ..Default::default()
-                                        },
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
                                     },
                                 )
                             }
