@@ -82,7 +82,8 @@ impl DeliveredStateTracking {
         let service = OrderServiceImpl::new(self_clone.db_pool.clone(), super_user());
         service
             .track_delivered_orders(max_delivered_state_duration)
-            .and_then(move |orders| saga.set_orders_completed(orders))
+            .map(move |orders| orders.into_iter().map(move |order| saga.set_order_completed(order)))
+            .and_then(::futures::future::join_all)
             .then(move |res| {
                 let mut busy = busy.lock().expect("DeliveredStateTracking: poisoned mutex at fetch step");
                 *busy = false;
