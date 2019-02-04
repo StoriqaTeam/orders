@@ -203,14 +203,16 @@ impl Controller for ControllerImpl {
                                 });
                             }
                             (Post, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
-                                return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(move |params| {
-                                    debug!(
-                                        "Received request to set delivery method in cart to {:?} for product {} for customer {}",
-                                        params.value, product_id, customer
-                                    );
+                                return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(
+                                    move |params| {
+                                        debug!(
+                                            "Received request to set delivery method in cart to {:?} for product {} for customer {}",
+                                            params.value, product_id, customer
+                                        );
 
-                                    (service_factory.cart)(login_data).set_delivery_method(customer, product_id, Some(params.value))
-                                }));
+                                        (service_factory.cart)(login_data).set_delivery_method(customer, product_id, Some(params.value))
+                                    },
+                                ));
                             }
                             (Delete, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future({
