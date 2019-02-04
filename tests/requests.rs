@@ -430,7 +430,7 @@ fn test_services() {
 
                 rpc.set_cart_items(hashset![cart_fixture.iter().filter(|v| v.selected).next().unwrap().clone()]);
 
-                su_rpc.inner.revert_cart_conversion(conversion_id).wait().unwrap();
+                su_rpc.inner.delete_order_and_revert_cart_conversion(conversion_id).wait().unwrap();
 
                 for order in created_orders_fixture.iter() {
                     assert_eq!(rpc.inner.get_order(order.id.into()).wait().unwrap(), None);

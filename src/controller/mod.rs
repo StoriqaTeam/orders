@@ -119,7 +119,7 @@ impl Controller for ControllerImpl {
                                     serialize_future::<String, _, _>(future::err(
                                         format_err!("Failed to retrieve query parameters from request").context(Error::ParseError),
                                     ))
-                                }
+                                };
                             }
                             (Get, Some(Route::CartProducts { customer })) => {
                                 let currency_type = parse_query!(uri.query().unwrap_or_default(), "currency_type" => CurrencyType);
@@ -132,7 +132,7 @@ impl Controller for ControllerImpl {
                                 return serialize_future({
                                     debug!("Received request to clear cart for customer {}", customer);
                                     (service_factory.cart)(login_data).clear_cart(customer)
-                                })
+                                });
                             }
                             (Delete, Some(Route::CartProduct { customer, product_id })) => {
                                 return serialize_future({
@@ -141,7 +141,7 @@ impl Controller for ControllerImpl {
                                         product_id, customer
                                     );
                                     (service_factory.cart)(login_data).delete_item(customer, product_id)
-                                })
+                                });
                             }
                             (
                                 Post,
@@ -157,7 +157,7 @@ impl Controller for ControllerImpl {
                                         coupon_id, product_id, customer
                                     );
                                     (service_factory.cart)(login_data).add_coupon(customer, product_id, coupon_id)
-                                })
+                                });
                             }
                             (Delete, Some(Route::DeleteCartCoupon { customer, coupon_id })) => {
                                 return serialize_future({
@@ -166,7 +166,7 @@ impl Controller for ControllerImpl {
                                         coupon_id, customer
                                     );
                                     (service_factory.cart)(login_data).delete_coupon(customer, coupon_id)
-                                })
+                                });
                             }
                             (Delete, Some(Route::DeleteCartCouponByProduct { customer, product_id })) => {
                                 return serialize_future({
@@ -175,7 +175,7 @@ impl Controller for ControllerImpl {
                                         product_id, customer
                                     );
                                     (service_factory.cart)(login_data).delete_coupon_by_product(customer, product_id)
-                                })
+                                });
                             }
                             (Post, Some(Route::DeleteProductsFromAllCarts)) => {
                                 return serialize_future({
@@ -186,7 +186,7 @@ impl Controller for ControllerImpl {
                                         .and_then(move |params| {
                                             (service_factory.cart)(login_data).delete_products_from_all_carts(params.product_ids)
                                         })
-                                })
+                                });
                             }
                             (Post, Some(Route::DeleteDeliveryMethodFromAllCarts)) => {
                                 return serialize_future({
@@ -200,7 +200,7 @@ impl Controller for ControllerImpl {
                                         .and_then(move |params| {
                                             (service_factory.cart)(login_data).delete_delivery_method_from_all_carts(params.product_ids)
                                         })
-                                })
+                                });
                             }
                             (Post, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future(parse_body::<CartProductDeliveryMethodIdPayload>(payload).and_then(move |params| {
@@ -210,7 +210,7 @@ impl Controller for ControllerImpl {
                                     );
 
                                     (service_factory.cart)(login_data).set_delivery_method(customer, product_id, Some(params.value))
-                                }))
+                                }));
                             }
                             (Delete, Some(Route::CartProductDeliveryMethod { customer, product_id })) => {
                                 return serialize_future({
@@ -219,7 +219,7 @@ impl Controller for ControllerImpl {
                                         product_id, customer
                                     );
                                     (service_factory.cart)(login_data).set_delivery_method(customer, product_id, None)
-                                })
+                                });
                             }
                             (Put, Some(Route::CartProductQuantity { customer, product_id })) => {
                                 return serialize_future(
@@ -233,7 +233,7 @@ impl Controller for ControllerImpl {
                                         .and_then(move |params| {
                                             (service_factory.cart)(login_data).set_quantity(customer, product_id, params.value)
                                         }),
-                                )
+                                );
                             }
                             (Put, Some(Route::CartProductSelection { customer, product_id })) => {
                                 return serialize_future(
@@ -247,7 +247,7 @@ impl Controller for ControllerImpl {
                                         .and_then(move |params| {
                                             (service_factory.cart)(login_data).set_selection(customer, product_id, params.value)
                                         }),
-                                )
+                                );
                             }
                             (Put, Some(Route::CartProductComment { customer, product_id })) => {
                                 return serialize_future(
@@ -261,7 +261,7 @@ impl Controller for ControllerImpl {
                                         .and_then(move |comment_payload| {
                                             (service_factory.cart)(login_data).set_comment(customer, product_id, comment_payload.value)
                                         }),
-                                )
+                                );
                             }
                             (Post, Some(Route::CartIncrementProduct { customer, product_id })) => {
                                 return serialize_future({
@@ -269,7 +269,7 @@ impl Controller for ControllerImpl {
                                         debug!("Received request to increment product {} for customer {}", product_id, customer);
                                         (service_factory.cart)(login_data).increment_item(customer, product_id, data)
                                     })
-                                })
+                                });
                             }
                             (Post, Some(Route::CartMerge)) => {
                                 let currency_type = parse_query!(uri.query().unwrap_or_default(), "currency_type" => CurrencyType);
@@ -284,19 +284,19 @@ impl Controller for ControllerImpl {
                                 return serialize_future({
                                     debug!("Received request to get orders for user {}", user);
                                     (service_factory.order)(login_data).get_orders_for_user(user)
-                                })
+                                });
                             }
                             (Get, Some(Route::Order { order_id })) => {
                                 return serialize_future({
                                     debug!("Received request to get order {:?}", order_id);
                                     (service_factory.order)(login_data).get_order(order_id)
-                                })
+                                });
                             }
                             (Get, Some(Route::OrderDiff { order_id })) => {
                                 return serialize_future({
                                     debug!("Received request to get order diff {:?}", order_id);
                                     (service_factory.order)(login_data).get_order_diff(order_id)
-                                })
+                                });
                             }
                             (Put, Some(Route::OrderStatus { order_id })) => {
                                 return serialize_future({
@@ -310,13 +310,13 @@ impl Controller for ControllerImpl {
                                             data.committer_role,
                                         )
                                     })
-                                })
+                                });
                             }
                             (Post, Some(Route::OrderSearch)) => {
                                 return serialize_future({
                                     parse_body::<OrderSearchTerms>(payload)
                                         .and_then(move |terms| (service_factory.order)(login_data).search(terms))
-                                })
+                                });
                             }
                             (Post, Some(Route::OrderFromCart)) => {
                                 return serialize_future({
@@ -349,20 +349,20 @@ impl Controller for ControllerImpl {
                                                 (service_factory.order)(login_data).create_buy_now(payload.buy_now, payload.conversion_id)
                                             })
                                     })
-                                })
+                                });
                             }
                             (Post, Some(Route::OrderFromCartRevert)) => {
                                 return serialize_future({
                                     parse_body::<ConvertCartRevertPayload>(payload).and_then(move |payload| {
-                                        (service_factory.order)(login_data).revert_cart_conversion(payload.conversion_id)
+                                        (service_factory.order)(login_data).delete_order_and_revert_cart_conversion(payload.conversion_id)
                                     })
-                                })
+                                });
                             }
                             (Delete, Some(Route::Order { order_id })) => {
                                 return serialize_future({
                                     debug!("Received request to delete order {:?}", order_id);
                                     (service_factory.order)(login_data).delete_order(order_id)
-                                })
+                                });
                             }
                             (method, Some(Route::Roles(route))) => {
                                 let c = RoleController {

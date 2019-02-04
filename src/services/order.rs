@@ -14,7 +14,7 @@ use repos::*;
 use types::*;
 
 use stq_api::orders::*;
-use stq_db::repo::*;
+use stq_db::{connection::BoxedConnection, repo::*};
 use stq_static_resources::{CommitterRole, OrderState};
 use stq_types::*;
 
@@ -29,7 +29,7 @@ pub enum RoleRemoveFilter {
 pub trait OrderService {
     fn convert_cart(&self, payload: ConvertCartPayload) -> ServiceFuture<Vec<Order>>;
     fn create_buy_now(&self, payload: BuyNow, conversion_id: Option<ConversionId>) -> ServiceFuture<Vec<Order>>;
-    fn revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
+    fn delete_order_and_revert_cart_conversion(&self, convertation_id: ConversionId) -> ServiceFuture<()>;
     fn get_order(&self, id: OrderIdentifier) -> ServiceFuture<Option<Order>>;
     fn get_order_diff(&self, id: OrderIdentifier) -> ServiceFuture<Vec<OrderDiff>>;
     fn get_orders_for_user(&self, user_id: UserId) -> ServiceFuture<Vec<Order>>;
@@ -240,7 +240,7 @@ impl OrderService for OrderServiceImpl {
         }))
     }
 
-    fn revert_cart_conversion(&self, conversion_id: ConversionId) -> ServiceFuture<()> {
+    fn delete_order_and_revert_cart_conversion(&self, conversion_id: ConversionId) -> ServiceFuture<()> {
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diff_repo_factory = self.order_diff_repo_factory.clone();
         let cart_repo_factory = self.cart_repo_factory.clone();
@@ -296,45 +296,7 @@ impl OrderService for OrderServiceImpl {
                     }
                 })
                 .and_then(move |(orders_with_diffs, conn)| {
-                    let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
-                        let mut cart_item = CartItem {
-                            id: order.0.created_from,
-                            customer: CartCustomer::User(order.0.customer),
-                            product_id: order.0.product,
-                            quantity: order.0.quantity,
-                            selected: true,
-                            comment: "".into(),
-                            store_id: order.0.store,
-                            pre_order: false,  // TODO get from order fields
-                            pre_order_days: 0, // TODO get from order fields
-                            coupon_id: order.0.coupon_id,
-                            delivery_method_id: None, // TODO get from order fields
-                            currency_type: order.0.currency_type,
-                        };
-                        for diff in diffs {
-                            if diff.0.state == OrderState::New {
-                                if let Some(comment) = diff.0.comment {
-                                    cart_item.comment = comment;
-                                    break;
-                                }
-                            }
-                        }
-                        CartItemInserter {
-                            strategy: CartItemMergeStrategy::Replacer,
-                            data: cart_item,
-                        }
-                    });
-
-                    let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
-
-                    for cart_item in new_cart_items {
-                        out = Box::new(out.and_then({
-                            let cart_repo_factory = cart_repo_factory.clone();
-                            move |conn| (cart_repo_factory)().insert_exactly_one(conn, cart_item).map(|(_, conn)| conn)
-                        }))
-                    }
-
-                    out.map(|conn| ((), conn))
+                    merge_cart_from_orders(conn, cart_repo_factory, orders_with_diffs).map(|conn| ((), conn))
                 })
         }))
     }
@@ -547,6 +509,7 @@ impl OrderService for OrderServiceImpl {
     ) -> ServiceFuture<Option<Order>> {
         use self::RepoLogin::*;
 
+        let cart_repo_factory = self.cart_repo_factory.clone();
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diff_repo_factory = self.order_diff_repo_factory.clone();
         let db_pool = self.db_pool.clone();
@@ -560,6 +523,7 @@ impl OrderService for OrderServiceImpl {
             state,
             comment,
             track_id,
+            cart_repo_factory,
             order_repo_factory,
             order_diff_repo_factory,
             db_pool,
@@ -593,6 +557,7 @@ impl OrderService for OrderServiceImpl {
             _ => UserId(-1),
         };
 
+        let cart_repo_factory = self.cart_repo_factory.clone();
         let order_repo_factory = self.order_repo_factory.clone();
         let order_diff_repo_factory2 = self.order_diff_repo_factory.clone();
         let db_pool2 = self.db_pool.clone();
@@ -619,6 +584,7 @@ impl OrderService for OrderServiceImpl {
                         OrderState::Complete,
                         None,
                         None,
+                        cart_repo_factory.clone(),
                         order_repo_factory.clone(),
                         order_diff_repo_factory2.clone(),
                         db_pool2.clone(),
@@ -751,6 +717,7 @@ fn set_order_state(
     state: OrderState,
     comment: Option<String>,
     track_id: Option<String>,
+    cart_repo_factory: Rc<Fn() -> Box<CartItemRepo>>,
     order_repo_factory: Rc<Fn() -> Box<OrderRepo>>,
     order_diff_repo_factory: Rc<Fn() -> Box<OrderDiffRepo>>,
     db_pool: DbPool,
@@ -775,6 +742,7 @@ fn set_order_state(
         .and_then(move |updated_order| {
             db_pool.run(move |conn| {
                 if let Some(order) = updated_order {
+                    let order_clone = order.clone();
                     Box::new(
                         (order_diff_repo_factory)()
                             .insert_exactly_one(
@@ -788,7 +756,25 @@ fn set_order_state(
                                     committer_role,
                                 },
                             )
-                            .map(move |(_, c)| (Some(order.0), c)),
+                            // Revert cart from the order if the payment expired
+                            .and_then(move |(_, conn)| match order.0.state {
+                                OrderState::AmountExpired => Box::new(
+                                    (order_diff_repo_factory)()
+                                        .select(
+                                            conn,
+                                            OrderDiffFilter {
+                                                parent: Some(order.0.id.into()),
+                                                ..Default::default()
+                                            },
+                                        )
+                                        .and_then(|(order_diffs, conn)| {
+                                            let order_with_diffs = vec![(order_clone, order_diffs)];
+                                            merge_cart_from_orders(conn, cart_repo_factory, order_with_diffs)
+                                        })
+                                        .map(|conn| (Some(order.0), conn)),
+                                ),
+                                _ => Box::new(future::ok((Some(order.0), conn))) as Box<Future<Item = _, Error = _>>,
+                            }),
                     )
                 } else {
                     Box::new(future::ok((None, conn))) as RepoConnectionFuture<Option<Order>>
@@ -797,6 +783,52 @@ fn set_order_state(
         });
 
     Box::new(result)
+}
+
+fn merge_cart_from_orders(
+    conn: BoxedConnection<RepoError>,
+    cart_repo_factory: Rc<Fn() -> Box<CartItemRepo>>,
+    orders_with_diffs: Vec<(DbOrder, Vec<DbOrderDiff>)>,
+) -> impl Future<Item = BoxedConnection<RepoError>, Error = (RepoError, BoxedConnection<RepoError>)> {
+    let new_cart_items = orders_with_diffs.into_iter().map(|(order, diffs)| {
+        let mut cart_item = CartItem {
+            id: order.0.created_from,
+            customer: CartCustomer::User(order.0.customer),
+            product_id: order.0.product,
+            quantity: order.0.quantity,
+            selected: true,
+            comment: "".into(),
+            store_id: order.0.store,
+            pre_order: false,  // TODO get from order fields
+            pre_order_days: 0, // TODO get from order fields
+            coupon_id: order.0.coupon_id,
+            delivery_method_id: None, // TODO get from order fields
+            currency_type: order.0.currency_type,
+        };
+        for diff in diffs {
+            if diff.0.state == OrderState::New {
+                if let Some(comment) = diff.0.comment {
+                    cart_item.comment = comment;
+                    break;
+                }
+            }
+        }
+        CartItemInserter {
+            strategy: CartItemMergeStrategy::Replacer,
+            data: cart_item,
+        }
+    });
+
+    let mut out = Box::new(future::ok(conn)) as Box<Future<Item = _, Error = _>>;
+
+    for cart_item in new_cart_items {
+        out = Box::new(out.and_then({
+            let cart_repo_factory = cart_repo_factory.clone();
+            move |conn| (cart_repo_factory)().insert_exactly_one(conn, cart_item).map(|(_, conn)| conn)
+        }))
+    }
+
+    out
 }
 
 #[cfg(test)]
