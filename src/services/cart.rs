@@ -106,6 +106,7 @@ impl CartService for CartServiceImpl {
                         future::ok(conn)
                             .and_then({
                                 let repo_factory = repo_factory.clone();
+                                let payload = payload.clone();
                                 move |conn| {
                                     (repo_factory)().insert_exactly_one(
                                         conn,
@@ -125,6 +126,25 @@ impl CartService for CartServiceImpl {
                                                 delivery_method_id: None,
                                                 currency_type: payload.currency_type,
                                                 user_country_code: payload.user_country_code,
+                                            },
+                                        },
+                                    )
+                                }
+                            })
+                            .and_then({
+                                let repo_factory = repo_factory.clone();
+                                move |(_, conn)| {
+                                    let repo: Box<CartItemRepo> = (repo_factory)();
+                                    repo.update(
+                                        conn,
+                                        CartItemUpdater {
+                                            data: CartItemUpdateData {
+                                                user_country_code: Some(payload.user_country_code),
+                                                ..Default::default()
+                                            },
+                                            filter: CartItemFilter {
+                                                customer: Some(customer),
+                                                meta_filter: Default::default(),
                                             },
                                         },
                                     )
