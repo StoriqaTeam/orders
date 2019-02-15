@@ -46,6 +46,7 @@ impl RpcClient {
                     product.pre_order,
                     product.pre_order_days,
                     product.currency_type,
+                    product.user_country_code,
                 )
                 .wait()
                 .unwrap();
@@ -70,7 +71,7 @@ impl RpcClient {
     pub fn create_product(&self, customer: CartCustomer, product_id: ProductId, store_id: StoreId) -> CartItem {
         let rsp = self
             .inner
-            .increment_item(customer, product_id, store_id, false, 0, CurrencyType::Crypto)
+            .increment_item(customer, product_id, store_id, false, 0, CurrencyType::Crypto, None)
             .wait()
             .unwrap();
         let v = rsp
@@ -93,6 +94,7 @@ impl RpcClient {
                 coupon_id: None,
                 delivery_method_id: None,
                 currency_type: CurrencyType::Crypto,
+                user_country_code: None
             },
         );
 
@@ -182,7 +184,7 @@ fn test_services() {
             product_2.quantity.0 += 1;
             assert_eq!(
                 rpc.inner
-                    .increment_item(user_1, product_id_2, store_id, false, 0, CurrencyType::Crypto)
+                    .increment_item(user_1, product_id_2, store_id, false, 0, CurrencyType::Crypto, None)
                     .wait()
                     .unwrap(),
                 hashset![product_1.clone(), product_2.clone()]
@@ -277,6 +279,7 @@ fn test_services() {
                     coupon_id: None,
                     delivery_method_id: None,
                     currency_type: CurrencyType::Fiat,
+                    user_country_code: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -291,6 +294,7 @@ fn test_services() {
                     coupon_id: None,
                     delivery_method_id: None,
                     currency_type: CurrencyType::Fiat,
+                    user_country_code: None,
                 },
                 CartItem {
                     id: CartItemId::new(),
@@ -305,6 +309,7 @@ fn test_services() {
                     coupon_id: None,
                     delivery_method_id: None,
                     currency_type: CurrencyType::Fiat,
+                    user_country_code: None,
                 },
             ]);
 

@@ -12,6 +12,7 @@ table! {
         coupon_id -> Nullable<Int4>,
         delivery_method_id -> Nullable<Jsonb>,
         currency_type -> Varchar,
+        user_country_code -> Nullable<Text>,
     }
 }
 
@@ -29,6 +30,7 @@ table! {
         coupon_id -> Nullable<Int4>,
         delivery_method_id -> Nullable<Jsonb>,
         currency_type -> Varchar,
+        user_country_code -> Nullable<Text>,
     }
 }
 

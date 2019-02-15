@@ -804,6 +804,7 @@ fn merge_cart_from_orders(
             coupon_id: order.0.coupon_id,
             delivery_method_id: None, // TODO get from order fields
             currency_type: order.0.currency_type,
+            user_country_code: None,
         };
         for diff in diffs {
             if diff.0.state == OrderState::New {
