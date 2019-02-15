@@ -114,6 +114,7 @@ impl Inserter for CartItemUser {
                 self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
             )
             .with_arg(CURRENCY_TYPE_COLUMN, self.currency_type)
+            .with_arg(USER_COUNTRY_CODE_COLUMN, self.user_country_code.map(|code| code.0))
     }
 }
 
@@ -135,6 +136,7 @@ impl Inserter for CartItemSession {
                 self.delivery_method_id.map(|v| serde_json::to_value(v).unwrap()),
             )
             .with_arg(CURRENCY_TYPE_COLUMN, self.currency_type)
+            .with_arg(USER_COUNTRY_CODE_COLUMN, self.user_country_code.map(|code| code.0))
     }
 }
 
@@ -258,6 +260,7 @@ pub struct CartItemUpdateData {
     pub comment: Option<String>,
     pub coupon_id: Option<Option<CouponId>>,
     pub delivery_method_id: Option<Option<DeliveryMethodId>>,
+    pub user_country_code: Option<Option<Alpha3>>,
 }
 
 #[derive(Clone, Debug)]
@@ -294,7 +297,8 @@ impl Inserter for CartItemUserInserter {
                  coupon_id = EXCLUDED.coupon_id, \
                  delivery_method_id = EXCLUDED.delivery_method_id, \
                  user_id = EXCLUDED.user_id, \
-                 currency_type = EXCLUDED.currency_type\
+                 currency_type = EXCLUDED.currency_type, \
+                 user_country_code = EXCLUDED.user_country_code\
                  ",
             ),
             Incrementer => b.with_extra("ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = cart_items_user.quantity + 1"),
@@ -325,7 +329,8 @@ impl Inserter for CartItemSessionInserter {
                  coupon_id = EXCLUDED.coupon_id, \
                  delivery_method_id = EXCLUDED.delivery_method_id, \
                  session_id = EXCLUDED.session_id, \
-                 currency_type = EXCLUDED.currency_type\
+                 currency_type = EXCLUDED.currency_type, \
+                 user_country_code = EXCLUDED.user_country_code\
                  ",
             ),
             Incrementer => b.with_extra("ON CONFLICT (session_id, product_id) DO UPDATE SET quantity = cart_items_session.quantity + 1"),
@@ -555,6 +560,10 @@ where
 
         if let Some(v) = data.delivery_method_id {
             b = b.with_value(DELIVERY_METHOD_ID_COLUMN, v.map(|v| serde_json::to_value(v).unwrap()));
+        }
+
+        if let Some(v) = data.user_country_code {
+            b = b.with_value(USER_COUNTRY_CODE_COLUMN, v.map(|code| code.0));
         }
 
         b
