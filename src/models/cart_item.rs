@@ -20,6 +20,7 @@ const PRE_ORDER_DAYS_COLUMN: &str = "pre_order_days";
 const COUPON_ID_COLUMN: &str = "coupon_id";
 const DELIVERY_METHOD_ID_COLUMN: &str = "delivery_method_id";
 const CURRENCY_TYPE_COLUMN: &str = "currency_type";
+const USER_COUNTRY_CODE_COLUMN: &str = "user_country_code";
 
 #[derive(Clone, Debug)]
 pub struct CartItemUser {
@@ -35,6 +36,7 @@ pub struct CartItemUser {
     pub coupon_id: Option<CouponId>,
     pub delivery_method_id: Option<DeliveryMethodId>,
     pub currency_type: CurrencyType,
+    pub user_country_code: Option<Alpha3>,
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +53,7 @@ pub struct CartItemSession {
     pub coupon_id: Option<CouponId>,
     pub delivery_method_id: Option<DeliveryMethodId>,
     pub currency_type: CurrencyType,
+    pub user_country_code: Option<Alpha3>,
 }
 
 impl From<CartItemUser> for CartItem {
@@ -68,6 +71,7 @@ impl From<CartItemUser> for CartItem {
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
             currency_type: v.currency_type,
+            user_country_code: v.user_country_code,
         }
     }
 }
@@ -87,6 +91,7 @@ impl From<CartItemSession> for CartItem {
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
             currency_type: v.currency_type,
+            user_country_code: v.user_country_code,
         }
     }
 }
@@ -156,6 +161,7 @@ impl CartItemUser {
             coupon_id: None,
             delivery_method_id: None,
             currency_type,
+            user_country_code: None,
         }
     }
 }
@@ -183,6 +189,7 @@ impl CartItemSession {
             coupon_id: None,
             delivery_method_id: None,
             currency_type,
+            user_country_code: None,
         }
     }
 }
@@ -218,6 +225,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
             currency_type: v.currency_type,
+            user_country_code: v.user_country_code,
         }),
         Anonymous(session_id) => Either::Right(CartItemSession {
             session_id,
@@ -232,6 +240,7 @@ pub fn split_cart_item(v: CartItem) -> Either<CartItemUser, CartItemSession> {
             coupon_id: v.coupon_id,
             delivery_method_id: v.delivery_method_id,
             currency_type: v.currency_type,
+            user_country_code: v.user_country_code,
         }),
     }
 }
@@ -342,6 +351,7 @@ impl From<Row> for CartItemUser {
                 .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
             currency_type: row.get(CURRENCY_TYPE_COLUMN),
+            user_country_code: row.get::<Option<String>, _>(USER_COUNTRY_CODE_COLUMN).map(Alpha3),
         }
     }
 }
@@ -363,6 +373,7 @@ impl From<Row> for CartItemSession {
                 .get::<Option<serde_json::Value>, _>(DELIVERY_METHOD_ID_COLUMN)
                 .and_then(|v| serde_json::from_value(v).ok()),
             currency_type: row.get(CURRENCY_TYPE_COLUMN),
+            user_country_code: row.get::<Option<String>, _>(USER_COUNTRY_CODE_COLUMN).map(Alpha3),
         }
     }
 }

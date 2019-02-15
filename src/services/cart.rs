@@ -116,7 +116,6 @@ impl CartService for CartServiceImpl {
                                                 customer,
                                                 product_id,
                                                 store_id: payload.store_id,
-
                                                 quantity: Quantity(1),
                                                 selected: true,
                                                 comment: String::new(),
@@ -125,6 +124,7 @@ impl CartService for CartServiceImpl {
                                                 coupon_id: None,
                                                 delivery_method_id: None,
                                                 currency_type: payload.currency_type,
+                                                user_country_code: payload.user_country_code,
                                             },
                                         },
                                     )
@@ -446,15 +446,15 @@ impl CartService for CartServiceImpl {
                                 for cart_item in from_items {
                                     let repo_factory = repo_factory.clone();
                                     b = Box::new(b.and_then(move |(_, conn)| {
-                                        (repo_factory)()
-                                            .insert(
-                                                conn,
-                                                CartItemInserter {
-                                                    strategy: CartItemMergeStrategy::CollisionNoOp,
-                                                    data: CartItem { customer: to, ..cart_item },
-                                                },
-                                            )
-                                            .map(|(_, conn)| ((), conn))
+                                        let f: Box<CartItemRepo> = (repo_factory)();
+                                        f.insert(
+                                            conn,
+                                            CartItemInserter {
+                                                strategy: CartItemMergeStrategy::CollisionNoOp,
+                                                data: CartItem { customer: to, ..cart_item },
+                                            },
+                                        )
+                                        .map(|(_, conn)| ((), conn))
                                     }));
                                 }
                                 b
