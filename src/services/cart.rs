@@ -105,9 +105,9 @@ impl CartService for CartServiceImpl {
             self.db_pool
                 .run({
                     move |conn| {
-                        let fut: BoxedFuture<_, _> = Box::new(future::ok(conn));
+                        let fut = future::ok(conn);
 
-                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                        let fut = fut.and_then({
                             let repo_factory = repo_factory.clone();
                             move |conn| {
                                 let repo: Box<CartItemRepo> = (repo_factory)();
@@ -119,9 +119,9 @@ impl CartService for CartServiceImpl {
                                     },
                                 )
                             }
-                        }));
+                        });
 
-                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                        let fut = fut.and_then({
                             let repo_factory = repo_factory.clone();
                             let payload = payload.clone();
                             move |(items, conn): (Vec<CartItem>, _)| {
@@ -153,7 +153,7 @@ impl CartService for CartServiceImpl {
                                     },
                                 )
                             }
-                        }));
+                        });
 
                         let fut: BoxedFuture<_, _> = match payload.clone().user_country_code {
                             None => Box::new(fut.map(move |(_, conn)| conn)),
@@ -181,7 +181,7 @@ impl CartService for CartServiceImpl {
                             ),
                         };
 
-                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                        let fut = fut.and_then({
                             let repo_factory = repo_factory.clone();
                             move |conn| {
                                 let repo: Box<CartItemRepo> = (repo_factory)();
@@ -193,7 +193,7 @@ impl CartService for CartServiceImpl {
                                     },
                                 )
                             }
-                        }));
+                        });
 
                         fut
                     }
