@@ -13,6 +13,8 @@ use stq_db::statement::*;
 use stq_static_resources::*;
 use stq_types::*;
 
+type BoxedFuture<T, E> = Box<Future<Item = T, Error = E>>;
+
 /// Service that provides operations for interacting with user carts
 pub trait CartService {
     /// Get user's cart contents
@@ -103,65 +105,97 @@ impl CartService for CartServiceImpl {
             self.db_pool
                 .run({
                     move |conn| {
-                        future::ok(conn)
-                            .and_then({
-                                let repo_factory = repo_factory.clone();
-                                let payload = payload.clone();
-                                move |conn| {
-                                    (repo_factory)().insert_exactly_one(
-                                        conn,
-                                        CartItemInserter {
-                                            strategy: CartItemMergeStrategy::Incrementer,
-                                            data: CartItem {
-                                                id: CartItemId::new(),
-                                                customer,
-                                                product_id,
-                                                store_id: payload.store_id,
-                                                quantity: Quantity(1),
-                                                selected: true,
-                                                comment: String::new(),
-                                                pre_order: payload.pre_order,
-                                                pre_order_days: payload.pre_order_days,
-                                                coupon_id: None,
-                                                delivery_method_id: None,
-                                                currency_type: payload.currency_type,
-                                                user_country_code: payload.user_country_code,
-                                            },
+                        let fut: BoxedFuture<_, _> = Box::new(future::ok(conn));
+
+                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |conn| {
+                                let repo: Box<CartItemRepo> = (repo_factory)();
+                                repo.select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        ..Default::default()
+                                    },
+                                )
+                            }
+                        }));
+
+                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                            let repo_factory = repo_factory.clone();
+                            let payload = payload.clone();
+                            move |(items, conn): (Vec<CartItem>, _)| {
+                                let user_country_code = match payload.user_country_code {
+                                    None => items.last().and_then(|i| i.user_country_code.clone()),
+                                    Some(u) => u.as_option(),
+                                };
+
+                                let repo: Box<CartItemRepo> = (repo_factory)();
+                                repo.insert_exactly_one(
+                                    conn,
+                                    CartItemInserter {
+                                        strategy: CartItemMergeStrategy::Incrementer,
+                                        data: CartItem {
+                                            id: CartItemId::new(),
+                                            customer,
+                                            product_id,
+                                            store_id: payload.store_id,
+                                            quantity: Quantity(1),
+                                            selected: true,
+                                            comment: String::new(),
+                                            pre_order: payload.pre_order,
+                                            pre_order_days: payload.pre_order_days,
+                                            coupon_id: None,
+                                            delivery_method_id: None,
+                                            currency_type: payload.currency_type,
+                                            user_country_code,
                                         },
-                                    )
-                                }
-                            })
-                            .and_then({
-                                let repo_factory = repo_factory.clone();
-                                move |(_, conn)| {
-                                    let repo: Box<CartItemRepo> = (repo_factory)();
-                                    repo.update(
-                                        conn,
-                                        CartItemUpdater {
-                                            data: CartItemUpdateData {
-                                                user_country_code: Some(payload.user_country_code),
-                                                ..Default::default()
+                                    },
+                                )
+                            }
+                        }));
+
+                        let fut: BoxedFuture<_, _> = match payload.clone().user_country_code {
+                            None => Box::new(fut.map(move |(_, conn)| conn)),
+                            Some(u) => Box::new(
+                                fut.and_then({
+                                    let repo_factory = repo_factory.clone();
+                                    move |(_, conn)| {
+                                        let repo: Box<CartItemRepo> = (repo_factory)();
+                                        repo.update(
+                                            conn,
+                                            CartItemUpdater {
+                                                data: CartItemUpdateData {
+                                                    user_country_code: Some(u.as_option()),
+                                                    ..Default::default()
+                                                },
+                                                filter: CartItemFilter {
+                                                    customer: Some(customer),
+                                                    meta_filter: Default::default(),
+                                                },
                                             },
-                                            filter: CartItemFilter {
-                                                customer: Some(customer),
-                                                meta_filter: Default::default(),
-                                            },
-                                        },
-                                    )
-                                }
-                            })
-                            .and_then({
-                                let repo_factory = repo_factory.clone();
-                                move |(_, conn)| {
-                                    (repo_factory)().select(
-                                        conn,
-                                        CartItemFilter {
-                                            customer: Some(customer),
-                                            meta_filter: CartItemMetaFilter { ..Default::default() },
-                                        },
-                                    )
-                                }
-                            })
+                                        )
+                                    }
+                                })
+                                .map(move |(_, conn)| conn),
+                            ),
+                        };
+
+                        let fut: BoxedFuture<_, _> = Box::new(fut.and_then({
+                            let repo_factory = repo_factory.clone();
+                            move |conn| {
+                                let repo: Box<CartItemRepo> = (repo_factory)();
+                                repo.select(
+                                    conn,
+                                    CartItemFilter {
+                                        customer: Some(customer),
+                                        meta_filter: CartItemMetaFilter { ..Default::default() },
+                                    },
+                                )
+                            }
+                        }));
+
+                        fut
                     }
                 })
                 .map(|c| c.into_iter().collect()),
