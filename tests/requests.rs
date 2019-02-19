@@ -46,7 +46,7 @@ impl RpcClient {
                     product.pre_order,
                     product.pre_order_days,
                     product.currency_type,
-                    product.user_country_code,
+                    product.user_country_code.map(|value| UserCountryCodeUpdater::Set { value }),
                 )
                 .wait()
                 .unwrap();
