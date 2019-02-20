@@ -799,10 +799,10 @@ fn merge_cart_from_orders(
             selected: true,
             comment: "".into(),
             store_id: order.0.store,
-            pre_order: false,  // TODO get from order fields
-            pre_order_days: 0, // TODO get from order fields
+            pre_order: order.0.pre_order,
+            pre_order_days: order.0.pre_order_days,
             coupon_id: order.0.coupon_id,
-            delivery_method_id: None, // TODO get from order fields
+            delivery_method_id: order.0.shipping_id.map(|id| DeliveryMethodId::ShippingPackage { id }),
             currency_type: order.0.currency_type,
             user_country_code: None,
         };
